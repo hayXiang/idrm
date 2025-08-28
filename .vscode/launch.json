@@ -11,8 +11,9 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            //"args": ["info", "v0_121-init.m4s", "-o", "init-m.m4s"]
-            "args": ["v0_121-0-T-155984927127.m4s", "11.m4s", "b85491a27c2852323ac704a07cf7b779"]
+            //"args": ["v0_121-init.m4s", "init-m.m4s"]
+            //"args": ["v8_222-0-T-164918980225.m4s.1", "11.m4s", "b85491a27c2852323ac704a07cf7b779"]
+            "args": ["-i","https://live.9528.eu.org/subscribe/npl/mpd?token=yueyue2014"]
         }
     ]
 }
