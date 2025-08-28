@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"net/url"
 	"regexp"
 	"strings"
@@ -29,6 +31,21 @@ func main() {
 
 	if m3uURL == "" {
 		log.Fatal("请使用 -i 参数输入 M3U URL")
+	}
+
+	var enablePprof bool
+	var pprofAddr string
+
+	flag.BoolVar(&enablePprof, "pprof-enable", false, "Enable pprof HTTP server")
+	flag.StringVar(&pprofAddr, "pprof-addr", "localhost:7070", "pprof listen address")
+
+	if enablePprof {
+		go func() {
+			log.Printf("Starting pprof server on %s", pprofAddr)
+			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+				log.Fatalf("pprof server error: %v", err)
+			}
+		}()
 	}
 
 	fmt.Println("代理服务器启动在 :" + port)
