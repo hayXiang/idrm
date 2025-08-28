@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/hex"
@@ -20,8 +21,7 @@ func padIV(iv8 []byte, iv16 *[16]byte) []byte {
 	return iv16[:]
 }
 
-// 高性能 Widevine 解密
-func decryptWidevineHighPerf(mp4File *mp4.File, key []byte) error {
+func decryptWidevine(mp4File *mp4.File, key []byte) error {
 	traf := mp4File.LastSegment().LastFragment().Moof.Traf
 	if traf == nil {
 		return fmt.Errorf("未找到 traf")
@@ -97,8 +97,17 @@ func decryptWidevineHighPerf(mp4File *mp4.File, key []byte) error {
 	return nil
 }
 
+func decryptWidevineFromBody(data []byte, key []byte) ([]byte, error) {
+	mp4File, err := mp4.DecodeFile(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("解析 MP4 文件失败: %w", err)
+	}
+	decryptWidevine(mp4File, key)
+	return encodeMP4ToBytes(mp4File)
+}
+
 // 从文件解密并写入输出
-func decryptWidevineFileHighPerf(inPath, outPath string, key []byte) error {
+func decryptWidevineFromFile(inPath, outPath string, key []byte) error {
 	inFile, err := os.Open(inPath)
 	if err != nil {
 		return fmt.Errorf("打开输入文件失败: %w", err)
@@ -110,7 +119,7 @@ func decryptWidevineFileHighPerf(inPath, outPath string, key []byte) error {
 		return fmt.Errorf("解析 MP4 文件失败: %w", err)
 	}
 
-	if err := decryptWidevineHighPerf(mp4File, key); err != nil {
+	if err := decryptWidevine(mp4File, key); err != nil {
 		return err
 	}
 
@@ -142,7 +151,7 @@ func xxxmain() {
 		return
 	}
 
-	if err := decryptWidevineFileHighPerf(inPath, outPath, key); err != nil {
+	if err := decryptWidevineFromFile(inPath, outPath, key); err != nil {
 		fmt.Println("解密失败:", err)
 	} else {
 		fmt.Println("解密完成")

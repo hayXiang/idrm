@@ -8,12 +8,19 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/valyala/fasthttp"
 )
 
 var m3uURL string
 var port string
+
+var client = &fasthttp.Client{
+	ReadTimeout:     30 * time.Second, // 读取响应超时
+	WriteTimeout:    10 * time.Second, // 写请求超时
+	MaxConnsPerHost: 500,              // 限制连接数
+}
 
 func main() {
 	flag.StringVar(&m3uURL, "i", "", "输入 M3U URL")
@@ -30,6 +37,23 @@ func main() {
 	}
 }
 
+func HttpGetWithUA(url string) (*fasthttp.Response, error) {
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+
+	req.SetRequestURI(url)
+	req.Header.Set("User-Agent", "okhttp/4.12.0")
+
+	if err := client.Do(req, resp); err != nil {
+		fasthttp.ReleaseRequest(req)
+		fasthttp.ReleaseResponse(resp)
+		return nil, err
+	}
+
+	fasthttp.ReleaseRequest(req) // 只释放请求，响应交给调用方
+	return resp, nil
+}
+
 func requestHandler(ctx *fasthttp.RequestCtx) {
 	path := string(ctx.Path())
 
@@ -44,23 +68,24 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 	}
 }
 
+var reTvg = regexp.MustCompile(`tvg-id="([^"]+)"`)
+var reDrm = regexp.MustCompile(`drm_legacy=org\.w3\.clearkey\|([0-9a-fA-F]+):([0-9a-fA-F]+)`)
+
 func proxyM3U(ctx *fasthttp.RequestCtx) {
-	status, body, err := fasthttp.Get(nil, m3uURL)
-	if err != nil || status != fasthttp.StatusOK {
+	resp, err := HttpGetWithUA(m3uURL)
+	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetStatusCode(fasthttp.StatusBadGateway)
 		ctx.SetBodyString("无法获取 M3U")
 		return
 	}
+	defer fasthttp.ReleaseResponse(resp)
 
-	lines := strings.Split(string(body), "\n")
+	lines := strings.Split(string(resp.Body()), "\n")
 	base, _ := url.Parse(m3uURL)
 
 	var tvgID, kid, key string
 	var newLines []string
 	newLines = append(newLines, "#EXTM3U")
-
-	reTvg := regexp.MustCompile(`tvg-id="([^"]+)"`)
-	reDrm := regexp.MustCompile(`drm_legacy=org\.w3\.clearkey\|([0-9a-fA-F]+):([0-9a-fA-F]+)`)
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -103,7 +128,7 @@ func proxyM3U(ctx *fasthttp.RequestCtx) {
 				tvgID,
 				kid,
 				key,
-				strings.ReplaceAll(u.String(), "://", "/"))
+				strings.Replace(u.String(), "://", "/", 1))
 			newLines = append(newLines, proxyPath)
 		}
 	}
@@ -112,6 +137,8 @@ func proxyM3U(ctx *fasthttp.RequestCtx) {
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBodyString(strings.Join(newLines, "\n"))
 }
+
+var re = regexp.MustCompile(`URI="([^"]+)"`)
 
 // 代理流 URL
 func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
@@ -125,8 +152,8 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	tvgID := parts[1]
 	kid := parts[2]
 	key := parts[3]
-	proxy_url := strings.ReplaceAll(parts[4], "http/", "http://")
-	proxy_url = strings.ReplaceAll(proxy_url, "https/", "https://")
+	proxy_url := strings.Replace(parts[4], "http/", "http://", 1)
+	proxy_url = strings.Replace(proxy_url, "https/", "https://", 1)
 	query := string(ctx.QueryArgs().QueryString())
 	if query != "" {
 		proxy_url += "?" + query
@@ -139,32 +166,16 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 
 	// 直接重定向到原始 URL
-	status, body, err := fasthttp.Get(nil, proxy_url)
-	if err != nil || status != fasthttp.StatusOK {
+	resp, err := HttpGetWithUA(proxy_url)
+	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetStatusCode(fasthttp.StatusBadGateway)
-		ctx.SetBodyString("无法获取 M3U")
+		ctx.SetBodyString("无法获取内容U")
 		return
 	}
-
-	// 使用 fasthttp.Client 获取远程响应头和 body
-	client := &fasthttp.Client{}
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
-	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
-
-	req.SetRequestURI(proxy_url)
-	if err := client.Do(req, resp); err != nil || resp.StatusCode() != fasthttp.StatusOK {
-		ctx.SetStatusCode(fasthttp.StatusBadGateway)
-		ctx.SetBodyString("无法获取内容")
-		return
-	}
-
-	body = resp.Body()
+	body := resp.Body()
 	contentType := string(resp.Header.ContentType())
-	re := regexp.MustCompile(`URI="([^"]+)"`)
 	if proxy_type == "m3u8" {
-		//if strings.HasPrefix(contentType, "text/plain") || strings.Contains(strings.ToLower(contentType), "mpegurl") {
 		lines := strings.Split(string(body), "\n")
 		var newLines []string
 		var lastLineWasExtInf bool
