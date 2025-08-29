@@ -22,23 +22,46 @@ func padIV(iv8 []byte, iv16 *[16]byte) []byte {
 }
 
 func decryptWidevine(mp4File *mp4.File, key []byte) error {
-	traf := mp4File.LastSegment().LastFragment().Moof.Traf
+
+	var traf *mp4.TrafBox = nil
+	var frag *mp4.Fragment = nil
+
+	//找到fragment
+	for i := len(mp4File.Segments) - 1; i >= 0; i-- {
+		seg := mp4File.Segments[i]
+		if len(seg.Fragments) > 0 {
+			// 取最后一个 fragment
+			frag = seg.Fragments[len(seg.Fragments)-1]
+			if frag.Moof != nil && len(frag.Moof.Trafs) > 0 {
+				traf = frag.Moof.Trafs[0]
+				break
+			}
+		}
+	}
+
 	if traf == nil {
 		return fmt.Errorf("未找到 traf")
 	}
 
-	// 查找 SENC box
+	// 查找 SENC box,并删除
 	var senc *mp4.SencBox
 	var newBoxes []mp4.Box
 	for _, box := range traf.Children {
 		if box.Type() == "senc" {
 			senc, _ = box.(*mp4.SencBox)
-		} else if box.Type() != "saio" && box.Type() != "saiz" {
+		} else if box.Type() != "saio" && box.Type() != "saiz" && box.Type() != "sbgp" && box.Type() != "sgpd" {
 			newBoxes = append(newBoxes, box)
 		}
 	}
-	traf.Children = newBoxes
 
+	if traf.Trun != nil {
+		flags, is_present := traf.Trun.FirstSampleFlags()
+		if is_present {
+			flags &^= 0x00010000
+			traf.Trun.SetFirstSampleFlags(flags)
+		}
+	}
+	traf.Children = newBoxes
 	if senc == nil {
 		return fmt.Errorf("未找到 senc box")
 	}
@@ -49,7 +72,7 @@ func decryptWidevine(mp4File *mp4.File, key []byte) error {
 		return err
 	}
 
-	mdata := mp4File.LastSegment().LastFragment().Mdat
+	mdata := frag.Mdat
 	if mdata == nil {
 		return fmt.Errorf("未找到 mdat")
 	}
@@ -94,6 +117,17 @@ func decryptWidevine(mp4File *mp4.File, key []byte) error {
 		}(i)
 	}
 	wg.Wait()
+	{
+		// 查找 pssh， 并删除
+		var newBoxes []mp4.Box
+		for _, box := range frag.Moof.Children {
+			if box.Type() != "pssh" {
+				newBoxes = append(newBoxes, box)
+			}
+		}
+		frag.Moof.Children = newBoxes
+	}
+
 	return nil
 }
 

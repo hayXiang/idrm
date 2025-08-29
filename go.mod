@@ -9,6 +9,8 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
+	github.com/beevik/etree v1.6.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
+	golang.org/x/net v0.43.0 // indirect
 )

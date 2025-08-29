@@ -13,7 +13,11 @@
             "program": "${fileDirname}",
             //"args": ["v0_121-init.m4s", "init-m.m4s"]
             //"args": ["v8_222-0-T-164918980225.m4s.1", "11.m4s", "b85491a27c2852323ac704a07cf7b779"]
-            "args": ["-i","https://live.9528.eu.org/subscribe/npl/mpd?token=yueyue2014"]
+            //"args": ["-i", "https://live.9528.eu.org/subscribe/npl/mpd?token=rashhman"]
+            //"args": ["-i","https://live.9528.eu.org/stan/live/index.m3u?token=c36f10fd0ff59c3bcce088d7a7a6c410"]
+            //"args": ["-i", "http://jp.haycker.eu.org:9528/dazn/live/index.m3u?token=92cfbe706ad62016ff64958d45e4de38"]
+            //"args": ["-i", "https://live.9528.eu.org/mytvsuper?token=yueyue202592a2432ba65d3076a8cafe"]
+            "args": ["-i", "https://live.9528.eu.org/mytvsuper?token=yueyue202592a2432ba65d3076a8cafe&player=tivimate"]
         }
     ]
 }
