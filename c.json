@@ -1,6 +1,6 @@
 [{
 	"name":"mytv",
-	"url":"http://127.0.0.1:1234/1.mpd",
-	"proxy":"socks://127.0.0.1:1234",
+	"url":"https://live.9528.eu.org/s/GRHK-D8q.m3u",
+	"proxy":"socks5://127.0.0.1:1234",
 	"headers":["user-agent: 1.1.1"]
 }]

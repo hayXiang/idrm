@@ -16,7 +16,7 @@
             //"args": ["-i", "https://live.9528.eu.org/subscribe/npl/mpd?token=rashhman"]
             //"args": ["-i", "http://jp.haycker.eu.org:9528/dazn/live/index.m3u?token=92cfbe706ad62016ff64958d45e4de38"]
             //"args": ["-i", "https://live.9528.eu.org/mytvsuper?token=yueyue202592a2432ba65d3076a8cafe&player=tivimate"]
-            "args": ["-c", "./c.json"]
+            "args": ["-c", "./c.json", "-l", "127.0.0.1:1234", "-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev"]
         }
     ]
 }
