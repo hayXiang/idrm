@@ -17,25 +17,56 @@ import (
 	"strings"
 	"time"
 
+	"os"
+
 	"github.com/beevik/etree"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/proxy"
 )
 
-var inputs multiFlag
+// ---------- 数据结构 ----------
+type StreamConfig struct {
+	Name              string   `json:"name"`
+	URL               string   `json:"url"`
+	Headers           []string `json:"headers"`
+	LicenseUrlHeaders []string `json:"license_url_headers"`
+	Proxy             string   `json:"proxy"`
+}
 
+// ---------- 支持多次传参的 flag ----------
 type multiFlag []string
 
 func (m *multiFlag) String() string {
-	return fmt.Sprintf("%v", *m)
+	return strings.Join(*m, ", ")
 }
-
 func (m *multiFlag) Set(value string) error {
 	*m = append(*m, value)
 	return nil
 }
 
-var port string
+var (
+	configFile  string
+	listenPort  string
+	singleInput string
+	headers     multiFlag
+	proxyURL    string
+
+	configsByAlias = make(map[string]StreamConfig)
+	clientsByAlias = make(map[string]*fasthttp.Client)
+	DEFAULT_CLIENT *fasthttp.Client
+)
+
+func loadConfigFile(path string) ([]StreamConfig, error) {
+	f, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg []StreamConfig
+	if err := json.Unmarshal(f, &cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
 
 func newFastHTTPClient(socks5_url string) *fasthttp.Client {
 	client := &fasthttp.Client{
@@ -71,38 +102,46 @@ func base64DecodeWithPad(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(s)
 }
 
-var m3uURLs = make(map[string]string)
-var m3uProxyUrls = make(map[string]string)
-var clientsByAlias = make(map[string]*fasthttp.Client)
 var clientsByTvgId = make(map[string]*fasthttp.Client)
-var DEFAULT_CLIENT *fasthttp.Client
+
+func init() {
+
+}
 
 func main() {
-	flag.Var(&inputs, "i", "M3U 别名=URL, 可以指定多个 -i")
-	flag.StringVar(&port, "p", ":1234", "代理服务器端口，默认 :1234")
+	flag.StringVar(&configFile, "c", "", "配置文件 (JSON)")
+	flag.StringVar(&listenPort, "port", ":1234", "代理服务器监听端口")
+
+	flag.StringVar(&singleInput, "input", "", "单个流 URL")
+	flag.Var(&headers, "header", "HTTP 请求头，可多次指定")
+	flag.StringVar(&proxyURL, "proxy", "", "单个流代理 (SOCKS5/HTTP)")
+
 	flag.Parse()
 
-	for index, in := range inputs {
-		kv := strings.SplitN(in, "#", 3)
-		alias := fmt.Sprintf("index-%d", index)
-		if index == 0 {
-			alias = "index"
+	var configs []StreamConfig
+	var err error
+	if configFile != "" {
+		configs, err = loadConfigFile(configFile)
+		if err != nil {
+			log.Fatalf("配置文件加载失败: %v", err)
 		}
-		if len(kv) == 3 {
-			alias = strings.TrimSpace(kv[1])
-			m3uURLs[alias] = strings.TrimSpace(kv[2])
-			m3uProxyUrls[alias] = strings.TrimSpace(kv[0])
-		} else if len(kv) == 2 {
-			alias = strings.TrimSpace(kv[0])
-			m3uURLs[alias] = strings.TrimSpace(kv[1])
-			m3uProxyUrls[alias] = ""
-		} else if len(kv) == 1 {
-			m3uURLs[alias] = in
-			m3uProxyUrls[alias] = ""
+	} else if singleInput != "" {
+		configs = []StreamConfig{
+			{
+				Name:    "default",
+				URL:     singleInput,
+				Headers: headers,
+				Proxy:   proxyURL,
+			},
 		}
+	} else {
+		flag.Usage()
+		os.Exit(1)
 	}
-	for alias, socks5_url := range m3uProxyUrls {
-		clientsByAlias[alias] = newFastHTTPClient(socks5_url)
+
+	for _, config := range configs {
+		configsByAlias[config.Name] = config
+		clientsByAlias[config.Name] = newFastHTTPClient(config.Proxy)
 	}
 	DEFAULT_CLIENT = newFastHTTPClient("")
 
@@ -111,9 +150,9 @@ func main() {
 
 	flag.BoolVar(&enablePprof, "pprof-enable", false, "Enable pprof HTTP server")
 	flag.StringVar(&pprofAddr, "pprof-addr", "localhost:7070", "pprof listen address")
-	for alias, _ := range m3uURLs {
+	for _, config := range configs {
 		go func() {
-			proxyM3U(nil, alias)
+			loadM3u(nil, config.Name)
 		}()
 	}
 
@@ -126,14 +165,14 @@ func main() {
 		}()
 	}
 
-	log.Println("代理服务器启动在 :" + port)
-	if err := fasthttp.ListenAndServe(port, requestHandler); err != nil {
+	log.Println("代理服务器启动在 :" + listenPort)
+	if err := fasthttp.ListenAndServe(listenPort, requestHandler); err != nil {
 		log.Fatalf("ListenAndServe error: %s", err)
 	}
 }
 
 // fetchWithRedirect 发起 GET 请求，自动跟随重定向（最多 maxRedirects 次）
-func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects int, ua string) (string, *fasthttp.Response, error) {
+func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects int, headers []string) (string, *fasthttp.Response, error) {
 	currentURL := startURL
 
 	for i := 0; i < maxRedirects; i++ {
@@ -142,10 +181,15 @@ func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects in
 
 		req.SetRequestURI(currentURL)
 		req.Header.SetMethod("GET")
-		if ua == "" {
+		if len(headers) == 0 {
 			req.Header.Set("User-Agent", "okhttp/4.12.0")
 		} else {
-			req.Header.Set("User-Agent", ua)
+			for _, head := range headers {
+				key_value := strings.Split(head, ":")
+				if len(key_value) == 2 {
+					req.Header.Set(key_value[0], key_value[1])
+				}
+			}
 		}
 
 		err := client.Do(req, resp)
@@ -192,15 +236,21 @@ func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects in
 	return currentURL, nil, fmt.Errorf("too many redirects")
 }
 
-func HttpGetWithUA(client *fasthttp.Client, url string, ua string) (*fasthttp.Response, error) {
+func HttpGetWithUA(client *fasthttp.Client, url string, headers []string) (*fasthttp.Response, error) {
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
 
 	req.SetRequestURI(url)
-	if ua == "" {
+	if len(headers) == 0 {
 		req.Header.Set("User-Agent", "okhttp/4.12.0")
 	} else {
-		req.Header.Set("User-Agent", ua)
+		for _, head := range headers {
+			key_value := strings.Split(head, ":")
+			if len(key_value) == 2 {
+				req.Header.Set(key_value[0], key_value[1])
+			}
+		}
+
 	}
 
 	if err := client.Do(req, resp); err != nil {
@@ -220,7 +270,7 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 	case strings.HasPrefix(path, "/drm/proxy/"):
 		proxyStreamURL(ctx, path)
 	case strings.HasSuffix(path, ".m3u"):
-		proxyM3U(ctx, "")
+		loadM3u(ctx, "")
 	default:
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.SetBodyString("Not Found")
@@ -260,11 +310,11 @@ func getAliasFromPath(path string) string {
 }
 
 // 使用示例
-func proxyM3U(ctx *fasthttp.RequestCtx, alias string) {
+func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	if ctx != nil {
-		alias = getAliasFromPath(string(ctx.URI().Path()))
+		name = getAliasFromPath(string(ctx.URI().Path()))
 	}
-	m3uURL, ok := m3uURLs[alias] // ok 表示 alias 是否存在
+	config, ok := configsByAlias[name] // ok 表示 alias 是否存在
 	if !ok {
 		if ctx != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
@@ -272,19 +322,29 @@ func proxyM3U(ctx *fasthttp.RequestCtx, alias string) {
 		}
 		return
 	}
-
-	resp, err := HttpGetWithUA(DEFAULT_CLIENT, m3uURL, "")
+	log.Printf("开始加载M3u: %s, %s", name, config.URL)
+	resp, err := HttpGetWithUA(DEFAULT_CLIENT, config.URL, []string{})
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		if ctx != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
 			ctx.SetBodyString("无法获取 M3U")
 		}
+		log.Printf("[ERROR]无法获取 M3U: %s, %s", name, config.URL)
 		return
 	}
 	defer fasthttp.ReleaseResponse(resp)
-
+	var count = 0
 	lines := strings.Split(string(resp.Body()), "\n")
-	base, _ := url.Parse(m3uURL)
+	if len(lines) > 0 && lines[0] != "#EXT" {
+		if ctx != nil {
+			ctx.SetStatusCode(fasthttp.StatusBadGateway)
+			ctx.SetBodyString("非法的M3U内容")
+		}
+		log.Printf("[ERROR]非法的M3U内容: %s, %s", name, config.URL)
+		log.Print(string(resp.Body()))
+		return
+	}
+	base, _ := url.Parse(config.URL)
 
 	var tvgID, clearkey string
 	var newLines []string
@@ -369,16 +429,17 @@ func proxyM3U(ctx *fasthttp.RequestCtx, alias string) {
 				tvgID = hex.EncodeToString(hash[:])
 			}
 			clearKeysMap[tvgID] = clearkey
-			clientsByTvgId[tvgID] = clientsByAlias[alias]
+			clientsByTvgId[tvgID] = clientsByAlias[name]
 			proxyPath := fmt.Sprintf("%s://%s:%s/drm/proxy/%s/%s/%s",
 				schema, serverName, port,
 				content_type,
 				tvgID,
 				strings.Replace(u.String(), "://", "/", 1))
 			newLines = append(newLines, proxyPath)
-
+			count = count + 1
 		}
 	}
+	log.Printf("结束加载M3u: 一共%d个频道, %s, %s", count, name, config.URL)
 	if ctx != nil {
 		ctx.SetContentType("text/plain; charset=utf-8")
 		ctx.SetStatusCode(fasthttp.StatusOK)
@@ -460,14 +521,14 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 
 	// 直接重定向到原始 URL
-	log.Printf("代理下载开始：%s:\n", tvgID)
-	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, "")
+	log.Printf("代理下载开始：%s %s", tvgID, proxy_url)
+	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByAlias[tvgID].Headers)
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetStatusCode(fasthttp.StatusBadGateway)
 		ctx.SetBodyString("无法获取内容U")
 		return
 	}
-	log.Printf("代理下载结束：%s:\n", tvgID)
+	log.Printf("代理下载结束：%s %s", tvgID, proxy_url)
 	defer fasthttp.ReleaseResponse(resp)
 	body := resp.Body()
 	contentType := string(resp.Header.ContentType())
@@ -567,7 +628,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	} else if proxy_type == "m4s" {
 		if val, ok := clearKeysMap[tvgID]; ok {
 			if strings.HasPrefix(val, "http") {
-				resp, err = HttpGetWithUA(client, val, "0.11")
+				resp, err = HttpGetWithUA(client, val, configsByAlias[tvgID].LicenseUrlHeaders)
 				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 					ctx.SetStatusCode(fasthttp.StatusBadGateway)
 					ctx.SetBodyString("无法获取 M3U")
@@ -615,7 +676,8 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	} else {
 		ctx.SetContentType(contentType)
 	}
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(body)
-	log.Printf("代理结束: %s, 大小=%d\n", tvgID, len(body))
+	log.Printf("代理结束: %s, 大小=%d\n, %s", tvgID, len(body), proxy_url)
 }
