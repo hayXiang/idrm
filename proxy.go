@@ -125,23 +125,6 @@ func base64DecodeWithPad(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(s)
 }
 
-// 自定义 Logger
-type MyLogger struct {
-	logger *log.Logger
-}
-
-func NewMyLogger() *MyLogger {
-	return &MyLogger{
-		logger: log.New(os.Stdout, "", 0), // 清空默认 flags
-	}
-}
-
-func (l *MyLogger) Println(v ...any) {
-	// 自定义时间格式 MM/DD HH:MM:SS.mmm
-	timestamp := time.Now().Format("01/02 15:04:05.000")
-	l.logger.Println(append([]any{timestamp}, v...)...)
-}
-
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
@@ -607,18 +590,18 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 
 	// 直接重定向到原始 URL
-	log.Printf("代理下载开始：%s，%s", tvgID, proxy_url)
+	log.Printf("下载开始：%s，%s", tvgID, proxy_url)
 	start := time.Now()
 	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider].Headers)
-	log.Printf("代理下载结束：%s，%s, 耗时：%d ms", tvgID, proxy_url, time.Since(start).Milliseconds())
+	log.Printf("下载结束：%s，%s, 耗时：%d ms", tvgID, proxy_url, time.Since(start).Milliseconds())
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetBodyString("无法获取内容")
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
-			log.Printf("[ERROR] 代理下载错误：%s，%s, %v", tvgID, proxy_url, err)
+			log.Printf("[ERROR] 下载错误：%s，%s, %v", tvgID, proxy_url, err)
 		} else {
 			ctx.SetStatusCode(resp.StatusCode())
-			log.Printf("[ERROR] 代理下载错误：%s，%s, 状态码: %d", tvgID, proxy_url, resp.StatusCode())
+			log.Printf("[ERROR] 下载错误：%s，%s, 状态码: %d", tvgID, proxy_url, resp.StatusCode())
 		}
 		return
 	}
@@ -779,5 +762,5 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(body)
-	log.Printf("代理全部结束: %s, 大小=%d, %s, 耗时：%d ms", tvgID, len(body), proxy_url, time.Since(start).Milliseconds())
+	log.Printf("代理结束: %s, %s, 大小=%d, 耗时：%d ms", tvgID, proxy_url, len(body), time.Since(start).Milliseconds())
 }
