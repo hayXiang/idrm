@@ -81,7 +81,7 @@ func newFastHTTPClient(socks5_url string) *fasthttp.Client {
 	}
 
 	if socks5_url != "" {
-		u, err := url.Parse(proxyURL)
+		u, err := url.Parse(socks5_url)
 		if err != nil {
 			log.Fatalf("无法创建 SOCKS5 代理: %v", err)
 		}

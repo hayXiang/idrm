@@ -3,4 +3,10 @@
 	"url":"https://live.9528.eu.org/s/GRHK-D8q.m3u",
 	"proxy":"socks5://127.0.0.1:1234",
 	"headers":["user-agent: 1.1.1"]
+},
+{
+    "name": "astro",
+    "url": "https://live.9528.eu.org/s/3vOAZaOs",
+    "proxy": "socks5://127.0.0.1:40808",
+    "headers": ["User-Agent:Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/8.0 TV Safari/537.36"]
 }]
