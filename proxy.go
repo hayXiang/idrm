@@ -714,7 +714,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 				val = string(resp.Body())
 				clearKeysMap[tvgID] = val
 			}
-			if strings.HasPrefix(val, "{\"keys\"") {
+			if strings.Contains(val, "kty") && strings.Contains(val, "keys") {
 				var jwk JWKSet
 				if err := json.Unmarshal([]byte(val), &jwk); err != nil {
 					panic(err)
