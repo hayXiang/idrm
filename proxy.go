@@ -226,7 +226,7 @@ func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects in
 			}
 		}
 
-		err := client.Do(req, resp)
+		err := client.DoTimeout(req, resp, 30*time.Second)
 		fasthttp.ReleaseRequest(req)
 		if err != nil {
 			fasthttp.ReleaseResponse(resp)
@@ -287,7 +287,7 @@ func HttpGetWithUA(client *fasthttp.Client, url string, headers []string) (*fast
 
 	}
 
-	if err := client.Do(req, resp); err != nil {
+	if err := client.DoTimeout(req, resp, 30*time.Second); err != nil {
 		fasthttp.ReleaseRequest(req)
 		fasthttp.ReleaseResponse(resp)
 		return nil, err
