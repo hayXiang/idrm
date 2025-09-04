@@ -762,5 +762,5 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(body)
-	log.Printf("代理结束: %s, %s, 大小=%d, 耗时：%d ms", tvgID, proxy_url, len(body), time.Since(start).Milliseconds())
+	log.Printf("代理结束: %s, %s, 耗时：%d ms, 大小=%d,", tvgID, proxy_url, time.Since(start).Milliseconds(), len(body))
 }
