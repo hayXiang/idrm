@@ -59,6 +59,8 @@ var (
 	DEFAULT_CLIENT    *fasthttp.Client
 )
 
+var version = "1.0.0.1"
+
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
 	if err != nil {
@@ -79,7 +81,19 @@ func newFastHTTPClient(socks5_url string) *fasthttp.Client {
 	}
 
 	if socks5_url != "" {
-		dialer, err := proxy.SOCKS5("tcp", strings.TrimPrefix(socks5_url, "socks5://"), nil, proxy.Direct)
+		u, err := url.Parse(proxyURL)
+		if err != nil {
+			log.Fatalf("无法创建 SOCKS5 代理: %v", err)
+		}
+		var auth *proxy.Auth = nil
+		if u.User != nil {
+			password, _ := u.User.Password()
+			auth = &proxy.Auth{
+				User:     u.User.Username(),
+				Password: password,
+			}
+		}
+		dialer, err := proxy.SOCKS5("tcp", u.Host, auth, proxy.Direct)
 		if err != nil {
 			log.Fatalf("无法创建 SOCKS5 代理: %v", err)
 		}
@@ -107,8 +121,8 @@ func base64DecodeWithPad(s string) ([]byte, error) {
 
 func main() {
 	flag.StringVar(&configFile, "c", "", "配置文件 (JSON)。使用这种模式，下面的--name, --input, --header --proxy将无效")
-	flag.StringVar(&bindAddr, "listen", ":1234", "代理服务器监听端口")
-	flag.StringVar(&bindAddr, "l", ":1234", "代理服务器监听端口 (简写)")
+	flag.StringVar(&bindAddr, "listen", "127.0.0.1:1234", "代理服务器监听端口")
+	flag.StringVar(&bindAddr, "l", "127.0.0.1:1234", "代理服务器监听端口 (简写)")
 	flag.StringVar(&name, "name", "index", "provider 的名称")
 	flag.StringVar(&singleInput, "input", "", "单个流 URL")
 	flag.StringVar(&singleInput, "i", "", "单个流 URL（简写）")
@@ -118,7 +132,15 @@ func main() {
 
 	flag.Parse()
 
-	if strings.HasPrefix(bindAddr, ":") {
+	name = strings.TrimSpace(name)
+	proxyURL = strings.TrimSpace(proxyURL)
+	bindAddr = strings.TrimSpace(bindAddr)
+	publishAddr = strings.TrimSpace(publishAddr)
+
+	// 处理监听地址
+	if !strings.Contains(bindAddr, ":") {
+		bindAddr = "127.0.0.1:" + bindAddr
+	} else if strings.HasPrefix(bindAddr, ":") {
 		bindAddr = "127.0.0.1" + bindAddr
 	}
 
@@ -169,7 +191,7 @@ func main() {
 		}()
 	}
 
-	log.Println("代理服务器启动在 :" + bindAddr)
+	log.Printf("代理服务器启动在：%s, 当前版本：%s\n", bindAddr, version)
 	if err := fasthttp.ListenAndServe(bindAddr, requestHandler); err != nil {
 		log.Fatalf("ListenAndServe error: %s", err)
 	}
@@ -327,25 +349,41 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 		return
 	}
 	log.Printf("开始加载M3u: %s, %s", name, config.URL)
-	resp, err := HttpGetWithUA(DEFAULT_CLIENT, config.URL, []string{})
-	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
-		if ctx != nil {
-			ctx.SetStatusCode(fasthttp.StatusBadGateway)
-			ctx.SetBodyString("无法获取 M3U")
-		}
-		log.Printf("[ERROR]无法获取 M3U: %s, %s", name, config.URL)
-		return
-	}
-	defer fasthttp.ReleaseResponse(resp)
 	var count = 0
-	lines := strings.Split(string(resp.Body()), "\n")
+	var body []byte
+	if strings.HasPrefix(config.URL, "http") {
+		resp, err := HttpGetWithUA(DEFAULT_CLIENT, config.URL, []string{})
+		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
+			if ctx != nil {
+				ctx.SetStatusCode(fasthttp.StatusBadGateway)
+				ctx.SetBodyString("无法获取 M3U")
+			}
+			log.Printf("[ERROR]无法获取 M3U: %s, %s, %d, %s", name, config.URL, resp.StatusCode(), string(resp.Body()))
+			return
+		}
+		defer fasthttp.ReleaseResponse(resp)
+		body = resp.Body()
+	} else {
+		// 本地文件
+		f, err := os.ReadFile(config.URL)
+		if err != nil {
+			if ctx != nil {
+				ctx.SetStatusCode(fasthttp.StatusBadGateway)
+				ctx.SetBodyString("无法读取本地 M3U")
+			}
+			log.Printf("[ERROR]无法读取本地 M3U: %s, %s", name, config.URL)
+			return
+		}
+		body = f
+	}
+	lines := strings.Split(string(body), "\n")
 	if len(lines) > 0 && !strings.HasPrefix(lines[0], "#EXT") {
 		if ctx != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
 			ctx.SetBodyString("非法的M3U内容")
 		}
 		log.Printf("[ERROR]非法的M3U内容: %s, %s", name, config.URL)
-		log.Print(string(resp.Body()))
+		log.Print(string(body))
 		return
 	}
 	base, _ := url.Parse(config.URL)
