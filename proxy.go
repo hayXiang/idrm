@@ -98,7 +98,13 @@ func newFastHTTPClient(socks5_url string) *fasthttp.Client {
 			log.Fatalf("无法创建 SOCKS5 代理: %v", err)
 		}
 		client.Dial = func(addr string) (net.Conn, error) {
-			return dialer.Dial("tcp", addr)
+			conn, err := dialer.Dial("tcp", addr)
+			if err != nil {
+				return nil, err
+			}
+			// 给连接设置读取和写入超时
+			conn.SetDeadline(time.Now().Add(30 * time.Second))
+			return conn, nil
 		}
 	}
 	return client
@@ -191,7 +197,7 @@ func main() {
 		}()
 	}
 
-	log.Printf("代理服务器启动在：%s, 当前版本：%s\n", bindAddr, version)
+	log.Printf("代理服务器启动在：%s, 当前版本：%s", bindAddr, version)
 	if err := fasthttp.ListenAndServe(bindAddr, requestHandler); err != nil {
 		log.Fatalf("ListenAndServe error: %s", err)
 	}
@@ -358,7 +364,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
 				ctx.SetBodyString("无法获取 M3U")
 			}
-			log.Printf("[ERROR]无法获取 M3U: %s, %s, %d, %s", name, config.URL, resp.StatusCode(), string(resp.Body()))
+			log.Printf("[ERROR]无法获取 M3U: %s, %s, %v", name, config.URL, err)
 			return
 		}
 		defer fasthttp.ReleaseResponse(resp)
@@ -383,7 +389,11 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 			ctx.SetBodyString("非法的M3U内容")
 		}
 		log.Printf("[ERROR]非法的M3U内容: %s, %s", name, config.URL)
-		log.Print(string(body))
+		if len(body) > 500 {
+			log.Printf("[ERROR] 非法M3U内容过长: %s, 前500字符: %s", name, string(body[:500]))
+		} else {
+			log.Printf("[ERROR] 非法M3U内容: %s, %s", name, string(body))
+		}
 		return
 	}
 	base, _ := url.Parse(config.URL)
@@ -578,15 +588,16 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 
 	// 直接重定向到原始 URL
-	log.Printf("代理下载开始：%s %s", tvgID, proxy_url)
+	log.Printf("代理下载开始：%s，%s", tvgID, proxy_url)
 
 	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider].Headers)
+	log.Printf("代理下载结束：%s，%s", tvgID, proxy_url)
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetStatusCode(fasthttp.StatusBadGateway)
-		ctx.SetBodyString("无法获取内容U")
+		ctx.SetBodyString("无法获取内容")
+		log.Printf("[ERROR] 代理下载错误：%s，%s, %v", tvgID, proxy_url, err)
 		return
 	}
-	log.Printf("代理下载结束：%s %s", tvgID, proxy_url)
 	defer fasthttp.ReleaseResponse(resp)
 	body := resp.Body()
 	contentType := string(resp.Header.ContentType())
@@ -634,6 +645,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
 			ctx.SetBodyString("xml 重写错误")
+			log.Printf("[ERROR] xml 重写错误 %s，%s, %s", tvgID, proxy_url, err)
 			return
 		}
 
@@ -680,6 +692,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
 			ctx.SetBodyString("移除 DRM 信息失败")
+			log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
 			return
 		}
 		ctx.SetContentType(contentType)
@@ -689,7 +702,8 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 				resp, err = HttpGetWithUA(client, val, configsByProvider[provider].LicenseUrlHeaders)
 				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 					ctx.SetStatusCode(fasthttp.StatusBadGateway)
-					ctx.SetBodyString("无法获取 M3U")
+					ctx.SetBodyString("无法获取 license")
+					log.Printf("[ERROR] 无法获取 license， %s，%s, %v", tvgID, val, err)
 					return
 				}
 				val = string(resp.Body())
@@ -711,24 +725,28 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			if len(kid_key) != 2 {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
 				ctx.SetBodyString("密钥格式错误," + val)
+				log.Printf("[ERROR] 密钥格式错误， %s，%s", tvgID, proxy_url)
 				return
 			}
 			key_bytes, err := hex.DecodeString(kid_key[1])
 			if err != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
 				ctx.SetBodyString("密钥格式错误")
+				log.Printf("[ERROR] 密钥格式错误， %s，%s, %s", tvgID, proxy_url, err)
 				return
 			}
 			body, err = decryptWidevineFromBody(body, key_bytes)
 			if err != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
 				ctx.SetBodyString("DRM 解密信息失败")
+				log.Printf("[ERROR] DRM 解密信息失败，%s，%s, %s", tvgID, proxy_url, err)
 				return
 			}
 			ctx.SetContentType(contentType)
 		} else {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
 			ctx.SetBodyString("找不到对应的clearKey")
+			log.Printf("[ERROR] 找不到对应的clearKey， %s，%s", tvgID, proxy_url)
 			return
 		}
 	} else {
@@ -737,5 +755,5 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(body)
-	log.Printf("代理结束: %s, 大小=%d\n, %s", tvgID, len(body), proxy_url)
+	log.Printf("代理结束: %s, 大小=%d, %s", tvgID, len(body), proxy_url)
 }
