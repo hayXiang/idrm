@@ -593,9 +593,14 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider].Headers)
 	log.Printf("代理下载结束：%s，%s", tvgID, proxy_url)
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
-		ctx.SetStatusCode(fasthttp.StatusBadGateway)
 		ctx.SetBodyString("无法获取内容")
-		log.Printf("[ERROR] 代理下载错误：%s，%s, %v", tvgID, proxy_url, err)
+		if err != nil {
+			ctx.SetStatusCode(fasthttp.StatusBadGateway)
+			log.Printf("[ERROR] 代理下载错误：%s，%s, %v", tvgID, proxy_url, err)
+		} else {
+			ctx.SetStatusCode(resp.StatusCode())
+			log.Printf("[ERROR] 代理下载错误：%s，%s, 状态码: %d", tvgID, proxy_url, resp.StatusCode())
+		}
 		return
 	}
 	defer fasthttp.ReleaseResponse(resp)
