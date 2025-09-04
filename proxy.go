@@ -161,6 +161,13 @@ func main() {
 
 	flag.Parse()
 
+	userSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "user-agent" || f.Name == "A" {
+			userSet = true
+		}
+	})
+
 	name = strings.TrimSpace(name)
 	proxyURL = strings.TrimSpace(proxyURL)
 	bindAddr = strings.TrimSpace(bindAddr)
@@ -181,12 +188,16 @@ func main() {
 			log.Fatalf("配置文件加载失败: %v", err)
 		}
 	} else if singleInput != "" {
+		var us *string = nil
+		if userSet {
+			us = &userAagent
+		}
 		configs = []StreamConfig{
 			{
 				Name:      name,
 				URL:       singleInput,
 				Headers:   headers,
-				UserAgent: &userAagent,
+				UserAgent: us,
 				Proxy:     proxyURL,
 			},
 		}
