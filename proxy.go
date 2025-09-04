@@ -613,6 +613,30 @@ func joinBaseAndMedia(baseURLs []string, media string) string {
 	return base + media // media 不加 /
 }
 
+func formatSize(size int) string {
+	const (
+		KB = 1024
+		MB = 1024 * KB
+	)
+
+	if size >= MB {
+		return fmt.Sprintf("%.2f MB", float64(size)/float64(MB))
+	} else if size >= KB {
+		return fmt.Sprintf("%.2f KB", float64(size)/float64(KB))
+	}
+	return fmt.Sprintf("%d B", size)
+}
+
+func formatDuration(d time.Duration) string {
+	ms := d.Milliseconds() // 转换为毫秒
+	sec := d.Seconds()     // 转换为秒
+
+	if ms >= 1000 {
+		return fmt.Sprintf("%.2f s", sec) // 大于等于 1 秒显示秒
+	}
+	return fmt.Sprintf("%d ms", ms) // 小于 1 秒显示毫秒
+}
+
 // 代理流 URL
 func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	parts := strings.SplitN(strings.TrimPrefix(path, "/drm/proxy/"), "/", 3)
@@ -648,7 +672,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	log.Printf("下载开始：%s，%s", tvgID, proxy_url)
 	start := time.Now()
 	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider].Headers)
-	log.Printf("下载结束：%s，%s, 耗时：%d ms", tvgID, proxy_url, time.Since(start).Milliseconds())
+	log.Printf("下载结束：%s，%s, 耗时：%s", tvgID, proxy_url, formatDuration(time.Since(start)))
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetBodyString("无法获取内容")
 		if err != nil {
@@ -817,5 +841,5 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(body)
-	log.Printf("代理结束: %s, %s, 耗时：%d ms, 大小=%d,", tvgID, proxy_url, time.Since(start).Milliseconds(), len(body))
+	log.Printf("代理结束: %s, %s, 耗时：%s, 大小=%s,", tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
 }
