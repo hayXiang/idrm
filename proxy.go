@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -29,7 +30,8 @@ type StreamConfig struct {
 	Name              string   `json:"name"`
 	URL               string   `json:"url"`
 	Headers           []string `json:"headers"`
-	LicenseUrlHeaders []string `json:"license_url_headers"`
+	UserAgent         *string  `json:"user-agent"`
+	LicenseUrlHeaders []string `json:"license-url-headers"`
 	Proxy             string   `json:"proxy"`
 }
 
@@ -52,6 +54,7 @@ var (
 	headers     multiFlag
 	proxyURL    string
 	publishAddr string
+	userAagent  string
 
 	providerByTvgId   = make(map[string]string)
 	configsByProvider = make(map[string]StreamConfig)
@@ -125,16 +128,34 @@ func base64DecodeWithPad(s string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(s)
 }
 
+func validateHeaderLine(line string) error {
+	// 必须包含冒号
+	if !strings.Contains(line, ":") {
+		return errors.New("header 缺少冒号")
+	}
+
+	// 拆分 key 和 value
+	parts := strings.SplitN(line, ":", 2)
+	key := strings.TrimSpace(parts[0])
+
+	if key == "" {
+		return errors.New("header key 为空")
+	}
+	return nil
+}
+
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
-	flag.StringVar(&configFile, "c", "", "配置文件 (JSON)。使用这种模式，下面的--name, --input, --header --proxy将无效")
+	flag.StringVar(&configFile, "c", "", "配置文件 (JSON)。使用这种模式，下面的--name, --input, --header, --proxy --user-agent 将无效")
 	flag.StringVar(&bindAddr, "listen", "127.0.0.1:1234", "代理服务器监听端口")
 	flag.StringVar(&bindAddr, "l", "127.0.0.1:1234", "代理服务器监听端口 (简写)")
 	flag.StringVar(&name, "name", "index", "provider 的名称")
 	flag.StringVar(&singleInput, "input", "", "单个流 URL")
 	flag.StringVar(&singleInput, "i", "", "单个流 URL（简写）")
 	flag.Var(&headers, "header", "HTTP 请求头，可多次指定")
+	flag.StringVar(&userAagent, "user-agent", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header")
+	flag.StringVar(&userAagent, "A", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header (简写)")
 	flag.StringVar(&proxyURL, "proxy", "", "代理设置 (SOCKS5)")
 	flag.StringVar(&publishAddr, "publish", "", "发布地址的前缀(公网可以访问的地址）,例如:https://live.9999.eu.org:443")
 
@@ -162,15 +183,57 @@ func main() {
 	} else if singleInput != "" {
 		configs = []StreamConfig{
 			{
-				Name:    name,
-				URL:     singleInput,
-				Headers: headers,
-				Proxy:   proxyURL,
+				Name:      name,
+				URL:       singleInput,
+				Headers:   headers,
+				UserAgent: &userAagent,
+				Proxy:     proxyURL,
 			},
 		}
 	} else {
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	// 处理 User-Agent 优先级
+	for i := range configs {
+		var user_agent_index = -1
+		for j, h := range configs[i].Headers {
+			parts := strings.SplitN(h, ":", 2)
+			if len(parts) != 2 {
+				continue // 非法 Header 跳过
+			}
+			key := strings.TrimSpace(strings.ToLower(parts[0]))
+			value := strings.TrimSpace(parts[1])
+			if key == "user-agent" {
+				user_agent_index = j
+				if configs[i].UserAgent == nil {
+					configs[i].UserAgent = &value
+				}
+				break
+			}
+		}
+		ua := "okhttp/4.12.0"
+		if configs[i].UserAgent == nil {
+			configs[i].UserAgent = &ua
+		}
+		if user_agent_index != -1 {
+			// 覆盖已有的 User-Agent
+			configs[i].Headers[user_agent_index] = "User-Agent: " + *configs[i].UserAgent
+		} else {
+			// 添加新的 User-Agent
+			configs[i].Headers = append(configs[i].Headers, "User-Agent: "+*configs[i].UserAgent)
+		}
+	}
+
+	for _, config := range configs {
+		if config.Headers != nil {
+			for _, line := range config.Headers {
+				if err := validateHeaderLine(line); err != nil {
+					log.Fatalf("无效的 header 格式: %s, 错误: %v.", line, err)
+				}
+			}
+		}
 	}
 
 	for _, config := range configs {
@@ -215,14 +278,10 @@ func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects in
 
 		req.SetRequestURI(currentURL)
 		req.Header.SetMethod("GET")
-		if len(headers) == 0 {
-			req.Header.Set("User-Agent", "okhttp/4.12.0")
-		} else {
-			for _, head := range headers {
-				key_value := strings.Split(head, ":")
-				if len(key_value) == 2 {
-					req.Header.Set(key_value[0], strings.TrimSpace(key_value[1]))
-				}
+		for _, head := range headers {
+			key_value := strings.Split(head, ":")
+			if len(key_value) == 2 {
+				req.Header.Set(key_value[0], strings.TrimSpace(key_value[1]))
 			}
 		}
 
@@ -275,16 +334,11 @@ func HttpGetWithUA(client *fasthttp.Client, url string, headers []string) (*fast
 	resp := fasthttp.AcquireResponse()
 
 	req.SetRequestURI(url)
-	if len(headers) == 0 {
-		req.Header.Set("User-Agent", "okhttp/4.12.0")
-	} else {
-		for _, head := range headers {
-			key_value := strings.Split(head, ":")
-			if len(key_value) == 2 {
-				req.Header.Set(key_value[0], strings.TrimSpace(key_value[1]))
-			}
+	for _, head := range headers {
+		key_value := strings.Split(head, ":")
+		if len(key_value) == 2 {
+			req.Header.Set(key_value[0], strings.TrimSpace(key_value[1]))
 		}
-
 	}
 
 	if err := client.DoTimeout(req, resp, 30*time.Second); err != nil {
@@ -356,11 +410,11 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 		}
 		return
 	}
-	log.Printf("开始加载M3u: %s, %s", name, config.URL)
+	log.Printf("开始加载M3u: %s, %s, User-Agent:%s", name, config.URL, *config.UserAgent)
 	var count = 0
 	var body []byte
 	if strings.HasPrefix(config.URL, "http") {
-		resp, err := HttpGetWithUA(DEFAULT_CLIENT, config.URL, []string{})
+		resp, err := HttpGetWithUA(DEFAULT_CLIENT, config.URL, []string{"user-agent: okhttp/4.12.0"})
 		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 			if ctx != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
@@ -497,10 +551,11 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 			count = count + 1
 		}
 	}
-	log.Printf("结束加载M3u: %s, 一共%d个频道, 访问地址: http://%s/%s.m3u", name, count, bindAddr, name)
+	var extra = ""
 	if publishAddr != "" {
-		log.Printf("结束加载M3u: %s, 发布地址: %s/%s.m3u", name, publishAddr, name)
+		extra += fmt.Sprintf(", 发布地址: %s/%s.m3u", publishAddr, name)
 	}
+	log.Printf("结束加载M3u: %s, 一共%d个频道, 访问地址: http://%s/%s.m3u%s", name, count, bindAddr, name, extra)
 
 	if ctx != nil {
 		ctx.SetContentType("text/plain; charset=utf-8")
