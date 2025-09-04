@@ -14,3 +14,5 @@ CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o ${BIN_NAME}-${GOOS}-${GO
 
 #windows
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o ${BIN_NAME}.exe
+
+scp -P60112 idrm-android-arm64 idrm-linux-amd64 idrm-linux-arm64 idrm.exe root@public.hxiang.eu.org:/mnt/data/local-disk1/public
