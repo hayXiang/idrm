@@ -16,6 +16,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"os"
@@ -62,7 +63,7 @@ var (
 	DEFAULT_CLIENT    *fasthttp.Client
 )
 
-var version = "1.0.0.1"
+var version = "1.0.0.2"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -380,6 +381,7 @@ var reTvg = regexp.MustCompile(`tvg-id="([^"]+)"`)
 var reDrm = regexp.MustCompile(`drm_legacy=org\.w3\.clearkey\|([0-9a-fA-F]+):([0-9a-fA-F]+)`)
 var reValidTvg = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`)
 var clearKeysMap = make(map[string]string)
+var mapLocker sync.RWMutex
 
 func GetForwardHeader(ctx *fasthttp.RequestCtx, header, fallback string) string {
 	if ctx == nil {
@@ -547,8 +549,12 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 				hash := md5.Sum([]byte(line))
 				tvgID = hex.EncodeToString(hash[:])
 			}
+
+			mapLocker.Lock()
 			clearKeysMap[tvgID] = clearkey
 			providerByTvgId[tvgID] = name
+			mapLocker.Unlock()
+
 			prefixAddress := fmt.Sprintf("%s://%s:%s", schema, serverName, port)
 			if publishAddr != "" {
 				prefixAddress = publishAddr
@@ -664,8 +670,9 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if query != "" {
 		proxy_url += "?" + query
 	}
-
+	mapLocker.RLock()
 	provider, ok := providerByTvgId[tvgID]
+	mapLocker.RUnlock()
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id, not found provider")
@@ -794,7 +801,10 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		}
 		ctx.SetContentType(contentType)
 	} else if proxy_type == "m4s" {
-		if val, ok := clearKeysMap[tvgID]; ok {
+		mapLocker.RLock()
+		val, ok := clearKeysMap[tvgID]
+		mapLocker.RUnlock()
+		if ok {
 			if strings.HasPrefix(val, "http") {
 				resp, err = HttpGetWithUA(client, val, configsByProvider[provider].LicenseUrlHeaders)
 				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
@@ -804,7 +814,9 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 					return
 				}
 				val = string(resp.Body())
+				mapLocker.Lock()
 				clearKeysMap[tvgID] = val
+				mapLocker.Unlock()
 			}
 			if strings.Contains(val, "kty") && strings.Contains(val, "keys") {
 				var jwk JWKSet
