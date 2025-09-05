@@ -57,7 +57,7 @@ var (
 	publishAddr string
 	userAagent  string
 
-	providerByTvgId   = make(map[string]string)
+	providerByTvgId   = sync.Map{} // map[tvgID]providerName
 	configsByProvider = make(map[string]StreamConfig)
 	clientsByProvider = make(map[string]*fasthttp.Client)
 	DEFAULT_CLIENT    *fasthttp.Client
@@ -380,8 +380,7 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 var reTvg = regexp.MustCompile(`tvg-id="([^"]+)"`)
 var reDrm = regexp.MustCompile(`drm_legacy=org\.w3\.clearkey\|([0-9a-fA-F]+):([0-9a-fA-F]+)`)
 var reValidTvg = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`)
-var clearKeysMap = make(map[string]string)
-var mapLocker sync.RWMutex
+var clearKeysMap = sync.Map{} // map[tvgID]clearkey
 
 func GetForwardHeader(ctx *fasthttp.RequestCtx, header, fallback string) string {
 	if ctx == nil {
@@ -550,10 +549,8 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 				tvgID = hex.EncodeToString(hash[:])
 			}
 
-			mapLocker.Lock()
-			clearKeysMap[tvgID] = clearkey
-			providerByTvgId[tvgID] = name
-			mapLocker.Unlock()
+			clearKeysMap.Store(tvgID, clearkey)
+			providerByTvgId.Store(tvgID, name)
 
 			prefixAddress := fmt.Sprintf("%s://%s:%s", schema, serverName, port)
 			if publishAddr != "" {
@@ -670,16 +667,15 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if query != "" {
 		proxy_url += "?" + query
 	}
-	mapLocker.RLock()
-	provider, ok := providerByTvgId[tvgID]
-	mapLocker.RUnlock()
+
+	provider, ok := providerByTvgId.Load(tvgID)
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id, not found provider")
 		return
 	}
 
-	client, ok := clientsByProvider[provider]
+	client, ok := clientsByProvider[provider.(string)]
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id")
@@ -689,7 +685,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	// 直接重定向到原始 URL
 	log.Printf("下载开始：%s，%s", tvgID, proxy_url)
 	start := time.Now()
-	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider].Headers)
+	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider.(string)].Headers)
 	log.Printf("下载结束：%s，%s, 耗时：%s", tvgID, proxy_url, formatDuration(time.Since(start)))
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetBodyString("无法获取内容")
@@ -801,12 +797,10 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		}
 		ctx.SetContentType(contentType)
 	} else if proxy_type == "m4s" {
-		mapLocker.RLock()
-		val, ok := clearKeysMap[tvgID]
-		mapLocker.RUnlock()
+		val, ok := clearKeysMap.Load(tvgID)
 		if ok {
-			if strings.HasPrefix(val, "http") {
-				resp, err = HttpGetWithUA(client, val, configsByProvider[provider].LicenseUrlHeaders)
+			if strings.HasPrefix(val.(string), "http") {
+				resp, err = HttpGetWithUA(client, val.(string), configsByProvider[provider.(string)].LicenseUrlHeaders)
 				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 					ctx.SetStatusCode(fasthttp.StatusBadGateway)
 					ctx.SetBodyString("无法获取 license")
@@ -814,13 +808,11 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 					return
 				}
 				val = string(resp.Body())
-				mapLocker.Lock()
-				clearKeysMap[tvgID] = val
-				mapLocker.Unlock()
+				clearKeysMap.Store(tvgID, val)
 			}
-			if strings.Contains(val, "kty") && strings.Contains(val, "keys") {
+			if strings.Contains(val.(string), "kty") && strings.Contains(val.(string), "keys") {
 				var jwk JWKSet
-				if err := json.Unmarshal([]byte(val), &jwk); err != nil {
+				if err := json.Unmarshal([]byte(val.(string)), &jwk); err != nil {
 					panic(err)
 				}
 
@@ -830,10 +822,10 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 					val = hex.EncodeToString(kid) + ":" + hex.EncodeToString(k)
 				}
 			}
-			kid_key := strings.Split(val, ":")
+			kid_key := strings.Split(val.(string), ":")
 			if len(kid_key) != 2 {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
-				ctx.SetBodyString("密钥格式错误," + val)
+				ctx.SetBodyString("密钥格式错误," + val.(string))
 				log.Printf("[ERROR] 密钥格式错误， %s，%s", tvgID, proxy_url)
 				return
 			}
