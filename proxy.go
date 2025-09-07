@@ -34,6 +34,8 @@ type StreamConfig struct {
 	UserAgent         *string  `json:"user-agent"`
 	LicenseUrlHeaders []string `json:"license-url-headers"`
 	Proxy             string   `json:"proxy"`
+	M3uProxy          string   `json:"m3u-proxy"`
+	M3uUserAgent      *string  `json:"m3u-user-agent"`
 }
 
 // ---------- 支持多次传参的 flag ----------
@@ -48,19 +50,21 @@ func (m *multiFlag) Set(value string) error {
 }
 
 var (
-	configFile  string
-	name        string
-	bindAddr    string
-	singleInput string
-	headers     multiFlag
-	proxyURL    string
-	publishAddr string
-	userAagent  string
+	configFile   string
+	name         string
+	bindAddr     string
+	singleInput  string
+	headers      multiFlag
+	proxyURL     string
+	publishAddr  string
+	userAgent    string
+	m3uProxy     string
+	m3uUserAgent string
 
-	providerByTvgId   = sync.Map{} // map[tvgID]providerName
-	configsByProvider = make(map[string]StreamConfig)
-	clientsByProvider = make(map[string]*fasthttp.Client)
-	DEFAULT_CLIENT    *fasthttp.Client
+	providerByTvgId     = sync.Map{} // map[tvgID]providerName
+	configsByProvider   = make(map[string]StreamConfig)
+	clientsByProvider   = make(map[string]*fasthttp.Client)
+	m3uClientByProvider = make(map[string]*fasthttp.Client)
 )
 
 var version = "1.0.0.2"
@@ -155,10 +159,12 @@ func main() {
 	flag.StringVar(&singleInput, "input", "", "单个流 URL")
 	flag.StringVar(&singleInput, "i", "", "单个流 URL（简写）")
 	flag.Var(&headers, "header", "HTTP 请求头，可多次指定")
-	flag.StringVar(&userAagent, "user-agent", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header")
-	flag.StringVar(&userAagent, "A", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header (简写)")
-	flag.StringVar(&proxyURL, "proxy", "", "代理设置 (SOCKS5)")
+	flag.StringVar(&userAgent, "user-agent", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header")
+	flag.StringVar(&userAgent, "A", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header (简写)")
+	flag.StringVar(&proxyURL, "proxy", "", "MPD或者M3U8代理设置 (SOCKS5)")
 	flag.StringVar(&publishAddr, "publish", "", "发布地址的前缀(公网可以访问的地址）,例如:https://live.9999.eu.org:443")
+	flag.StringVar(&m3uProxy, "m3u-proxy", "", "M3U 请求的代理设置 (SOCKS5)")
+	flag.StringVar(&m3uUserAgent, "m3u-user-agent", "okhttp/4.12.0", "M3U 请求的 User-Agent")
 
 	flag.Parse()
 
@@ -188,18 +194,26 @@ func main() {
 		if err != nil {
 			log.Fatalf("配置文件加载失败: %v", err)
 		}
+		var ua string = "okhttp/4.12.0"
+		for i := range configs {
+			if configs[i].M3uUserAgent == nil {
+				configs[i].M3uUserAgent = &ua
+			}
+		}
 	} else if singleInput != "" {
 		var us *string = nil
 		if userSet {
-			us = &userAagent
+			us = &userAgent
 		}
 		configs = []StreamConfig{
 			{
-				Name:      name,
-				URL:       singleInput,
-				Headers:   headers,
-				UserAgent: us,
-				Proxy:     proxyURL,
+				Name:         name,
+				URL:          singleInput,
+				Headers:      headers,
+				UserAgent:    us,
+				Proxy:        proxyURL,
+				M3uProxy:     m3uProxy,
+				M3uUserAgent: &m3uUserAgent,
 			},
 		}
 	} else {
@@ -251,8 +265,8 @@ func main() {
 	for _, config := range configs {
 		configsByProvider[config.Name] = config
 		clientsByProvider[config.Name] = newFastHTTPClient(config.Proxy)
+		m3uClientByProvider[config.Name] = newFastHTTPClient(config.M3uProxy)
 	}
-	DEFAULT_CLIENT = newFastHTTPClient("")
 
 	var enablePprof bool
 	var pprofAddr string
@@ -426,7 +440,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	var count = 0
 	var body []byte
 	if strings.HasPrefix(config.URL, "http") {
-		resp, err := HttpGetWithUA(DEFAULT_CLIENT, config.URL, []string{"user-agent: okhttp/4.12.0"})
+		resp, err := HttpGetWithUA(m3uClientByProvider[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent})
 		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 			if ctx != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
