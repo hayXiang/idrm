@@ -763,10 +763,10 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			return
 		}
 
-		if !strings.Contains(path, "mpd") {
-			ctx.SetContentType(contentType)
-		} else {
+		if strings.Contains(query, "debug") {
 			ctx.SetContentType("text/plain; charset=utf-8")
+		} else {
+			ctx.SetContentType(contentType)
 		}
 	} else if proxy_type == "m3u8" {
 		lines := strings.Split(string(body), "\n")
@@ -800,7 +800,11 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			newLines = append(newLines, line)
 		}
 		body = []byte(strings.Join(newLines, "\n"))
-		ctx.SetContentType("text/plain; charset=utf-8")
+		if strings.Contains(query, "debug") {
+			ctx.SetContentType("text/plain; charset=utf-8")
+		} else {
+			ctx.SetContentType(contentType)
+		}
 	} else if proxy_type == "init-m4s" {
 		body, err = removePsshAndSinfFromBody(body)
 		if err != nil {
