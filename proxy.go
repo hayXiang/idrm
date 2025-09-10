@@ -71,7 +71,7 @@ var (
 	m3uClientByProvider = make(map[string]*fasthttp.Client)
 )
 
-var version = "1.0.0.2"
+var version = "1.0.0.3"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
