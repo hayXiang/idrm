@@ -876,8 +876,8 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 						groupID, lang, lang, tvgId, playlistName))
 			} else {
 				masterLines = append(masterLines,
-					fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s"`,
-						bandwidth, resolution, codecs))
+					fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="%s"`,
+						bandwidth, resolution, codecs, groupID))
 				masterLines = append(masterLines, fmt.Sprintf("/drm/proxy/hls/%s/%s", tvgId, playlistName))
 			}
 
