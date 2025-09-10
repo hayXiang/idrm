@@ -39,6 +39,7 @@ type StreamConfig struct {
 	M3uProxy          string   `json:"m3u-proxy"`
 	M3uUserAgent      *string  `json:"m3u-user-agent"`
 	BestQuality       *bool    `json:"best-quality"`
+	ToFmp4OverHls     *bool    `json:"to-fmp4-over-hls"`
 }
 
 // ---------- 支持多次传参的 flag ----------
@@ -53,22 +54,25 @@ func (m *multiFlag) Set(value string) error {
 }
 
 var (
-	configFile   string
-	name         string
-	bindAddr     string
-	singleInput  string
-	headers      multiFlag
-	proxyURL     string
-	publishAddr  string
-	userAgent    string
-	m3uProxy     string
-	m3uUserAgent string
-	bestQuality  bool
+	configFile    string
+	name          string
+	bindAddr      string
+	singleInput   string
+	headers       multiFlag
+	proxyURL      string
+	publishAddr   string
+	userAgent     string
+	m3uProxy      string
+	m3uUserAgent  string
+	bestQuality   bool
+	toFmp4OverHls bool
 
 	providerByTvgId     = sync.Map{} // map[tvgID]providerName
 	configsByProvider   = make(map[string]StreamConfig)
 	clientsByProvider   = make(map[string]*fasthttp.Client)
 	m3uClientByProvider = make(map[string]*fasthttp.Client)
+	hlsByTvgId          = sync.Map{}
+	rawUrlByTvgId       = sync.Map{}
 )
 
 var version = "1.0.0.3"
@@ -170,6 +174,7 @@ func main() {
 	flag.StringVar(&m3uProxy, "m3u-proxy", "", "M3U 请求的代理设置 (SOCKS5)")
 	flag.StringVar(&m3uUserAgent, "m3u-user-agent", "okhttp/4.12.0", "M3U 请求的 User-Agent")
 	flag.BoolVar(&bestQuality, "best-quality", true, "仅保留最高码率的音视频")
+	flag.BoolVar(&toFmp4OverHls, "to-hls", false, "将dash转成fmp4 over hls")
 
 	flag.Parse()
 
@@ -208,6 +213,10 @@ func main() {
 			if configs[i].BestQuality == nil {
 				configs[i].BestQuality = &bestQuality
 			}
+
+			if configs[i].ToFmp4OverHls == nil {
+				configs[i].ToFmp4OverHls = &toFmp4OverHls
+			}
 		}
 	} else if singleInput != "" {
 		var us *string = nil
@@ -216,14 +225,15 @@ func main() {
 		}
 		configs = []StreamConfig{
 			{
-				Name:         name,
-				URL:          singleInput,
-				Headers:      headers,
-				UserAgent:    us,
-				Proxy:        proxyURL,
-				M3uProxy:     m3uProxy,
-				M3uUserAgent: &m3uUserAgent,
-				BestQuality:  &bestQuality,
+				Name:          name,
+				URL:           singleInput,
+				Headers:       headers,
+				UserAgent:     us,
+				Proxy:         proxyURL,
+				M3uProxy:      m3uProxy,
+				M3uUserAgent:  &m3uUserAgent,
+				BestQuality:   &bestQuality,
+				ToFmp4OverHls: &toFmp4OverHls,
 			},
 		}
 	} else {
@@ -580,11 +590,32 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 			if publishAddr != "" {
 				prefixAddress = publishAddr
 			}
-			proxyPath := fmt.Sprintf("%s/drm/proxy/%s/%s/%s",
-				prefixAddress,
-				content_type,
-				tvgID,
-				strings.Replace(u.String(), "://", "/", 1))
+			var proxyPath = ""
+			if *(configsByProvider[name].ToFmp4OverHls) && content_type == "mpd" {
+				var suffix = ""
+				if strings.Contains(suffix, ".m3u8") {
+					suffix = ".m3u8"
+				}
+				if strings.Contains(suffix, ".mpd") {
+					suffix = ".mpd"
+				}
+				if *configsByProvider[name].ToFmp4OverHls {
+					suffix = ".m3u8"
+				}
+				rawUrlByTvgId.Store(tvgID, u.String())
+				proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/index%s",
+					prefixAddress,
+					content_type,
+					tvgID,
+					suffix,
+				)
+			} else {
+				proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/%s",
+					prefixAddress,
+					content_type,
+					tvgID,
+					strings.Replace(u.String(), "://", "/", 1))
+			}
 			newLines = append(newLines, proxyPath)
 			count = count + 1
 		}
@@ -799,6 +830,188 @@ func atoi(s string) int {
 	return n
 }
 
+// 返回 HLS playlists 内容，key = filename, value = m3u8 内容
+func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, error) {
+	doc := etree.NewDocument()
+	if err := doc.ReadFromBytes(body); err != nil {
+		return nil, fmt.Errorf("failed to parse MPD: %v", err)
+	}
+
+	hlsMap := make(map[string]string)
+	hlsMap["mpd"] = mpdUrl
+
+	masterLines := []string{
+		"#EXTM3U",
+		"#EXT-X-VERSION:7",
+		"#EXT-X-INDEPENDENT-SEGMENTS",
+	}
+
+	periods := doc.FindElements("//MPD/Period")
+	for _, period := range periods {
+		adaps := period.FindElements("AdaptationSet")
+		for _, adap := range adaps {
+			contentType := adap.SelectAttrValue("contentType", "")
+			groupID := contentType
+
+			rep := adap.FindElement("Representation")
+			if rep == nil {
+				continue
+			}
+			repID := rep.SelectAttrValue("id", "")
+			bandwidth := rep.SelectAttrValue("bandwidth", "")
+			codecs := rep.SelectAttrValue("codecs", "")
+			resolution := ""
+			if contentType == "video" {
+				width := rep.SelectAttrValue("width", "")
+				height := rep.SelectAttrValue("height", "")
+				resolution = fmt.Sprintf("%sx%s", width, height)
+			}
+
+			playlistName := fmt.Sprintf("%s_%s.m3u8", contentType, repID)
+
+			if contentType == "audio" {
+				lang := adap.SelectAttrValue("lang", "und")
+				masterLines = append(masterLines,
+					fmt.Sprintf(`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s"`,
+						groupID, lang, lang, tvgId, playlistName))
+			} else {
+				masterLines = append(masterLines,
+					fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s"`,
+						bandwidth, resolution, codecs))
+				masterLines = append(masterLines, fmt.Sprintf("/drm/proxy/hls/%s/%s", tvgId, playlistName))
+			}
+
+			// 生成媒体 playlist
+			mediaLines := []string{
+				"#EXTM3U",
+				"#EXT-X-VERSION:7",
+				"#EXT-X-TARGETDURATION:6",
+			}
+
+			segTemp := adap.FindElement("SegmentTemplate")
+			if segTemp == nil {
+				continue
+			}
+			startNumberStr := segTemp.SelectAttrValue("startNumber", "1")
+			startNumber, _ := strconv.Atoi(startNumberStr)
+			timescaleStr := segTemp.SelectAttrValue("timescale", "1")
+			timescale, _ := strconv.Atoi(timescaleStr)
+			mediaTemplate := segTemp.SelectAttrValue("media", "")
+			initURI := segTemp.SelectAttrValue("initialization", "")
+
+			mediaTemplate = strings.ReplaceAll(mediaTemplate, "$RepresentationID$", repID)
+			initURI = strings.ReplaceAll(initURI, "$RepresentationID$", repID)
+
+			mediaLines = append(mediaLines, fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d", startNumber))
+			mediaLines = append(mediaLines, fmt.Sprintf(`#EXT-X-MAP:URI="%s"`, initURI))
+
+			timeline := segTemp.FindElement("SegmentTimeline")
+			if timeline != nil {
+				seq := startNumber
+				for _, s := range timeline.FindElements("S") {
+					dStr := s.SelectAttrValue("d", "0")
+					rStr := s.SelectAttrValue("r", "0")
+					tStr := s.SelectAttrValue("t", "0")
+					d, _ := strconv.Atoi(dStr)
+					r, _ := strconv.Atoi(rStr)
+					t, _ := strconv.Atoi(tStr)
+					duration := float64(d) / float64(timescale)
+					for i := 0; i <= r; i++ {
+						mediaURI := strings.ReplaceAll(mediaTemplate, "$RepresentationID$", repID)
+						mediaURI = strings.ReplaceAll(mediaURI, "$Time$", strconv.Itoa(t))
+						mediaLines = append(mediaLines, fmt.Sprintf("#EXTINF:%.3f,", duration))
+						mediaLines = append(mediaLines, mediaURI)
+						t += d
+						seq++
+					}
+				}
+			}
+
+			// 存入 map
+			hlsMap[playlistName] = strings.Join(mediaLines, "\n")
+		}
+	}
+
+	// master playlist
+	hlsMap["master.m3u8"] = strings.Join(masterLines, "\n")
+	return hlsMap, nil
+}
+
+func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, error) {
+	doc := etree.NewDocument()
+	doc.ReadFromBytes(body)
+
+	if mpd := doc.FindElement("//MPD"); mpd != nil {
+		// 删除 DRM 命名空间
+		mpd.RemoveAttr("xmlns:cenc")
+		mpd.RemoveAttr("xmlns:mspr")
+		// 保留必要的其他命名空间
+		// 比如 xmlns, xmlns:xsi, xmlns:scte35
+	}
+
+	//删除DRM信息
+	for _, cp := range doc.FindElements("//ContentProtection") {
+		cp.Parent().RemoveChild(cp)
+	}
+
+	// 查找所有 SegmentTemplate 节点
+	segTemplates := doc.FindElements("//SegmentTemplate")
+	for _, st := range segTemplates {
+		media := st.SelectAttrValue("media", "")
+		if media != "" {
+			media = joinBaseAndMedia(collectBaseURLs(st), media)
+			media_type := "m4s"
+			if strings.Contains(media, "jpg") || strings.Contains(media, "png") {
+				media_type = "jpg"
+			}
+			st.RemoveAttr("media")
+			st.CreateAttr("media", convert_to_proxy_url(media_type, tvgId, media, url))
+		}
+
+		init := st.SelectAttrValue("initialization", "")
+		if init != "" {
+			init = joinBaseAndMedia(collectBaseURLs(st), init)
+			st.RemoveAttr("initialization")
+			st.CreateAttr("initialization", convert_to_proxy_url("init-m4s", tvgId, init, url))
+		}
+	}
+
+	//删除BaseURL
+	BaseURLs := doc.FindElements("//BaseURL")
+	for _, bu := range BaseURLs {
+		parent := bu.Parent() // 获取父节点
+		if parent != nil {
+			parent.RemoveChild(bu) // 从父节点删除自己
+		}
+	}
+
+	if *(configsByProvider[provider].BestQuality) {
+		// --- 保留最高码率 Representation ---
+		for _, period := range doc.FindElements("//Period") {
+			for _, aset := range period.FindElements("AdaptationSet") {
+				reps := aset.FindElements("Representation")
+				if len(reps) == 0 {
+					continue
+				}
+
+				// 按 bandwidth 排序，最高码率放前
+				sort.Slice(reps, func(i, j int) bool {
+					bi := reps[i].SelectAttrValue("bandwidth", "0")
+					bj := reps[j].SelectAttrValue("bandwidth", "0")
+					return atoi(bi) > atoi(bj)
+				})
+
+				// 只保留最高码率
+				for i := 1; i < len(reps); i++ {
+					aset.RemoveChild(reps[i])
+				}
+			}
+		}
+	}
+
+	return doc.WriteToBytes()
+}
+
 // 代理流 URL
 func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	parts := strings.SplitN(strings.TrimPrefix(path, "/drm/proxy/"), "/", 3)
@@ -809,12 +1022,26 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 	proxy_type := parts[0]
 	tvgID := parts[1]
-	proxy_url := strings.Replace(parts[2], "http/", "http://", 1)
-	proxy_url = strings.Replace(proxy_url, "https/", "https://", 1)
-	query := string(ctx.QueryArgs().QueryString())
-	if query != "" {
-		proxy_url += "?" + query
+	var proxy_url = ""
+	if !strings.HasPrefix(parts[2], "index.") {
+		proxy_url = strings.Replace(parts[2], "http/", "http://", 1)
+		proxy_url = strings.Replace(proxy_url, "https/", "https://", 1)
+		query := string(ctx.QueryArgs().QueryString())
+		if query != "" {
+			proxy_url += "?" + query
+		}
+		proxy_url = strings.Replace(proxy_url, "?debug", "", 1)
+		proxy_url = strings.Replace(proxy_url, "&debug", "", 1)
+	} else {
+		raw_url, ok := rawUrlByTvgId.Load(tvgID)
+		if !ok {
+			ctx.SetStatusCode(fasthttp.StatusBadRequest)
+			ctx.SetBodyString("invalid tvg id, not found")
+			return
+		}
+		proxy_url = raw_url.(string)
 	}
+	query := string(ctx.QueryArgs().QueryString())
 
 	provider, ok := providerByTvgId.Load(tvgID)
 	if !ok {
@@ -827,6 +1054,25 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id")
+		return
+	}
+
+	if proxy_type == "hls" {
+		hls_list, ok := hlsByTvgId.Load(tvgID)
+		if ok {
+			startOrResetUpdater(provider.(string), tvgID, hls_list.(map[string]string)["mpd"], client, configsByProvider[provider.(string)].Headers, 3*time.Second)
+			body := []byte(hls_list.(map[string]string)[proxy_url])
+			contentType := "application/vnd.apple.mpegurl"
+			ctx.Response.Header.Set("Cache-Control", "no-cache")
+			ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
+			ctx.SetStatusCode(fasthttp.StatusOK)
+			ctx.SetBody(body)
+			if strings.Contains(query, "debug") {
+				ctx.SetContentType("text/plain; charset=utf-8")
+			} else {
+				ctx.SetContentType(contentType)
+			}
+		}
 		return
 	}
 
@@ -850,83 +1096,19 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	body := resp.Body()
 	contentType := string(resp.Header.ContentType())
 	if proxy_type == "mpd" || contentType == "application/dash+xml" {
-		doc := etree.NewDocument()
-		doc.ReadFromBytes(body)
-
-		if mpd := doc.FindElement("//MPD"); mpd != nil {
-			// 删除 DRM 命名空间
-			mpd.RemoveAttr("xmlns:cenc")
-			mpd.RemoveAttr("xmlns:mspr")
-			// 保留必要的其他命名空间
-			// 比如 xmlns, xmlns:xsi, xmlns:scte35
-		}
-
-		//删除DRM信息
-		for _, cp := range doc.FindElements("//ContentProtection") {
-			cp.Parent().RemoveChild(cp)
-		}
-
-		// 查找所有 SegmentTemplate 节点
-		segTemplates := doc.FindElements("//SegmentTemplate")
-		for _, st := range segTemplates {
-			media := st.SelectAttrValue("media", "")
-			if media != "" {
-				media = joinBaseAndMedia(collectBaseURLs(st), media)
-				media_type := "m4s"
-				if strings.Contains(media, "jpg") || strings.Contains(media, "png") {
-					media_type = "jpg"
-				}
-				st.RemoveAttr("media")
-				st.CreateAttr("media", convert_to_proxy_url(media_type, tvgID, media, proxy_url))
-			}
-
-			init := st.SelectAttrValue("initialization", "")
-			if init != "" {
-				init = joinBaseAndMedia(collectBaseURLs(st), init)
-				st.RemoveAttr("initialization")
-				st.CreateAttr("initialization", convert_to_proxy_url("init-m4s", tvgID, init, proxy_url))
-			}
-		}
-
-		//删除BaseURL
-		BaseURLs := doc.FindElements("//BaseURL")
-		for _, bu := range BaseURLs {
-			parent := bu.Parent() // 获取父节点
-			if parent != nil {
-				parent.RemoveChild(bu) // 从父节点删除自己
-			}
-		}
-
-		if *(configsByProvider[provider.(string)].BestQuality) {
-			// --- 保留最高码率 Representation ---
-			for _, period := range doc.FindElements("//Period") {
-				for _, aset := range period.FindElements("AdaptationSet") {
-					reps := aset.FindElements("Representation")
-					if len(reps) == 0 {
-						continue
-					}
-
-					// 按 bandwidth 排序，最高码率放前
-					sort.Slice(reps, func(i, j int) bool {
-						bi := reps[i].SelectAttrValue("bandwidth", "0")
-						bj := reps[j].SelectAttrValue("bandwidth", "0")
-						return atoi(bi) > atoi(bj)
-					})
-
-					// 只保留最高码率
-					for i := 1; i < len(reps); i++ {
-						aset.RemoveChild(reps[i])
-					}
-				}
-			}
-		}
-
-		body, err = doc.WriteToBytes()
+		body, err = modifyMpd(provider.(string), tvgID, proxy_url, resp.Body())
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
 			ctx.SetBodyString("xml 重写错误")
 			log.Printf("[ERROR] xml 重写错误 %s，%s, %s", tvgID, proxy_url, err)
 			return
+		}
+
+		if *(configsByProvider[provider.(string)].ToFmp4OverHls) {
+			hls_list, _ := DashToHLS(proxy_url, body, tvgID)
+			hlsByTvgId.Store(tvgID, hls_list)
+			body = []byte(hls_list["master.m3u8"])
+			contentType = "application/vnd.apple.mpegurl"
 		}
 
 		if strings.Contains(query, "debug") {
