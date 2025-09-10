@@ -39,7 +39,7 @@ type StreamConfig struct {
 	M3uProxy          string   `json:"m3u-proxy"`
 	M3uUserAgent      *string  `json:"m3u-user-agent"`
 	BestQuality       *bool    `json:"best-quality"`
-	ToFmp4OverHls     *bool    `json:"to-fmp4-over-hls"`
+	ToFmp4OverHls     *bool    `json:"to-hls"`
 }
 
 // ---------- 支持多次传参的 flag ----------
