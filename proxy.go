@@ -15,6 +15,8 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,6 +38,7 @@ type StreamConfig struct {
 	Proxy             string   `json:"proxy"`
 	M3uProxy          string   `json:"m3u-proxy"`
 	M3uUserAgent      *string  `json:"m3u-user-agent"`
+	BestQuality       *bool    `json:"best-quality"`
 }
 
 // ---------- 支持多次传参的 flag ----------
@@ -60,6 +63,7 @@ var (
 	userAgent    string
 	m3uProxy     string
 	m3uUserAgent string
+	bestQuality  bool
 
 	providerByTvgId     = sync.Map{} // map[tvgID]providerName
 	configsByProvider   = make(map[string]StreamConfig)
@@ -165,6 +169,7 @@ func main() {
 	flag.StringVar(&publishAddr, "publish", "", "发布地址的前缀(公网可以访问的地址）,例如:https://live.9999.eu.org:443")
 	flag.StringVar(&m3uProxy, "m3u-proxy", "", "M3U 请求的代理设置 (SOCKS5)")
 	flag.StringVar(&m3uUserAgent, "m3u-user-agent", "okhttp/4.12.0", "M3U 请求的 User-Agent")
+	flag.BoolVar(&bestQuality, "best", false, "仅保留最高码率的音视频")
 
 	flag.Parse()
 
@@ -195,9 +200,14 @@ func main() {
 			log.Fatalf("配置文件加载失败: %v", err)
 		}
 		var ua string = "okhttp/4.12.0"
+		var bq bool = false
 		for i := range configs {
 			if configs[i].M3uUserAgent == nil {
 				configs[i].M3uUserAgent = &ua
+			}
+
+			if configs[i].BestQuality == nil {
+				configs[i].BestQuality = &bq
 			}
 		}
 	} else if singleInput != "" {
@@ -214,6 +224,7 @@ func main() {
 				Proxy:        proxyURL,
 				M3uProxy:     m3uProxy,
 				M3uUserAgent: &m3uUserAgent,
+				BestQuality:  &bestQuality,
 			},
 		}
 	} else {
@@ -665,6 +676,130 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%d ms", ms) // 小于 1 秒显示毫秒
 }
 
+func filterHighestAV(body string) string {
+	lines := strings.Split(body, "\n")
+
+	var maxVideoBW int64 = -1
+	var bestVideoINF, bestVideoURI, bestAudioGroup, bestCCGroup string
+
+	// 存全局标签 / 图片轨道
+	var globalTags, imageTracks []string
+
+	// 找最高码率视频
+	for i := 0; i < len(lines)-1; i++ {
+		line := strings.TrimSpace(lines[i])
+		if line == "" {
+			continue
+		}
+
+		// 收集全局标签
+		if strings.HasPrefix(line, "#EXT-X-VERSION") ||
+			strings.HasPrefix(line, "#EXT-X-INDEPENDENT-SEGMENTS") {
+			globalTags = append(globalTags, line)
+		}
+
+		// 收集图片轨道
+		if strings.HasPrefix(line, "#EXT-X-IMAGE-STREAM-INF") {
+			imageTracks = append(imageTracks, line)
+			if i+1 < len(lines) && !strings.HasPrefix(lines[i+1], "#") {
+				imageTracks = append(imageTracks, lines[i+1])
+			}
+		}
+
+		// 视频流
+		if strings.HasPrefix(line, "#EXT-X-STREAM-INF:") {
+			attrs := strings.Split(line[len("#EXT-X-STREAM-INF:"):], ",")
+			var bw int64
+			var audioGroup, ccGroup string
+			for _, a := range attrs {
+				kv := strings.SplitN(strings.TrimSpace(a), "=", 2)
+				if len(kv) == 2 {
+					key := strings.ToUpper(kv[0])
+					val := strings.Trim(kv[1], `"`)
+					switch key {
+					case "BANDWIDTH":
+						fmt.Sscanf(val, "%d", &bw)
+					case "AUDIO":
+						audioGroup = val
+					case "CLOSED-CAPTIONS":
+						ccGroup = val
+					}
+				}
+			}
+			uri := strings.TrimSpace(lines[i+1])
+			if bw > maxVideoBW {
+				maxVideoBW = bw
+				bestVideoINF = line
+				bestVideoURI = uri
+				bestAudioGroup = audioGroup
+				bestCCGroup = ccGroup
+			}
+		}
+	}
+
+	// 找对应的音频
+	var bestAudioLine string
+	if bestAudioGroup != "" {
+		var maxABW int64 = -1
+		re := regexp.MustCompile(`BANDWIDTH=(\d+)`)
+		for _, line := range lines {
+			if strings.HasPrefix(line, "#EXT-X-MEDIA:") &&
+				strings.Contains(line, "TYPE=AUDIO") &&
+				strings.Contains(line, fmt.Sprintf("GROUP-ID=\"%s\"", bestAudioGroup)) {
+				m := re.FindStringSubmatch(line)
+				var bw int64
+				if len(m) == 2 {
+					if v, err := strconv.ParseInt(m[1], 10, 64); err == nil {
+						bw = v
+					}
+				}
+				if bw > maxABW {
+					maxABW = bw
+					bestAudioLine = line
+				}
+			}
+		}
+	}
+
+	// 找对应的字幕
+	var ccLines []string
+	if bestCCGroup != "" && bestCCGroup != "NONE" {
+		for _, line := range lines {
+			if strings.HasPrefix(line, "#EXT-X-MEDIA:") &&
+				strings.Contains(line, "TYPE=CLOSED-CAPTIONS") &&
+				strings.Contains(line, fmt.Sprintf("GROUP-ID=\"%s\"", bestCCGroup)) {
+				ccLines = append(ccLines, line)
+			}
+		}
+	}
+
+	// 拼结果
+	var sb strings.Builder
+	sb.WriteString("#EXTM3U\n")
+	for _, g := range globalTags {
+		sb.WriteString(g + "\n")
+	}
+	if bestAudioLine != "" {
+		sb.WriteString(bestAudioLine + "\n")
+	}
+	for _, l := range ccLines {
+		sb.WriteString(l + "\n")
+	}
+	if bestVideoINF != "" {
+		sb.WriteString(bestVideoINF + "\n" + bestVideoURI + "\n")
+	}
+	for _, img := range imageTracks {
+		sb.WriteString(img + "\n")
+	}
+	return sb.String()
+}
+
+// 字符串转 int 辅助函数
+func atoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
+}
+
 // 代理流 URL
 func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	parts := strings.SplitN(strings.TrimPrefix(path, "/drm/proxy/"), "/", 3)
@@ -719,6 +854,14 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		doc := etree.NewDocument()
 		doc.ReadFromBytes(body)
 
+		if mpd := doc.FindElement("//MPD"); mpd != nil {
+			// 删除 DRM 命名空间
+			mpd.RemoveAttr("xmlns:cenc")
+			mpd.RemoveAttr("xmlns:mspr")
+			// 保留必要的其他命名空间
+			// 比如 xmlns, xmlns:xsi, xmlns:scte35
+		}
+
 		//删除DRM信息
 		for _, cp := range doc.FindElements("//ContentProtection") {
 			cp.Parent().RemoveChild(cp)
@@ -755,6 +898,30 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			}
 		}
 
+		if *(configsByProvider[provider.(string)].BestQuality) {
+			// --- 保留最高码率 Representation ---
+			for _, period := range doc.FindElements("//Period") {
+				for _, aset := range period.FindElements("AdaptationSet") {
+					reps := aset.FindElements("Representation")
+					if len(reps) == 0 {
+						continue
+					}
+
+					// 按 bandwidth 排序，最高码率放前
+					sort.Slice(reps, func(i, j int) bool {
+						bi := reps[i].SelectAttrValue("bandwidth", "0")
+						bj := reps[j].SelectAttrValue("bandwidth", "0")
+						return atoi(bi) > atoi(bj)
+					})
+
+					// 只保留最高码率
+					for i := 1; i < len(reps); i++ {
+						aset.RemoveChild(reps[i])
+					}
+				}
+			}
+		}
+
 		body, err = doc.WriteToBytes()
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
@@ -769,9 +936,15 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			ctx.SetContentType(contentType)
 		}
 	} else if proxy_type == "m3u8" {
-		lines := strings.Split(string(body), "\n")
+		strBody := string(body)
 		var newLines []string
 		var lastLineWasExtInf bool
+		if *(configsByProvider[provider.(string)].BestQuality) {
+			if strings.Contains(strBody, "#EXT-X-STREAM-INF:") {
+				strBody = filterHighestAV(strBody)
+			}
+		}
+		lines := strings.Split(strBody, "\n")
 		for _, line := range lines {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "#EXT-X-KEY") {
