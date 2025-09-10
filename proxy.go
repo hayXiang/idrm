@@ -169,7 +169,7 @@ func main() {
 	flag.StringVar(&publishAddr, "publish", "", "发布地址的前缀(公网可以访问的地址）,例如:https://live.9999.eu.org:443")
 	flag.StringVar(&m3uProxy, "m3u-proxy", "", "M3U 请求的代理设置 (SOCKS5)")
 	flag.StringVar(&m3uUserAgent, "m3u-user-agent", "okhttp/4.12.0", "M3U 请求的 User-Agent")
-	flag.BoolVar(&bestQuality, "best-quality", false, "仅保留最高码率的音视频")
+	flag.BoolVar(&bestQuality, "best-quality", true, "仅保留最高码率的音视频")
 
 	flag.Parse()
 
@@ -200,14 +200,13 @@ func main() {
 			log.Fatalf("配置文件加载失败: %v", err)
 		}
 		var ua string = "okhttp/4.12.0"
-		var bq bool = false
 		for i := range configs {
 			if configs[i].M3uUserAgent == nil {
 				configs[i].M3uUserAgent = &ua
 			}
 
 			if configs[i].BestQuality == nil {
-				configs[i].BestQuality = &bq
+				configs[i].BestQuality = &bestQuality
 			}
 		}
 	} else if singleInput != "" {
