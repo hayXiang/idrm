@@ -176,6 +176,12 @@ func main() {
 	flag.BoolVar(&bestQuality, "best-quality", true, "仅保留最高码率的音视频")
 	flag.BoolVar(&toFmp4OverHls, "to-hls", false, "将dash转成fmp4 over hls")
 
+	var enablePprof bool
+	var pprofAddr string
+
+	flag.BoolVar(&enablePprof, "pprof-enable", false, "Enable pprof HTTP server")
+	flag.StringVar(&pprofAddr, "pprof-addr", "localhost:7070", "pprof listen address")
+
 	flag.Parse()
 
 	userSet := false
@@ -288,11 +294,6 @@ func main() {
 		m3uClientByProvider[config.Name] = newFastHTTPClient(config.M3uProxy)
 	}
 
-	var enablePprof bool
-	var pprofAddr string
-
-	flag.BoolVar(&enablePprof, "pprof-enable", false, "Enable pprof HTTP server")
-	flag.StringVar(&pprofAddr, "pprof-addr", "localhost:7070", "pprof listen address")
 	for _, config := range configs {
 		go func() {
 			loadM3u(nil, config.Name)
