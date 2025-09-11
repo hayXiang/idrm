@@ -79,7 +79,7 @@ var (
 	rawUrlByTvgId       = sync.Map{}
 )
 
-var version = "1.0.0.3"
+var version = "1.0.0.4"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -850,21 +850,32 @@ func atoi(s string) int {
 	return n
 }
 
+// 判断 AdaptationSet 是否有有效字幕
 func hasSubtitle(adap *etree.Element) bool {
-    contentType := adap.SelectAttrValue("contentType", "")
-    rep := adap.FindElement("Representation")
-    segTemp := adap.FindElement("SegmentTemplate")
-    if rep == nil || segTemp == nil {
-        return false
-    }
+	contentType := adap.SelectAttrValue("contentType", "")
+	rep := adap.FindElement("Representation")
+	segTemp := adap.FindElement("SegmentTemplate")
+	if rep == nil || segTemp == nil {
+		return false
+	}
 
-    mimeType := rep.SelectAttrValue("mimeType", "")
-    codecs := rep.SelectAttrValue("codecs", "")
-    if contentType == "text" || contentType == "subtitle" ||
-       mimeType == "application/ttml+xml" || strings.Contains(codecs, "stpp") {
-        return true
-    }
-    return false
+	mimeType := rep.SelectAttrValue("mimeType", "")
+	codecs := rep.SelectAttrValue("codecs", "")
+	if contentType == "text" || contentType == "subtitle" ||
+		mimeType == "application/ttml+xml" || strings.Contains(codecs, "stpp") {
+		return true
+	}
+	return false
+}
+
+func periodHasSubtitle(period *etree.Element) bool {
+	adaps := period.FindElements("AdaptationSet")
+	for _, adap := range adaps {
+		if hasSubtitle(adap) { // 前面定义的 hasSubtitle
+			return true
+		}
+	}
+	return false
 }
 
 // 返回 HLS playlists 内容，key = filename, value = m3u8 内容
@@ -885,6 +896,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 
 	periods := doc.FindElements("//MPD/Period")
 	for _, period := range periods {
+		subtitleExists := periodHasSubtitle(period)
 		adaps := period.FindElements("AdaptationSet")
 		for _, adap := range adaps {
 			contentType := adap.SelectAttrValue("contentType", "")
@@ -919,7 +931,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 			default:
 				line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio"`,
 					bandwidth, resolution, codecs)
-				if hasSubtitle(adap) {
+				if subtitleExists {
 					line += `,SUBTITLES="subs"`
 				}
 				masterLines = append(masterLines, line)
