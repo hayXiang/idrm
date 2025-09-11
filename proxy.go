@@ -1294,6 +1294,8 @@ func startAutoGC(interval time.Duration) {
 		ticker := time.NewTicker(interval)
 		for range ticker.C {
 			runtime.GC()
+			debug.FreeOSMemory()
+			log.Printf("auto gc")
 		}
 	}()
 }
