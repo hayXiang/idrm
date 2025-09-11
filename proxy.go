@@ -15,6 +15,8 @@ import (
 	"net/url"
 	"path"
 	"regexp"
+	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -66,6 +68,8 @@ var (
 	m3uUserAgent  string
 	bestQuality   bool
 	toFmp4OverHls bool
+	maxMemory     int64
+	gcInterval    int
 
 	providerByTvgId     = sync.Map{} // map[tvgID]providerName
 	configsByProvider   = make(map[string]StreamConfig)
@@ -175,6 +179,8 @@ func main() {
 	flag.StringVar(&m3uUserAgent, "m3u-user-agent", "okhttp/4.12.0", "M3U 请求的 User-Agent")
 	flag.BoolVar(&bestQuality, "best-quality", true, "仅保留最高码率的音视频")
 	flag.BoolVar(&toFmp4OverHls, "to-hls", false, "将dash转成fmp4 over hls")
+	flag.Int64Var(&maxMemory, "max-memory", 0, "最大内存使用，单位MB，0表示不限制, 最小值100MB")
+	flag.IntVar(&gcInterval, "auto-gc", 30, "自动垃圾回收间隔，单位秒，0表示不启用, 最小值5秒")
 
 	var enablePprof bool
 	var pprofAddr string
@@ -184,6 +190,19 @@ func main() {
 
 	flag.Parse()
 
+	if gcInterval > 0 {
+		if gcInterval < 5 {
+			gcInterval = 5
+		}
+		startAutoGC(time.Duration(gcInterval) * time.Second)
+	}
+
+	if maxMemory > 0 {
+		if maxMemory < 100 {
+			maxMemory = 100
+		}
+		debug.SetMemoryLimit(maxMemory << 20)
+	}
 	userSet := false
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "user-agent" || f.Name == "A" {
@@ -1230,4 +1249,13 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(body)
 	log.Printf("代理结束: %s, %s, 耗时：%s, 大小=%s,", tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
+}
+
+func startAutoGC(interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		for range ticker.C {
+			runtime.GC()
+		}
+	}()
 }
