@@ -850,6 +850,23 @@ func atoi(s string) int {
 	return n
 }
 
+func hasSubtitle(adap *etree.Element) bool {
+    contentType := adap.SelectAttrValue("contentType", "")
+    rep := adap.FindElement("Representation")
+    segTemp := adap.FindElement("SegmentTemplate")
+    if rep == nil || segTemp == nil {
+        return false
+    }
+
+    mimeType := rep.SelectAttrValue("mimeType", "")
+    codecs := rep.SelectAttrValue("codecs", "")
+    if contentType == "text" || contentType == "subtitle" ||
+       mimeType == "application/ttml+xml" || strings.Contains(codecs, "stpp") {
+        return true
+    }
+    return false
+}
+
 // 返回 HLS playlists 内容，key = filename, value = m3u8 内容
 func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, error) {
 	doc := etree.NewDocument()
@@ -900,10 +917,14 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 					fmt.Sprintf(`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s"`,
 						groupID, lang, lang, tvgId, playlistName))
 			default:
-				masterLines = append(masterLines,
-					fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio",SUBTITLES="subs"`,
-						bandwidth, resolution, codecs))
+				line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio"`,
+					bandwidth, resolution, codecs)
+				if hasSubtitle(adap) {
+					line += `,SUBTITLES="subs"`
+				}
+				masterLines = append(masterLines, line)
 				masterLines = append(masterLines, fmt.Sprintf("/drm/proxy/hls/%s/%s", tvgId, playlistName))
+
 			}
 
 			// 生成媒体 playlist
