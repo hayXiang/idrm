@@ -888,15 +888,20 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 			}
 
 			playlistName := fmt.Sprintf("%s_%s.m3u8", contentType, repID)
-
-			if contentType == "audio" {
+			switch contentType {
+			case "text", "subtitle":
+				lang := adap.SelectAttrValue("lang", "und")
+				masterLines = append(masterLines, fmt.Sprintf(
+					`#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=NO,FORCED=NO,URI="/drm/proxy/hls/%s/%s"`,
+					lang, lang, tvgId, playlistName))
+			case "audio":
 				lang := adap.SelectAttrValue("lang", "und")
 				masterLines = append(masterLines,
 					fmt.Sprintf(`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s"`,
 						groupID, lang, lang, tvgId, playlistName))
-			} else {
+			default:
 				masterLines = append(masterLines,
-					fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio"`,
+					fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio",SUBTITLES="subs"`,
 						bandwidth, resolution, codecs))
 				masterLines = append(masterLines, fmt.Sprintf("/drm/proxy/hls/%s/%s", tvgId, playlistName))
 			}
