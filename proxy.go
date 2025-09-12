@@ -1098,6 +1098,9 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			1*time.Second,        // 最大等待时间
 			100*time.Millisecond, // 每次检查间隔
 			func(key string) ([]byte, string, bool) {
+				if cache == nil {
+					return nil, "", false
+				}
 				data, dataType, _, _ := cache.Get(key)
 				return data, dataType, data != nil
 			},
