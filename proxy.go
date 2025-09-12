@@ -532,7 +532,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 		resp, err := HttpGetWithUA(m3uClientByProvider[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent}, 30)
 		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 			if ctx != nil {
-				ctx.SetStatusCode(fasthttp.StatusBadGateway)
+				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				ctx.SetBodyString("无法获取 M3U")
 			}
 			log.Printf("[ERROR]无法获取 M3U: %s, %s, %v", name, config.URL, err)
@@ -1137,7 +1137,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetBodyString("无法获取内容")
 		if err != nil {
-			ctx.SetStatusCode(fasthttp.StatusBadGateway)
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			log.Printf("[ERROR] 下载错误：%s，%s, %v", tvgID, proxy_url, err)
 		} else {
 			ctx.SetStatusCode(resp.StatusCode())
@@ -1151,7 +1151,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if proxy_type == "mpd" || contentType == "application/dash+xml" {
 		body, err = modifyMpd(provider.(string), tvgID, proxy_url, resp.Body())
 		if err != nil {
-			ctx.SetStatusCode(fasthttp.StatusBadGateway)
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("xml 重写错误")
 			log.Printf("[ERROR] xml 重写错误 %s，%s, %s", tvgID, proxy_url, err)
 			return
@@ -1216,7 +1216,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	} else if proxy_type == "init-m4s" {
 		body, err = removePsshAndSinfFromBody(body)
 		if err != nil {
-			ctx.SetStatusCode(fasthttp.StatusBadGateway)
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("移除 DRM 信息失败")
 			log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
 			return
@@ -1230,7 +1230,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			if strings.HasPrefix(val.(string), "http") {
 				resp, err = HttpGetWithUA(client, val.(string), configsByProvider[provider.(string)].LicenseUrlHeaders, *configsByProvider[provider.(string)].HttpTimeout)
 				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
-					ctx.SetStatusCode(fasthttp.StatusBadGateway)
+					ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 					ctx.SetBodyString("无法获取 license")
 					log.Printf("[ERROR] 无法获取 license， %s，%s, %v", tvgID, val, err)
 					return
@@ -1252,21 +1252,21 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			}
 			kid_key := strings.Split(val.(string), ":")
 			if len(kid_key) != 2 {
-				ctx.SetStatusCode(fasthttp.StatusBadGateway)
+				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				ctx.SetBodyString("密钥格式错误," + val.(string))
 				log.Printf("[ERROR] 密钥格式错误， %s，%s", tvgID, proxy_url)
 				return
 			}
 			key_bytes, err := hex.DecodeString(kid_key[1])
 			if err != nil {
-				ctx.SetStatusCode(fasthttp.StatusBadGateway)
+				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				ctx.SetBodyString("密钥格式错误")
 				log.Printf("[ERROR] 密钥格式错误， %s，%s, %s", tvgID, proxy_url, err)
 				return
 			}
 			body, err = decryptWidevineFromBody(body, key_bytes)
 			if err != nil {
-				ctx.SetStatusCode(fasthttp.StatusBadGateway)
+				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				ctx.SetBodyString("DRM 解密信息失败")
 				log.Printf("[ERROR] DRM 解密信息失败，%s，%s, %s", tvgID, proxy_url, err)
 				return
@@ -1334,12 +1334,12 @@ func WaitOrRedirect(
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.Response.Header.Set("Retry-After", "1")
 			ctx.SetBodyString("资源下载失败，请过一会再试")
-			log.Printf("[ERROR] 资源请求失败：%s", key)
+			log.Printf("[ERROR] 资源请求失败：%s,%s", getClientIP(ctx), key)
 			return
 		case <-timeout:
 			ctx.SetStatusCode(302)
 			ctx.SetBodyString("资源正在下载中，请过一会再试")
-			log.Printf("资源正在下载中：%s", key)
+			log.Printf("[ERROR]资源正在下载中：%s,%s", getClientIP(ctx), key)
 			onTimeout()
 			return
 		}
