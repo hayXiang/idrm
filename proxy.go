@@ -44,6 +44,7 @@ type StreamConfig struct {
 	M3uUserAgent      *string  `json:"m3u-user-agent"`
 	BestQuality       *bool    `json:"best-quality"`
 	ToFmp4OverHls     *bool    `json:"to-hls"`
+	HttpTimeout       *int     `json:"http-timeout"`
 }
 
 // ---------- 支持多次传参的 flag ----------
@@ -72,6 +73,7 @@ var (
 	toFmp4OverHls bool
 	maxMemory     int64
 	gcInterval    int
+	httpTimeout   int
 
 	providerByTvgId     = sync.Map{} // map[tvgID]providerName
 	configsByProvider   = make(map[string]StreamConfig)
@@ -95,9 +97,9 @@ func loadConfigFile(path string) ([]StreamConfig, error) {
 	return cfg, nil
 }
 
-func newFastHTTPClient(socks5_url string) *fasthttp.Client {
+func newFastHTTPClient(socks5_url string, timeout int) *fasthttp.Client {
 	client := &fasthttp.Client{
-		ReadTimeout:     30 * time.Second,
+		ReadTimeout:     time.Second * time.Duration(timeout),
 		WriteTimeout:    10 * time.Second,
 		MaxConnsPerHost: 500,
 	}
@@ -183,6 +185,7 @@ func main() {
 	flag.BoolVar(&toFmp4OverHls, "to-hls", false, "将dash转成fmp4 over hls")
 	flag.Int64Var(&maxMemory, "max-memory", 0, "最大内存使用，单位MB，0表示不限制, 最小值100MB")
 	flag.IntVar(&gcInterval, "auto-gc", 30, "自动垃圾回收间隔，单位秒，0表示不启用, 最小值5秒")
+	flag.IntVar(&httpTimeout, "http-timeout", 15, "默认http请求超时")
 
 	var enablePprof bool
 	var pprofAddr string
@@ -244,6 +247,10 @@ func main() {
 			if configs[i].ToFmp4OverHls == nil {
 				configs[i].ToFmp4OverHls = &toFmp4OverHls
 			}
+
+			if configs[i].HttpTimeout == nil {
+				configs[i].HttpTimeout = &httpTimeout
+			}
 		}
 	} else if singleInput != "" {
 		var us *string = nil
@@ -261,6 +268,7 @@ func main() {
 				M3uUserAgent:  &m3uUserAgent,
 				BestQuality:   &bestQuality,
 				ToFmp4OverHls: &toFmp4OverHls,
+				HttpTimeout:   &httpTimeout,
 			},
 		}
 	} else {
@@ -311,8 +319,8 @@ func main() {
 
 	for _, config := range configs {
 		configsByProvider[config.Name] = config
-		clientsByProvider[config.Name] = newFastHTTPClient(config.Proxy)
-		m3uClientByProvider[config.Name] = newFastHTTPClient(config.M3uProxy)
+		clientsByProvider[config.Name] = newFastHTTPClient(config.Proxy, *config.HttpTimeout)
+		m3uClientByProvider[config.Name] = newFastHTTPClient(config.M3uProxy, 30)
 	}
 
 	for _, config := range configs {
@@ -337,7 +345,7 @@ func main() {
 }
 
 // fetchWithRedirect 发起 GET 请求，自动跟随重定向（最多 maxRedirects 次）
-func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects int, headers []string) (string, *fasthttp.Response, error) {
+func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects int, headers []string, timeout int) (string, *fasthttp.Response, error) {
 	currentURL := startURL
 
 	for i := 0; i < maxRedirects; i++ {
@@ -353,7 +361,7 @@ func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects in
 			}
 		}
 
-		err := client.DoTimeout(req, resp, 30*time.Second)
+		err := client.DoTimeout(req, resp, time.Duration(timeout)*time.Second)
 		fasthttp.ReleaseRequest(req)
 		if err != nil {
 			fasthttp.ReleaseResponse(resp)
@@ -397,7 +405,7 @@ func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects in
 	return currentURL, nil, fmt.Errorf("too many redirects")
 }
 
-func HttpGetWithUA(client *fasthttp.Client, url string, headers []string) (*fasthttp.Response, error) {
+func HttpGetWithUA(client *fasthttp.Client, url string, headers []string, timeout int) (*fasthttp.Response, error) {
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
 
@@ -409,7 +417,7 @@ func HttpGetWithUA(client *fasthttp.Client, url string, headers []string) (*fast
 		}
 	}
 
-	if err := client.DoTimeout(req, resp, 30*time.Second); err != nil {
+	if err := client.DoTimeout(req, resp, time.Duration(timeout)*time.Second); err != nil {
 		fasthttp.ReleaseRequest(req)
 		fasthttp.ReleaseResponse(resp)
 		return nil, err
@@ -482,7 +490,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	var count = 0
 	var body []byte
 	if strings.HasPrefix(config.URL, "http") {
-		resp, err := HttpGetWithUA(m3uClientByProvider[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent})
+		resp, err := HttpGetWithUA(m3uClientByProvider[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent}, 30)
 		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 			if ctx != nil {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
@@ -1010,7 +1018,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if proxy_type == "hls" {
 		hls_list, ok := hlsByTvgId.Load(tvgID)
 		if ok {
-			startOrResetUpdater(provider.(string), tvgID, hls_list.(map[string]string)["mpd"], client, configsByProvider[provider.(string)].Headers, 3*time.Second)
+			startOrResetUpdater(provider.(string), tvgID, hls_list.(map[string]string)["mpd"], client, configsByProvider[provider.(string)].Headers, 3*time.Second, *configsByProvider[provider.(string)].HttpTimeout)
 			body := []byte(hls_list.(map[string]string)[proxy_url])
 			contentType := "application/vnd.apple.mpegurl"
 			ctx.Response.Header.Set("Cache-Control", "no-cache")
@@ -1029,7 +1037,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	// 直接重定向到原始 URL
 	log.Printf("下载开始：%s，%s", tvgID, proxy_url)
 	start := time.Now()
-	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider.(string)].Headers)
+	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider.(string)].Headers, *configsByProvider[provider.(string)].HttpTimeout)
 	log.Printf("下载结束：%s，%s, 耗时：%s", tvgID, proxy_url, formatDuration(time.Since(start)))
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetBodyString("无法获取内容")
@@ -1122,7 +1130,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		val, ok := clearKeysMap.Load(tvgID)
 		if ok {
 			if strings.HasPrefix(val.(string), "http") {
-				resp, err = HttpGetWithUA(client, val.(string), configsByProvider[provider.(string)].LicenseUrlHeaders)
+				resp, err = HttpGetWithUA(client, val.(string), configsByProvider[provider.(string)].LicenseUrlHeaders, *configsByProvider[provider.(string)].HttpTimeout)
 				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 					ctx.SetStatusCode(fasthttp.StatusBadGateway)
 					ctx.SetBodyString("无法获取 license")

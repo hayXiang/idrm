@@ -12,21 +12,16 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-var etreePool = sync.Pool{
-	New: func() any {
-		return etree.NewDocument()
-	},
-}
-
 type HLSUpdater struct {
-	provider   string
-	tvgID      string
-	mpdURL     string
-	interval   time.Duration
-	stopCh     chan struct{}
-	lastAccess time.Time
-	client     *fasthttp.Client
-	headers    []string
+	provider    string
+	tvgID       string
+	mpdURL      string
+	interval    time.Duration
+	stopCh      chan struct{}
+	lastAccess  time.Time
+	client      *fasthttp.Client
+	headers     []string
+	httpTimeout int
 }
 
 var (
@@ -34,7 +29,7 @@ var (
 	updatersMu sync.Mutex
 )
 
-func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client, headers []string, interval time.Duration) {
+func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client, headers []string, interval time.Duration, timeout int) {
 	updatersMu.Lock()
 	defer updatersMu.Unlock()
 
@@ -47,14 +42,15 @@ func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client
 
 	// 创建新的 updater
 	upd = &HLSUpdater{
-		provider:   provider,
-		tvgID:      tvgID,
-		mpdURL:     mpdURL,
-		interval:   interval,
-		stopCh:     make(chan struct{}),
-		lastAccess: time.Now(),
-		client:     client,
-		headers:    headers,
+		provider:    provider,
+		tvgID:       tvgID,
+		mpdURL:      mpdURL,
+		interval:    interval,
+		stopCh:      make(chan struct{}),
+		lastAccess:  time.Now(),
+		client:      client,
+		headers:     headers,
+		httpTimeout: timeout,
 	}
 
 	updaters[tvgID] = upd
@@ -75,7 +71,7 @@ func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client
 					return
 				}
 
-				_, resp, err := fetchWithRedirect(u.client, u.mpdURL, 5, u.headers)
+				_, resp, err := fetchWithRedirect(u.client, u.mpdURL, 5, u.headers, u.httpTimeout)
 				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 					log.Printf("[ERROR] 更新mpd失败%s，%s, %v", u.tvgID, u.mpdURL, err)
 					continue
@@ -100,12 +96,7 @@ func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client
 
 // 返回 HLS playlists 内容，key = filename, value = m3u8 内容
 func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, error) {
-	doc := etreePool.Get().(*etree.Document)
-	// 清空旧内容
-	doc.SetRoot(nil)
-	doc.Child = nil
-	doc.Attr = nil
-
+	doc := etree.NewDocument()
 	hlsMap := make(map[string]string)
 	hlsMap["mpd"] = mpdUrl
 
