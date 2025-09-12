@@ -1083,7 +1083,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if cache != nil {
 		data, dataType, _, _ := cache.Get(proxy_url)
 		if data != nil {
-			log.Printf("资源Hit：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
+			log.Printf("资源hit：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 			ctx.SetStatusCode(fasthttp.StatusOK)
 			ctx.Response.Header.Set("IDRM-CACHE", "HIT")
 			resposneBody(ctx, data, dataType)
