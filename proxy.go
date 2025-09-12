@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -649,7 +651,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	if ctx != nil {
 		ctx.SetContentType("text/plain; charset=utf-8")
 		ctx.SetStatusCode(fasthttp.StatusOK)
-		ctx.SetBodyString(strings.Join(newLines, "\n"))
+		resposneBody(ctx, []byte(strings.Join(newLines, "\n")))
 	}
 }
 
@@ -878,123 +880,6 @@ func periodHasSubtitle(period *etree.Element) bool {
 	return false
 }
 
-// 返回 HLS playlists 内容，key = filename, value = m3u8 内容
-func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, error) {
-	doc := etree.NewDocument()
-	if err := doc.ReadFromBytes(body); err != nil {
-		return nil, fmt.Errorf("failed to parse MPD: %v", err)
-	}
-
-	hlsMap := make(map[string]string)
-	hlsMap["mpd"] = mpdUrl
-
-	masterLines := []string{
-		"#EXTM3U",
-		"#EXT-X-VERSION:7",
-		"#EXT-X-INDEPENDENT-SEGMENTS",
-	}
-
-	periods := doc.FindElements("//MPD/Period")
-	for _, period := range periods {
-		subtitleExists := periodHasSubtitle(period)
-		adaps := period.FindElements("AdaptationSet")
-		for _, adap := range adaps {
-			contentType := adap.SelectAttrValue("contentType", "")
-			groupID := contentType
-
-			rep := adap.FindElement("Representation")
-			if rep == nil {
-				continue
-			}
-			repID := rep.SelectAttrValue("id", "")
-			bandwidth := rep.SelectAttrValue("bandwidth", "")
-			codecs := rep.SelectAttrValue("codecs", "")
-			resolution := ""
-			if contentType == "video" {
-				width := rep.SelectAttrValue("width", "")
-				height := rep.SelectAttrValue("height", "")
-				resolution = fmt.Sprintf("%sx%s", width, height)
-			}
-
-			playlistName := fmt.Sprintf("%s_%s.m3u8", contentType, repID)
-			switch contentType {
-			case "text", "subtitle":
-				lang := adap.SelectAttrValue("lang", "und")
-				masterLines = append(masterLines, fmt.Sprintf(
-					`#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=NO,FORCED=NO,URI="/drm/proxy/hls/%s/%s"`,
-					lang, lang, tvgId, playlistName))
-			case "audio":
-				lang := adap.SelectAttrValue("lang", "und")
-				masterLines = append(masterLines,
-					fmt.Sprintf(`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s"`,
-						groupID, lang, lang, tvgId, playlistName))
-			default:
-				line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio"`,
-					bandwidth, resolution, codecs)
-				if subtitleExists {
-					line += `,SUBTITLES="subs"`
-				}
-				masterLines = append(masterLines, line)
-				masterLines = append(masterLines, fmt.Sprintf("/drm/proxy/hls/%s/%s", tvgId, playlistName))
-
-			}
-
-			// 生成媒体 playlist
-			mediaLines := []string{
-				"#EXTM3U",
-				"#EXT-X-VERSION:7",
-				"#EXT-X-TARGETDURATION:6",
-			}
-
-			segTemp := adap.FindElement("SegmentTemplate")
-			if segTemp == nil {
-				continue
-			}
-			startNumberStr := segTemp.SelectAttrValue("startNumber", "1")
-			startNumber, _ := strconv.Atoi(startNumberStr)
-			timescaleStr := segTemp.SelectAttrValue("timescale", "1")
-			timescale, _ := strconv.Atoi(timescaleStr)
-			mediaTemplate := segTemp.SelectAttrValue("media", "")
-			initURI := segTemp.SelectAttrValue("initialization", "")
-
-			mediaTemplate = strings.ReplaceAll(mediaTemplate, "$RepresentationID$", repID)
-			initURI = strings.ReplaceAll(initURI, "$RepresentationID$", repID)
-
-			mediaLines = append(mediaLines, fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d", startNumber))
-			mediaLines = append(mediaLines, fmt.Sprintf(`#EXT-X-MAP:URI="%s"`, initURI))
-
-			timeline := segTemp.FindElement("SegmentTimeline")
-			if timeline != nil {
-				seq := startNumber
-				for _, s := range timeline.FindElements("S") {
-					dStr := s.SelectAttrValue("d", "0")
-					rStr := s.SelectAttrValue("r", "0")
-					tStr := s.SelectAttrValue("t", "0")
-					d, _ := strconv.Atoi(dStr)
-					r, _ := strconv.Atoi(rStr)
-					t, _ := strconv.Atoi(tStr)
-					duration := float64(d) / float64(timescale)
-					for i := 0; i <= r; i++ {
-						mediaURI := strings.ReplaceAll(mediaTemplate, "$RepresentationID$", repID)
-						mediaURI = strings.ReplaceAll(mediaURI, "$Time$", strconv.Itoa(t))
-						mediaLines = append(mediaLines, fmt.Sprintf("#EXTINF:%.3f,", duration))
-						mediaLines = append(mediaLines, mediaURI)
-						t += d
-						seq++
-					}
-				}
-			}
-
-			// 存入 map
-			hlsMap[playlistName] = strings.Join(mediaLines, "\n")
-		}
-	}
-
-	// master playlist
-	hlsMap["master.m3u8"] = strings.Join(masterLines, "\n")
-	return hlsMap, nil
-}
-
 func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, error) {
 	doc := etree.NewDocument()
 	doc.ReadFromBytes(body)
@@ -1068,6 +953,13 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 	}
 
 	return doc.WriteToBytes()
+}
+
+func resposneBody(ctx *fasthttp.RequestCtx, data []byte) error {
+	reader := bytes.NewReader(data) // data 是你缓存的分片
+	w := ctx.Response.BodyWriter()  // 直接写到底层连接
+	_, err := io.Copy(w, reader)    // 边读边写
+	return err
 }
 
 // 代理流 URL
@@ -1285,7 +1177,8 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
-	ctx.SetBody(body)
+	log.Printf("解密结束: %s, %s, 耗时：%s, 大小=%s,", tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
+	resposneBody(ctx, body)
 	log.Printf("代理结束: %s, %s, 耗时：%s, 大小=%s,", tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
 }
 
