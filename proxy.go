@@ -34,17 +34,21 @@ import (
 
 // ---------- 数据结构 ----------
 type StreamConfig struct {
-	Name              string   `json:"name"`
-	URL               string   `json:"url"`
-	Headers           []string `json:"headers"`
-	UserAgent         *string  `json:"user-agent"`
-	LicenseUrlHeaders []string `json:"license-url-headers"`
-	Proxy             string   `json:"proxy"`
-	M3uProxy          string   `json:"m3u-proxy"`
-	M3uUserAgent      *string  `json:"m3u-user-agent"`
-	BestQuality       *bool    `json:"best-quality"`
-	ToFmp4OverHls     *bool    `json:"to-hls"`
-	HttpTimeout       *int     `json:"http-timeout"`
+	Name                     string   `json:"name"`
+	URL                      string   `json:"url"`
+	Headers                  []string `json:"headers"`
+	UserAgent                *string  `json:"user-agent"`
+	LicenseUrlHeaders        []string `json:"license-url-headers"`
+	Proxy                    string   `json:"proxy"`
+	M3uProxy                 string   `json:"m3u-proxy"`
+	M3uUserAgent             *string  `json:"m3u-user-agent"`
+	BestQuality              *bool    `json:"best-quality"`
+	ToFmp4OverHls            *bool    `json:"to-hls"`
+	HttpTimeout              *int     `json:"http-timeout"`
+	ManifestCacheExpire      *int     `json:"manifest-cache"`
+	SegmentMemoryCacheExpire *int     `json:"segment-memory-cache"`
+	SegmentFileCacheExpire   *int     `json:"segment-file-cache"`
+	CacheDir                 *string  `json:"cache-dir"`
 }
 
 // ---------- 支持多次传参的 flag ----------
@@ -59,31 +63,37 @@ func (m *multiFlag) Set(value string) error {
 }
 
 var (
-	configFile    string
-	name          string
-	bindAddr      string
-	singleInput   string
-	headers       multiFlag
-	proxyURL      string
-	publishAddr   string
-	userAgent     string
-	m3uProxy      string
-	m3uUserAgent  string
-	bestQuality   bool
-	toFmp4OverHls bool
-	maxMemory     int64
-	gcInterval    int
-	httpTimeout   int
+	configFile               string
+	name                     string
+	bindAddr                 string
+	singleInput              string
+	headers                  multiFlag
+	proxyURL                 string
+	publishAddr              string
+	userAgent                string
+	m3uProxy                 string
+	m3uUserAgent             string
+	bestQuality              bool
+	toFmp4OverHls            bool
+	maxMemory                int64
+	gcInterval               int
+	httpTimeout              int
+	manifestCacheExpire      int
+	segmentMemoryCacheExpire int
+	segmentFileCacheExpire   int
+	cacheDir                 string
 
-	providerByTvgId     = sync.Map{} // map[tvgID]providerName
-	configsByProvider   = make(map[string]StreamConfig)
-	clientsByProvider   = make(map[string]*fasthttp.Client)
-	m3uClientByProvider = make(map[string]*fasthttp.Client)
-	hlsByTvgId          = sync.Map{}
-	rawUrlByTvgId       = sync.Map{}
+	providerByTvgId         = sync.Map{} // map[tvgID]providerName
+	configsByProvider       = make(map[string]StreamConfig)
+	clientsByProvider       = make(map[string]*fasthttp.Client)
+	m3uClientByProvider     = make(map[string]*fasthttp.Client)
+	manifestCacheByProvider = make(map[string]*FileCache)
+	segmentCacheByProvider  = make(map[string]*FileCache)
+	hlsByTvgId              = sync.Map{}
+	rawUrlByTvgId           = sync.Map{}
 )
 
-var version = "1.0.0.4"
+var version = "1.0.0.5"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -171,7 +181,7 @@ func main() {
 	flag.StringVar(&configFile, "c", "", "配置文件 (JSON)。使用这种模式，下面的--name, --input, --header, --proxy --user-agent 将无效")
 	flag.StringVar(&bindAddr, "listen", "127.0.0.1:1234", "代理服务器监听端口")
 	flag.StringVar(&bindAddr, "l", "127.0.0.1:1234", "代理服务器监听端口 (简写)")
-	flag.StringVar(&name, "name", "index", "provider 的名称")
+	flag.StringVar(&name, "name", "default", "provider 的名称")
 	flag.StringVar(&singleInput, "input", "", "单个流 URL")
 	flag.StringVar(&singleInput, "i", "", "单个流 URL（简写）")
 	flag.Var(&headers, "header", "HTTP 请求头，可多次指定")
@@ -186,6 +196,10 @@ func main() {
 	flag.Int64Var(&maxMemory, "max-memory", 0, "最大内存使用，单位MB，0表示不限制, 最小值100MB")
 	flag.IntVar(&gcInterval, "auto-gc", 30, "自动垃圾回收间隔，单位秒，0表示不启用, 最小值5秒")
 	flag.IntVar(&httpTimeout, "http-timeout", 15, "默认http请求超时")
+	flag.StringVar(&cacheDir, "cache-dir", "./", "cache 文件的保存路径，默认当前路径")
+	flag.IntVar(&manifestCacheExpire, "manifest-cache", -1, "mpd或者m3u8缓存过期时间，单位秒,-1 表示不开启")
+	flag.IntVar(&segmentMemoryCacheExpire, "segment-memory-cache", -1, "ts或者m4s缓存短期过期时间，单位秒, -1 表示不开启")
+	flag.IntVar(&segmentFileCacheExpire, "segment-file-cache", -1, "ts或者m4s缓存文件最大存活时间，单位秒,-1 表示不开启")
 
 	var enablePprof bool
 	var pprofAddr string
@@ -251,6 +265,18 @@ func main() {
 			if configs[i].HttpTimeout == nil {
 				configs[i].HttpTimeout = &httpTimeout
 			}
+
+			if configs[i].ManifestCacheExpire == nil {
+				configs[i].ManifestCacheExpire = &manifestCacheExpire
+			}
+
+			if configs[i].SegmentFileCacheExpire == nil {
+				configs[i].SegmentFileCacheExpire = &segmentFileCacheExpire
+			}
+
+			if configs[i].SegmentMemoryCacheExpire == nil {
+				configs[i].SegmentMemoryCacheExpire = &segmentMemoryCacheExpire
+			}
 		}
 	} else if singleInput != "" {
 		var us *string = nil
@@ -259,16 +285,19 @@ func main() {
 		}
 		configs = []StreamConfig{
 			{
-				Name:          name,
-				URL:           singleInput,
-				Headers:       headers,
-				UserAgent:     us,
-				Proxy:         proxyURL,
-				M3uProxy:      m3uProxy,
-				M3uUserAgent:  &m3uUserAgent,
-				BestQuality:   &bestQuality,
-				ToFmp4OverHls: &toFmp4OverHls,
-				HttpTimeout:   &httpTimeout,
+				Name:                     name,
+				URL:                      singleInput,
+				Headers:                  headers,
+				UserAgent:                us,
+				Proxy:                    proxyURL,
+				M3uProxy:                 m3uProxy,
+				M3uUserAgent:             &m3uUserAgent,
+				BestQuality:              &bestQuality,
+				ToFmp4OverHls:            &toFmp4OverHls,
+				HttpTimeout:              &httpTimeout,
+				SegmentMemoryCacheExpire: &segmentMemoryCacheExpire,
+				SegmentFileCacheExpire:   &segmentFileCacheExpire,
+				ManifestCacheExpire:      &manifestCacheExpire,
 			},
 		}
 	} else {
@@ -321,6 +350,13 @@ func main() {
 		configsByProvider[config.Name] = config
 		clientsByProvider[config.Name] = newFastHTTPClient(config.Proxy, *config.HttpTimeout)
 		m3uClientByProvider[config.Name] = newFastHTTPClient(config.M3uProxy, 30)
+		if *config.ManifestCacheExpire >= 0 {
+			manifestCacheByProvider[config.Name] = NewFileCache("./idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
+		}
+
+		if *config.SegmentFileCacheExpire >= 0 || *config.SegmentMemoryCacheExpire >= 0 {
+			segmentCacheByProvider[config.Name] = NewFileCache("./idrm-cache/"+config.Name, *config.SegmentMemoryCacheExpire, *config.SegmentFileCacheExpire)
+		}
 	}
 
 	for _, config := range configs {
@@ -657,9 +693,8 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	log.Printf("结束加载M3u: %s, 一共%d个频道, 访问地址: http://%s/%s.m3u%s", name, count, bindAddr, name, extra)
 
 	if ctx != nil {
-		ctx.SetContentType("text/plain; charset=utf-8")
 		ctx.SetStatusCode(fasthttp.StatusOK)
-		resposneBody(ctx, []byte(strings.Join(newLines, "\n")))
+		resposneBody(ctx, []byte(strings.Join(newLines, "\n")), "text/plain; charset=utf-8")
 	}
 }
 
@@ -963,12 +998,15 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 	return doc.WriteToBytes()
 }
 
-func resposneBody(ctx *fasthttp.RequestCtx, data []byte) error {
+func resposneBody(ctx *fasthttp.RequestCtx, data []byte, contentType string) error {
 	reader := bytes.NewReader(data) // data 是你缓存的分片
-	w := ctx.Response.BodyWriter()  // 直接写到底层连接
-	_, err := io.Copy(w, reader)    // 边读边写
+	ctx.SetContentType(contentType)
+	w := ctx.Response.BodyWriter() // 直接写到底层连接
+	_, err := io.Copy(w, reader)   // 边读边写
 	return err
 }
+
+var rm = NewRequestManager()
 
 // 代理流 URL
 func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
@@ -1001,6 +1039,8 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 	query := string(ctx.QueryArgs().QueryString())
 
+	log.Printf("代理开始：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
+
 	provider, ok := providerByTvgId.Load(tvgID)
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
@@ -1026,19 +1066,55 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			ctx.SetStatusCode(fasthttp.StatusOK)
 			ctx.SetBody(body)
 			if strings.Contains(query, "debug") {
-				ctx.SetContentType("text/plain; charset=utf-8")
-			} else {
-				ctx.SetContentType(contentType)
+				contentType = "text/plain; charset=utf-8"
 			}
+			ctx.SetContentType(contentType)
 		}
 		return
 	}
 
+	cache := manifestCacheByProvider[provider.(string)]
+	if proxy_type == "m4s" {
+		cache = segmentCacheByProvider[provider.(string)]
+	}
+
+	if cache != nil {
+		data, dataType, _, _ := cache.Get(proxy_url)
+		if data != nil {
+			log.Printf("资源Hit：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
+			ctx.SetStatusCode(fasthttp.StatusOK)
+			ctx.Response.Header.Set("IDRM-CACHE", "HIT")
+			resposneBody(ctx, data, dataType)
+			return
+		}
+	}
+
+	canRequest, waitCh := rm.TryRequest(proxy_url)
+	if !canRequest {
+		WaitOrRedirect(
+			ctx,
+			proxy_url,
+			waitCh,
+			1*time.Second,        // 最大等待时间
+			100*time.Millisecond, // 每次检查间隔
+			func(key string) ([]byte, string, bool) {
+				data, dataType, _, _ := cache.Get(key)
+				return data, dataType, data != nil
+			},
+			func(ctx *fasthttp.RequestCtx, data []byte, dataType string) {
+				log.Printf("资源Hit：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
+				resposneBody(ctx, data, dataType)
+			},
+		)
+		return
+	}
+	defer rm.DoneRequest(proxy_url)
+
 	// 直接重定向到原始 URL
-	log.Printf("下载开始：%s，%s", tvgID, proxy_url)
+	log.Printf("下载开始：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 	start := time.Now()
 	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, configsByProvider[provider.(string)].Headers, *configsByProvider[provider.(string)].HttpTimeout)
-	log.Printf("下载结束：%s，%s, 耗时：%s", tvgID, proxy_url, formatDuration(time.Since(start)))
+	log.Printf("下载结束：%s, %s，%s, 耗时：%s", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)))
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetBodyString("无法获取内容")
 		if err != nil {
@@ -1068,11 +1144,11 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			body = []byte(hls_list["master.m3u8"])
 			contentType = "application/vnd.apple.mpegurl"
 		}
-
 		if strings.Contains(query, "debug") {
-			ctx.SetContentType("text/plain; charset=utf-8")
-		} else {
-			ctx.SetContentType(contentType)
+			contentType = "text/plain; charset=utf-8"
+		}
+		if cache != nil {
+			cache.Set(proxy_url, body, contentType)
 		}
 	} else if proxy_type == "m3u8" {
 		strBody := string(body)
@@ -1113,9 +1189,10 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		}
 		body = []byte(strings.Join(newLines, "\n"))
 		if strings.Contains(query, "debug") {
-			ctx.SetContentType("text/plain; charset=utf-8")
-		} else {
-			ctx.SetContentType(contentType)
+			contentType = "text/plain; charset=utf-8"
+		}
+		if cache != nil {
+			cache.Set(proxy_url, body, contentType)
 		}
 	} else if proxy_type == "init-m4s" {
 		body, err = removePsshAndSinfFromBody(body)
@@ -1125,7 +1202,9 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
 			return
 		}
-		ctx.SetContentType(contentType)
+		if cache != nil {
+			cache.Set(proxy_url, body, contentType)
+		}
 	} else if proxy_type == "m4s" {
 		val, ok := clearKeysMap.Load(tvgID)
 		if ok {
@@ -1173,21 +1252,21 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 				log.Printf("[ERROR] DRM 解密信息失败，%s，%s, %s", tvgID, proxy_url, err)
 				return
 			}
-			ctx.SetContentType(contentType)
+			if cache != nil {
+				cache.Set(proxy_url, body, contentType)
+			}
 		} else {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
 			ctx.SetBodyString("找不到对应的clearKey")
 			log.Printf("[ERROR] 找不到对应的clearKey， %s，%s", tvgID, proxy_url)
 			return
 		}
-	} else {
-		ctx.SetContentType(contentType)
 	}
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
-	log.Printf("解密结束: %s, %s, 耗时：%s, 大小=%s,", tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
-	resposneBody(ctx, body)
-	log.Printf("代理结束: %s, %s, 耗时：%s, 大小=%s,", tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
+	log.Printf("解密结束: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
+	resposneBody(ctx, body, contentType)
+	log.Printf("代理结束: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
 }
 
 func startAutoGC(interval time.Duration) {
@@ -1198,4 +1277,49 @@ func startAutoGC(interval time.Duration) {
 			debug.FreeOSMemory()
 		}
 	}()
+}
+
+// WaitOrRedirect 等待已有请求完成，最多 waitMax 时间，每 interval 检查一次缓存。
+// cacheGetter 用于检查缓存是否可用（返回 data != nil 表示有数据）。
+// onHit 用于在命中缓存时输出响应。
+func WaitOrRedirect(
+	ctx *fasthttp.RequestCtx,
+	key string,
+	waitCh chan struct{},
+	waitMax time.Duration,
+	interval time.Duration,
+	cacheGetter func(string) ([]byte, string, bool),
+	onHit func(*fasthttp.RequestCtx, []byte, string),
+) {
+	timeout := time.After(waitMax)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			// 周期性检查缓存
+			if data, dataType, ok := cacheGetter(key); ok && data != nil {
+				ctx.Response.Header.Set("IDRM-CACHE", "HIT")
+				onHit(ctx, data, dataType)
+				return
+			}
+		case <-waitCh:
+			// 收到完成信号，重新查缓存
+			if data, dataType, ok := cacheGetter(key); ok && data != nil {
+				ctx.Response.Header.Set("IDRM-CACHE", "HIT")
+				onHit(ctx, data, dataType)
+				return
+			}
+			ctx.SetStatusCode(500)
+			ctx.SetBodyString("资源下载失败，请过一会再试")
+			log.Printf("[ERROR] 资源请求失败：%s", key)
+			return
+		case <-timeout:
+			ctx.SetStatusCode(302)
+			ctx.SetBodyString("资源正在下载中，请过一会再试")
+			log.Printf("资源正在下载中：%s", key)
+			return
+		}
+	}
 }
