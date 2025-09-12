@@ -45,9 +45,9 @@ type StreamConfig struct {
 	BestQuality              *bool    `json:"best-quality"`
 	ToFmp4OverHls            *bool    `json:"to-hls"`
 	HttpTimeout              *int     `json:"http-timeout"`
-	ManifestCacheExpire      *int     `json:"manifest-cache"`
-	SegmentMemoryCacheExpire *int     `json:"segment-memory-cache"`
-	SegmentFileCacheExpire   *int     `json:"segment-file-cache"`
+	ManifestCacheExpire      *int     `json:"cache-manifest"`
+	SegmentMemoryCacheExpire *int     `json:"cache-segment-memory"`
+	SegmentFileCacheExpire   *int     `json:"cache-segment-file"`
 	CacheDir                 *string  `json:"cache-dir"`
 }
 
@@ -197,9 +197,9 @@ func main() {
 	flag.IntVar(&gcInterval, "auto-gc", 30, "自动垃圾回收间隔，单位秒，0表示不启用, 最小值5秒")
 	flag.IntVar(&httpTimeout, "http-timeout", 15, "默认http请求超时")
 	flag.StringVar(&cacheDir, "cache-dir", "./", "cache 文件的保存路径，默认当前路径")
-	flag.IntVar(&manifestCacheExpire, "manifest-cache", -1, "mpd或者m3u8缓存过期时间，单位秒,-1 表示不开启")
-	flag.IntVar(&segmentMemoryCacheExpire, "segment-memory-cache", -1, "ts或者m4s缓存短期过期时间，单位秒, -1 表示不开启")
-	flag.IntVar(&segmentFileCacheExpire, "segment-file-cache", -1, "ts或者m4s缓存文件最大存活时间，单位秒,-1 表示不开启")
+	flag.IntVar(&manifestCacheExpire, "cache-manifest", -1, "mpd或者m3u8缓存过期时间，单位秒,-1 表示不开启")
+	flag.IntVar(&segmentMemoryCacheExpire, "cache-segment-memory", -1, "ts或者m4s缓存短期过期时间，单位秒, -1 表示不开启")
+	flag.IntVar(&segmentFileCacheExpire, "cache-segment-file", -1, "ts或者m4s缓存文件最大存活时间，单位秒,-1 表示不开启")
 
 	var enablePprof bool
 	var pprofAddr string

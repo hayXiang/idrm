@@ -19,7 +19,7 @@
             //"args": ["-c", "./c.json", "-l", "127.0.0.1:1234", "-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev"]
             //"args": ["-i", "https://live.9528.eu.org/s/Dl1Jfxda", "-name", "tvb","-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev", "-proxy", "socks5://127.0.0.1:40808"]
             //"args": ["-to-hls=true","-i", "https://live.9528.eu.org/s/3vOAZaOs", "-name", "tvb","-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev", "-A", "Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/8.0 TV Safari/537.36"]
-            "args": ["-name", "nba", "-i", "https://live.9528.eu.org/subscribe/npl/mpd?token=yueyue2014", "-segment-file-cache=30", "-segment-memory-cache=10"]
+            "args": ["-name", "nba", "-i", "https://live.9528.eu.org/subscribe/npl/mpd?token=yueyue2014", "cache-segment-file=30", "cache-segment-memory=10"]
         }
     ]
 }
