@@ -197,14 +197,14 @@ func (fc *FileCache) cleanupLoop() {
 			files, _ := os.ReadDir(fc.dir)
 			now := time.Now()
 			for _, file := range files {
-				if filepath.Ext(file.Name()) != ".idrm-data" {
+				ext := filepath.Ext(file.Name())
+				if ext != ".idrm-data" && ext != ".idrm-meta" {
 					continue
 				}
 				path := filepath.Join(fc.dir, file.Name())
 				info, err := os.Stat(path)
 				if err == nil && fc.fileTTL > 0 && now.Sub(info.ModTime()) > time.Duration(fc.fileTTL)*time.Second {
 					_ = os.Remove(path)
-					_ = os.Remove(path[:len(path)-5] + ".idrm-meta") // 删除对应的 .meta
 				}
 			}
 		}
