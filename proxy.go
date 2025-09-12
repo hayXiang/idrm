@@ -1019,13 +1019,13 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		ctx.SetBodyString("Invalid proxy URL")
 		return
 	}
+	query := string(ctx.QueryArgs().QueryString())
 	proxy_type := parts[0]
 	tvgID := parts[1]
 	var proxy_url = ""
 	if !strings.HasPrefix(parts[2], "index.") {
 		proxy_url = strings.Replace(parts[2], "http/", "http://", 1)
 		proxy_url = strings.Replace(proxy_url, "https/", "https://", 1)
-		query := string(ctx.QueryArgs().QueryString())
 		if query != "" {
 			proxy_url += "?" + query
 		}
@@ -1040,7 +1040,6 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		}
 		proxy_url = raw_url.(string)
 	}
-	query := string(ctx.QueryArgs().QueryString())
 
 	log.Printf("代理开始：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 
@@ -1110,6 +1109,13 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			func(ctx *fasthttp.RequestCtx, data []byte, dataType string) {
 				log.Printf("资源Hit：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 				resposneBody(ctx, data, dataType)
+			},
+			func() {
+				var location_302 string = path
+				if query != "" {
+					location_302 += ("?" + query)
+				}
+				ctx.Response.Header.Set("location", location_302)
 			},
 		)
 		return
@@ -1296,6 +1302,7 @@ func WaitOrRedirect(
 	interval time.Duration,
 	cacheGetter func(string) ([]byte, string, bool),
 	onHit func(*fasthttp.RequestCtx, []byte, string),
+	onTimeout func(),
 ) {
 	timeout := time.After(waitMax)
 	ticker := time.NewTicker(interval)
@@ -1325,6 +1332,7 @@ func WaitOrRedirect(
 			ctx.SetStatusCode(302)
 			ctx.SetBodyString("资源正在下载中，请过一会再试")
 			log.Printf("资源正在下载中：%s", key)
+			onTimeout()
 			return
 		}
 	}
