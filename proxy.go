@@ -1091,36 +1091,43 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		}
 	}
 
-	canRequest, waitCh := rm.TryRequest(proxy_url)
-	if !canRequest {
-		WaitOrRedirect(
-			ctx,
-			proxy_url,
-			waitCh,
-			1*time.Second,        // 最大等待时间
-			100*time.Millisecond, // 每次检查间隔
-			func(key string) ([]byte, string, bool) {
-				if cache == nil {
-					return nil, "", false
-				}
-				data, dataType, _, _ := cache.Get(key)
-				return data, dataType, data != nil
-			},
-			func(ctx *fasthttp.RequestCtx, data []byte, dataType string) {
-				log.Printf("资源Hit：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
-				resposneBody(ctx, data, dataType)
-			},
-			func() {
-				var location_302 string = path
-				if query != "" {
-					location_302 += ("?" + query)
-				}
-				ctx.Response.Header.Set("location", location_302)
-			},
-		)
-		return
+	if cache != nil {
+		if canRequest, waitCh := rm.TryRequest(proxy_url); !canRequest {
+			WaitOrRedirect(
+				ctx,
+				proxy_url,
+				waitCh,
+				1*time.Second,        // 最大等待时间
+				100*time.Millisecond, // 每次检查间隔
+				func(key string) ([]byte, string, bool) {
+					if cache == nil {
+						return nil, "", false
+					}
+					data, dataType, _, _ := cache.Get(key)
+					return data, dataType, data != nil
+				},
+				//ON HIT
+				func(ctx *fasthttp.RequestCtx, data []byte, dataType string) {
+					log.Printf("资源Hit：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
+					resposneBody(ctx, data, dataType)
+				},
+				//ON TIMEOUT
+				func() {
+					var location_302 string = path
+					if query != "" {
+						location_302 += ("?" + query)
+					}
+					ctx.Response.Header.Set("Location", location_302)
+				},
+			)
+			return
+		}
 	}
-	defer rm.DoneRequest(proxy_url)
+	defer func() {
+		if cache != nil {
+			rm.DoneRequest(proxy_url)
+		}
+	}()
 
 	// 直接重定向到原始 URL
 	log.Printf("下载开始：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
@@ -1324,7 +1331,8 @@ func WaitOrRedirect(
 				onHit(ctx, data, dataType)
 				return
 			}
-			ctx.SetStatusCode(500)
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+			ctx.Response.Header.Set("Retry-After", "1")
 			ctx.SetBodyString("资源下载失败，请过一会再试")
 			log.Printf("[ERROR] 资源请求失败：%s", key)
 			return
