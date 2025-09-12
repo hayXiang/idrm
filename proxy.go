@@ -346,7 +346,7 @@ func main() {
 		}
 	}
 
-	if strings.HasSuffix(cacheDir, "/") {
+	if !strings.HasSuffix(cacheDir, "/") {
 		cacheDir += "/"
 	}
 	for _, config := range configs {
