@@ -346,16 +346,19 @@ func main() {
 		}
 	}
 
+	if strings.HasSuffix(cacheDir, "/") {
+		cacheDir += "/"
+	}
 	for _, config := range configs {
 		configsByProvider[config.Name] = config
 		clientsByProvider[config.Name] = newFastHTTPClient(config.Proxy, *config.HttpTimeout)
 		m3uClientByProvider[config.Name] = newFastHTTPClient(config.M3uProxy, 30)
 		if *config.ManifestCacheExpire >= 0 {
-			manifestCacheByProvider[config.Name] = NewFileCache("./idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
+			manifestCacheByProvider[config.Name] = NewFileCache(cacheDir+"idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
 		}
 
 		if *config.SegmentFileCacheExpire >= 0 || *config.SegmentMemoryCacheExpire >= 0 {
-			segmentCacheByProvider[config.Name] = NewFileCache("./idrm-cache/"+config.Name, *config.SegmentMemoryCacheExpire, *config.SegmentFileCacheExpire)
+			segmentCacheByProvider[config.Name] = NewFileCache(cacheDir+"idrm-cache/"+config.Name, *config.SegmentMemoryCacheExpire, *config.SegmentFileCacheExpire)
 		}
 	}
 
