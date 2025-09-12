@@ -82,7 +82,11 @@ func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client
 					log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mpdURL, err)
 					continue
 				}
-				hlsMap, _ := DashToHLS(u.mpdURL, body, u.tvgID)
+				hlsMap, err := DashToHLS(u.mpdURL, body, u.tvgID)
+				if err != nil {
+					log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mpdURL, err)
+					continue
+				}
 				hlsByTvgId.Store(u.tvgID, hlsMap)
 				log.Println("Updated HLS for", u.tvgID)
 
