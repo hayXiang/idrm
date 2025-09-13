@@ -274,14 +274,11 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 			startNumber, _ := strconv.Atoi(segTemp.SelectAttrValue("startNumber", "1"))
 			timescale, _ := strconv.Atoi(segTemp.SelectAttrValue("timescale", "1"))
 			mediaTemplate := strings.ReplaceAll(segTemp.SelectAttrValue("media", ""), "$RepresentationID$", repID)
-			initURI := strings.ReplaceAll(segTemp.SelectAttrValue("initialization", ""), "$RepresentationID$", repID)
 
-			mediaBuilder.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", startNumber))
-			mediaBuilder.WriteString(fmt.Sprintf(`#EXT-X-MAP:URI="%s"`+"\n", initURI))
-
+			var segmentBuilder strings.Builder
 			timeline := segTemp.FindElement("SegmentTimeline")
+			seq := startNumber
 			if timeline != nil {
-				seq := startNumber
 				lastT := 0
 				for _, s := range timeline.FindElements("S") {
 					d, _ := strconv.Atoi(s.SelectAttrValue("d", "0"))
@@ -294,11 +291,10 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 						t = lastT
 					}
 					duration := float64(d) / float64(timescale)
-
 					for i := 0; i <= r; i++ {
 						segURI := strings.ReplaceAll(mediaTemplate, "$Time$", strconv.Itoa(t))
 						segURI = strings.ReplaceAll(segURI, "$Number$", strconv.Itoa(seq))
-						mediaBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", duration, segURI))
+						segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", duration, segURI))
 						t += d
 						seq++
 					}
@@ -306,8 +302,13 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 				}
 			}
 			if is_static {
-				mediaBuilder.WriteString("#ENDLIST")
+				segmentBuilder.WriteString("#ENDLIST")
 			}
+
+			initURI := strings.ReplaceAll(segTemp.SelectAttrValue("initialization", ""), "$RepresentationID$", repID)
+			mediaBuilder.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", seq))
+			mediaBuilder.WriteString(fmt.Sprintf(`#EXT-X-MAP:URI="%s"`+"\n", initURI))
+			mediaBuilder.WriteString(segmentBuilder.String())
 			hlsMap[playlistName] = mediaBuilder.String()
 		}
 	}
