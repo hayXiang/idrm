@@ -1129,7 +1129,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 
 	if *config.SpeedUp || *config.ToFmp4OverHls {
-		startOrResetUpdater(provider.(string), tvgID, raw_url.(string), client, config, 3*time.Second)
+		startOrResetUpdater(provider.(string), tvgID, raw_url.(string), client, config, 2*time.Second)
 	}
 
 	if proxy_type == "hls" {
