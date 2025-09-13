@@ -26,6 +26,11 @@ type HLSUpdater struct {
 var updaters sync.Map
 
 func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.Client, config *StreamConfig, interval time.Duration) {
+
+	if mediaType, ok := hlsTypeByTvgId.Load(tvgID); ok && mediaType == "static" {
+		return
+	}
+
 	cachedUpd, exists := updaters.Load(tvgID)
 	if exists {
 		cachedUpd.(*HLSUpdater).lastAccess = time.Now()
@@ -66,19 +71,20 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 
 			var hlsMap = make(map[string]string)
 			var hlsMapLock sync.Mutex
-
+			var mediaType = "dynamic"
 			if strings.Contains(u.mainfestUrl, ".mpd") || contentType == "application/dash+xml" {
 				body, err = modifyMpd(u.provider, u.tvgID, u.mainfestUrl, body)
 				if err != nil {
 					log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
 				}
-				hlsMap, err = DashToHLS(u.mainfestUrl, body, u.tvgID)
+				mediaType, hlsMap, err = DashToHLS(u.mainfestUrl, body, u.tvgID)
 				if err != nil {
 					log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
 				}
 				hlsByTvgId.Store(u.tvgID, hlsMap)
+				hlsTypeByTvgId.Store(u.tvgID, mediaType)
 			} else {
 				body = modifyHLS(body, u.tvgID, u.mainfestUrl, *u.config.BestQuality)
 				urls, err := HLSParse(body, finalURI)
@@ -98,16 +104,29 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 						}
 						modifyBody := modifyHLS(resp.Body(), u.tvgID, _url, *u.config.BestQuality)
 						hlsMapLock.Lock()
-						hlsMap[_key+".m3u8"] = string(modifyBody)
+						m3u8Content := string(modifyBody)
+						hlsMap[_key+".m3u8"] = m3u8Content
+						if strings.Contains(m3u8Content, "#ENDLIST") {
+							hlsTypeByTvgId.Store(u.tvgID, "static")
+						}
 						hlsMapLock.Unlock()
 						fasthttp.ReleaseResponse(resp)
 					}(key, url)
 				}
 				wg.Wait()
 			}
-
 			log.Println("Updated HLS for", u.tvgID)
 
+			if mediaType, ok := hlsTypeByTvgId.Load(tvgID); ok && mediaType == "static" {
+				log.Printf("VOD资源，停止预加载 %s，%s", u.tvgID, u.mainfestUrl)
+				close(u.stopCh)
+				updaters.Delete(u.tvgID)
+				return
+			}
+
+			if !*config.SpeedUp {
+				return
+			}
 			// 预加载最后三个分片
 			for name, playlist := range hlsMap {
 				if name == "master.m3u8" || !strings.HasSuffix(name, ".m3u8") {
@@ -182,7 +201,7 @@ func GetMaxSegmentDuration(adp *etree.Element) float64 {
 }
 
 // 返回 HLS playlists 内容，key = filename, value = m3u8 内容
-func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, error) {
+func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]string, error) {
 	doc := etree.NewDocument()
 	hlsMap := make(map[string]string)
 
@@ -190,8 +209,12 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 	masterBuilder.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-INDEPENDENT-SEGMENTS\n")
 
 	if err := doc.ReadFromBytes(body); err != nil {
-		return nil, fmt.Errorf("failed to parse MPD: %v", err)
+		return "", nil, fmt.Errorf("failed to parse MPD: %v", err)
 	}
+
+	mpd := doc.FindElement("//MPD")
+	media_type := mpd.SelectAttrValue("type", "")
+	is_static := media_type == "static"
 
 	periods := doc.FindElements("//MPD/Period")
 	for _, period := range periods {
@@ -274,6 +297,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 
 					for i := 0; i <= r; i++ {
 						segURI := strings.ReplaceAll(mediaTemplate, "$Time$", strconv.Itoa(t))
+						segURI = strings.ReplaceAll(segURI, "$Number$", strconv.Itoa(seq))
 						mediaBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", duration, segURI))
 						t += d
 						seq++
@@ -281,13 +305,15 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 					lastT = t
 				}
 			}
-
+			if is_static {
+				mediaBuilder.WriteString("#ENDLIST")
+			}
 			hlsMap[playlistName] = mediaBuilder.String()
 		}
 	}
 
 	hlsMap["master.m3u8"] = masterBuilder.String()
-	return hlsMap, nil
+	return media_type, hlsMap, nil
 }
 
 func preloadSegments(provider string, tvgID string, segmentURLs []string) {

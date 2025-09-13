@@ -93,6 +93,7 @@ var (
 	segmentCacheByProvider  = make(map[string]*FileCache)
 	hlsByTvgId              = sync.Map{}
 	rawUrlByTvgId           = sync.Map{}
+	hlsTypeByTvgId          = sync.Map{}
 )
 
 var version = "1.0.0.6"
@@ -1012,6 +1013,18 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 		}
 	}
 
+	//删除image
+	adpsets := doc.FindElements("//AdaptationSet")
+	for _, adp := range adpsets {
+		mimeTpye := adp.SelectAttrValue("mimeType", "")
+		if strings.HasPrefix(mimeTpye, "image/") {
+			parent := adp.Parent()
+			if parent != nil {
+				parent.RemoveChild(adp)
+			}
+		}
+	}
+
 	//删除DRM信息
 	for _, cp := range doc.FindElements("//ContentProtection") {
 		cp.Parent().RemoveChild(cp)
@@ -1242,7 +1255,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			return
 		}
 		if *config.ToFmp4OverHls {
-			hls_list, _ := DashToHLS(proxy_url, body, tvgID)
+			_, hls_list, _ := DashToHLS(proxy_url, body, tvgID)
 			hlsByTvgId.Store(tvgID, hls_list)
 			body = []byte(hls_list["master.m3u8"])
 			contentType = "application/vnd.apple.mpegurl"
