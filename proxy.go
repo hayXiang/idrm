@@ -95,7 +95,7 @@ var (
 	rawUrlByTvgId           = sync.Map{}
 )
 
-var version = "1.0.0.5"
+var version = "1.0.0.6"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
