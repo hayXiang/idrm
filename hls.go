@@ -47,95 +47,107 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 	updaters.Store(tvgID, upd)
 
 	go func(u *HLSUpdater) {
+		update := func() {
+			// 检查是否超时
+			if time.Since(u.lastAccess) > 30*time.Second {
+				log.Println("Stopping updater for", u.tvgID)
+				updaters.Delete(u.tvgID)
+				return
+			}
+
+			finalURI, resp, err := fetchWithRedirect(u.client, u.mainfestUrl, 5, u.config.Headers, *u.config.HttpTimeout)
+			if err != nil || resp.StatusCode() != fasthttp.StatusOK {
+				log.Printf("[ERROR] 更新manifest失败 %s，%s, %v", u.tvgID, u.mainfestUrl, err)
+				return
+			}
+			body := append([]byte(nil), resp.Body()...)
+			contentType := string(resp.Header.ContentType())
+			fasthttp.ReleaseResponse(resp)
+
+			var hlsMap = make(map[string]string)
+			var hlsMapLock sync.Mutex
+
+			if strings.Contains(u.mainfestUrl, ".mpd") || contentType == "application/dash+xml" {
+				body, err = modifyMpd(u.provider, u.tvgID, u.mainfestUrl, body)
+				if err != nil {
+					log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
+					return
+				}
+				hlsMap, err = DashToHLS(u.mainfestUrl, body, u.tvgID)
+				if err != nil {
+					log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
+					return
+				}
+				hlsByTvgId.Store(u.tvgID, hlsMap)
+			} else {
+				body = modifyHLS(body, u.tvgID, u.mainfestUrl, *u.config.BestQuality)
+				urls, err := HLSParse(body, finalURI)
+				if err != nil {
+					log.Printf("[ERROR] HLS解析错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
+					return
+				}
+				var wg sync.WaitGroup
+				for key, url := range urls {
+					wg.Add(1)
+					go func(_key, _url string) {
+						defer wg.Done()
+						_, resp, err := fetchWithRedirect(u.client, _url, 5, u.config.Headers, *u.config.HttpTimeout)
+						if err != nil {
+							fmt.Println("请求失败:", _url, err)
+							return
+						}
+						modifyBody := modifyHLS(resp.Body(), u.tvgID, _url, *u.config.BestQuality)
+						hlsMapLock.Lock()
+						hlsMap[_key+".m3u8"] = string(modifyBody)
+						hlsMapLock.Unlock()
+						fasthttp.ReleaseResponse(resp)
+					}(key, url)
+				}
+				wg.Wait()
+			}
+
+			log.Println("Updated HLS for", u.tvgID)
+
+			// 预加载最后三个分片
+			for name, playlist := range hlsMap {
+				if name == "master.m3u8" || !strings.HasSuffix(name, ".m3u8") {
+					continue
+				}
+				var segmentList []string
+				playlist = strings.ReplaceAll(playlist, "#EXT-X-MAP:URI=\"", "")
+				lines := strings.Split(playlist, "\n")
+				for _, line := range lines {
+					if strings.HasPrefix(line, "#") || line == "" {
+						continue
+					}
+					segmentList = append(segmentList, line)
+				}
+
+				lastSegments := segmentList
+				if len(segmentList) > 3 {
+					lastSegments = segmentList[len(segmentList)-3:]
+				}
+				preloadSegments(u.provider, u.tvgID, lastSegments)
+			}
+		}
+
+		// 异步执行一次 update，并等待完成
+		doneCh := make(chan struct{})
+		go func() {
+			update()
+			close(doneCh)
+		}()
+
+		// 等待第一次更新完成，再启动 ticker
+		<-doneCh
+
 		ticker := time.NewTicker(u.interval)
 		defer ticker.Stop()
 
 		for {
 			select {
 			case <-ticker.C:
-				// 检查是否超时
-				if time.Since(u.lastAccess) > 30*time.Second {
-					log.Println("Stopping updater for", u.tvgID)
-					updaters.Delete(u.tvgID)
-					return
-				}
-
-				finalURI, resp, err := fetchWithRedirect(u.client, u.mainfestUrl, 5, u.config.Headers, *u.config.HttpTimeout)
-				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
-					log.Printf("[ERROR] 更新manifest失败%s，%s, %v", u.tvgID, u.mainfestUrl, err)
-					continue
-				}
-				body := resp.Body()
-				contentType := string(resp.Header.ContentType())
-				fasthttp.ReleaseResponse(resp)
-				var hlsMap = make(map[string]string)
-				var hlsMapLock sync.Mutex
-				if strings.Contains(mainfestUrl, ".mpd") || contentType == "application/dash+xml" {
-					body, err = modifyMpd(provider, u.tvgID, u.mainfestUrl, body)
-					if err != nil {
-						log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
-						continue
-					}
-					hlsMap, err = DashToHLS(u.mainfestUrl, body, u.tvgID)
-					if err != nil {
-						log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
-						continue
-					}
-					hlsByTvgId.Store(u.tvgID, hlsMap)
-				} else {
-					body = modifyHLS(body, tvgID, u.mainfestUrl, *config.BestQuality)
-					urls, err := HLSParse(body, finalURI)
-					if err != nil {
-						log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
-						continue
-					}
-					var wg sync.WaitGroup
-					for key, url := range urls {
-						wg.Add(1)
-						go func(_key string, _url string) {
-							defer wg.Done()
-							_, resp, err := fetchWithRedirect(u.client, _url, 5, u.config.Headers, *u.config.HttpTimeout)
-							if err != nil {
-								fmt.Println("请求失败:", _url, err)
-								return
-							}
-							modifyBody := modifyHLS(resp.Body(), u.tvgID, _url, *u.config.BestQuality)
-							hlsMapLock.Lock()
-							hlsMap[_key+".m3u8"] = string(modifyBody)
-							hlsMapLock.Unlock()
-							fasthttp.ReleaseResponse(resp)
-						}(key, url)
-					}
-					wg.Wait()
-				}
-				log.Println("Updated HLS for", u.tvgID)
-
-				for name, playlist := range hlsMap {
-					var segmentList []string
-					playlist = strings.ReplaceAll(playlist, "#EXT-X-MAP:URI=\"", "")
-					if name == "master.m3u8" {
-						continue // 只处理分片列表，不处理 master.m3u8 和 mpd
-					}
-
-					if !strings.HasSuffix(name, ".m3u8") {
-						continue // 只处理分片列表，不处理 master.m3u8 和 mpd
-					}
-
-					lines := strings.Split(playlist, "\n")
-					for _, line := range lines {
-						if strings.HasPrefix(line, "#") || line == "" {
-							continue
-						}
-						segmentList = append(segmentList, line)
-					}
-
-					//预加载最后三个分片
-					lastSegments := segmentList
-					if len(segmentList) > 3 {
-						lastSegments = segmentList[len(segmentList)-3:]
-					}
-					preloadSegments(provider, tvgID, lastSegments)
-				}
+				go update() // 后续周期更新仍然异步执行
 			case <-u.stopCh:
 				log.Println("Updater stopped manually for", u.tvgID)
 				return
