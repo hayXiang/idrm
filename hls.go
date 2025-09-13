@@ -224,6 +224,20 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 		for _, adap := range adaps {
 			maxDuration := int(GetMaxSegmentDuration(adap))
 			contentType := adap.SelectAttrValue("contentType", "")
+			if contentType == "" {
+				mimeType := adap.SelectAttrValue("mimeType", "")
+				if strings.HasPrefix(mimeType, "video") {
+					contentType = "video"
+				} else if strings.HasPrefix(mimeType, "audio") {
+					contentType = "audio"
+				} else if strings.HasPrefix(mimeType, "text") || strings.HasPrefix(mimeType, "application") {
+					contentType = "text"
+				}
+			}
+
+			if contentType == "" {
+				continue
+			}
 			groupID := contentType
 
 			rep := adap.FindElement("Representation")
