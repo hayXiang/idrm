@@ -301,7 +301,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string) {
 
 		// 先看缓存
 		if data, _, _, _ := cache.Get(segURL); data != nil {
-			log.Printf("资源Hit(预加载）： %s，%s", tvgID, segURL)
+			//log.Printf("资源Hit(预加载）： %s，%s", tvgID, segURL)
 			continue
 		}
 
