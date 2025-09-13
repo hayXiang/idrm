@@ -316,7 +316,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 				}
 			}
 			if is_static {
-				segmentBuilder.WriteString("#ENDLIST")
+				segmentBuilder.WriteString("#EXT-X-ENDLIST")
 			}
 
 			initURI := strings.ReplaceAll(segTemp.SelectAttrValue("initialization", ""), "$RepresentationID$", repID)
