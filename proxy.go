@@ -96,7 +96,7 @@ var (
 	hlsTypeByTvgId          = sync.Map{}
 )
 
-var version = "1.0.0.6"
+var version = "1.0.0.7"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
