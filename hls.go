@@ -50,7 +50,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 		update := func() {
 			// 检查是否超时
 			if time.Since(u.lastAccess) > 30*time.Second {
-				log.Println("Stopping updater for", u.tvgID)
+				close(u.stopCh)
 				updaters.Delete(u.tvgID)
 				return
 			}
@@ -130,16 +130,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 				preloadSegments(u.provider, u.tvgID, lastSegments)
 			}
 		}
-
-		// 异步执行一次 update，并等待完成
-		doneCh := make(chan struct{})
-		go func() {
-			update()
-			close(doneCh)
-		}()
-
-		// 等待第一次更新完成，再启动 ticker
-		<-doneCh
+		update()
 
 		ticker := time.NewTicker(u.interval)
 		defer ticker.Stop()
@@ -147,13 +138,47 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 		for {
 			select {
 			case <-ticker.C:
-				go update() // 后续周期更新仍然异步执行
+				update() // 后续周期更新仍然异步执行
 			case <-u.stopCh:
 				log.Println("Updater stopped manually for", u.tvgID)
 				return
 			}
 		}
 	}(upd)
+}
+
+func GetMaxSegmentDuration(adp *etree.Element) float64 {
+	var maxDur float64 = 0
+	timescale := 1.0
+
+	for _, segTpl := range adp.FindElements("//SegmentTemplate") {
+		tsAttr := segTpl.SelectAttrValue("timescale", "1")
+		t, _ := strconv.ParseFloat(tsAttr, 64)
+		timescale = t
+
+		timeline := segTpl.SelectElement("SegmentTimeline")
+		if timeline != nil {
+			for _, s := range timeline.SelectElements("S") {
+				dAttr := s.SelectAttrValue("d", "0")
+				dur, _ := strconv.ParseFloat(dAttr, 64)
+				segDur := dur / timescale
+				if segDur > maxDur {
+					maxDur = segDur
+				}
+			}
+		} else {
+			// fallback: 单个 duration
+			durAttr := segTpl.SelectAttrValue("duration", "")
+			if durAttr != "" {
+				dur, _ := strconv.ParseFloat(durAttr, 64)
+				segDur := dur / timescale
+				if segDur > maxDur {
+					maxDur = segDur
+				}
+			}
+		}
+	}
+	return maxDur
 }
 
 // 返回 HLS playlists 内容，key = filename, value = m3u8 内容
@@ -174,6 +199,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 		adaps := period.FindElements("AdaptationSet")
 
 		for _, adap := range adaps {
+			maxDuration := int(GetMaxSegmentDuration(adap))
 			contentType := adap.SelectAttrValue("contentType", "")
 			groupID := contentType
 
@@ -216,7 +242,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 
 			// 生成 media playlist
 			var mediaBuilder strings.Builder
-			mediaBuilder.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:6\n")
+			mediaBuilder.WriteString(fmt.Sprintf("#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:%d\n", maxDuration))
 
 			segTemp := adap.FindElement("SegmentTemplate")
 			if segTemp == nil {
