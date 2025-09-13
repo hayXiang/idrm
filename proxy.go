@@ -1001,6 +1001,17 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 		// 比如 xmlns, xmlns:xsi, xmlns:scte35
 	}
 
+	//只保留最后一个
+	periods := doc.FindElements("//Period")
+	if len(periods) > 1 {
+		for i := 0; i < len(periods)-1; i++ {
+			parent := periods[i].Parent()
+			if parent != nil {
+				parent.RemoveChild(periods[i])
+			}
+		}
+	}
+
 	//删除DRM信息
 	for _, cp := range doc.FindElements("//ContentProtection") {
 		cp.Parent().RemoveChild(cp)
