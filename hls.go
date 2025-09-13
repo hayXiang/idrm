@@ -113,6 +113,10 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 				for name, playlist := range hlsMap {
 					var segmentList []string
 					playlist = strings.ReplaceAll(playlist, "#EXT-X-MAP:URI=\"", "")
+					if name == "master.m3u8" {
+						continue // 只处理分片列表，不处理 master.m3u8 和 mpd
+					}
+
 					if !strings.HasSuffix(name, ".m3u8") {
 						continue // 只处理分片列表，不处理 master.m3u8 和 mpd
 					}
@@ -259,6 +263,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string) {
 
 		// 先看缓存
 		if data, _, _, _ := cache.Get(segURL); data != nil {
+			log.Printf("资源Hit(预加载）： %s，%s", tvgID, segURL)
 			continue
 		}
 
