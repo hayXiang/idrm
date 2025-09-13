@@ -15,45 +15,36 @@ import (
 type HLSUpdater struct {
 	provider    string
 	tvgID       string
-	mpdURL      string
+	mainfestUrl string
 	interval    time.Duration
 	stopCh      chan struct{}
 	lastAccess  time.Time
 	client      *fasthttp.Client
-	headers     []string
-	httpTimeout int
+	config      *StreamConfig
 }
 
-var (
-	updaters   = make(map[string]*HLSUpdater)
-	updatersMu sync.Mutex
-)
+var updaters sync.Map
 
-func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client, headers []string, interval time.Duration, timeout int) {
-	updatersMu.Lock()
-	defer updatersMu.Unlock()
-
-	upd, exists := updaters[tvgID]
+func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.Client, config *StreamConfig, interval time.Duration) {
+	cachedUpd, exists := updaters.Load(tvgID)
 	if exists {
-		// 重置访问时间
-		upd.lastAccess = time.Now()
+		cachedUpd.(*HLSUpdater).lastAccess = time.Now()
 		return
 	}
 
 	// 创建新的 updater
-	upd = &HLSUpdater{
+	upd := &HLSUpdater{
 		provider:    provider,
 		tvgID:       tvgID,
-		mpdURL:      mpdURL,
+		mainfestUrl: mainfestUrl,
 		interval:    interval,
 		stopCh:      make(chan struct{}),
 		lastAccess:  time.Now(),
 		client:      client,
-		headers:     headers,
-		httpTimeout: timeout,
+		config:      config,
 	}
 
-	updaters[tvgID] = upd
+	updaters.Store(tvgID, upd)
 
 	go func(u *HLSUpdater) {
 		ticker := time.NewTicker(u.interval)
@@ -65,31 +56,82 @@ func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client
 				// 检查是否超时
 				if time.Since(u.lastAccess) > 30*time.Second {
 					log.Println("Stopping updater for", u.tvgID)
-					updatersMu.Lock()
-					delete(updaters, u.tvgID)
-					updatersMu.Unlock()
+					updaters.Delete(u.tvgID)
 					return
 				}
 
-				_, resp, err := fetchWithRedirect(u.client, u.mpdURL, 5, u.headers, u.httpTimeout)
+				finalURI, resp, err := fetchWithRedirect(u.client, u.mainfestUrl, 5, u.config.Headers, *u.config.HttpTimeout)
 				if err != nil || resp.StatusCode() != fasthttp.StatusOK {
-					log.Printf("[ERROR] 更新mpd失败%s，%s, %v", u.tvgID, u.mpdURL, err)
+					log.Printf("[ERROR] 更新manifest失败%s，%s, %v", u.tvgID, u.mainfestUrl, err)
 					continue
 				}
+				body := resp.Body()
+				contentType := string(resp.Header.ContentType())
 				fasthttp.ReleaseResponse(resp)
-				body, err := modifyMpd(provider, u.tvgID, u.mpdURL, resp.Body())
-				if err != nil {
-					log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mpdURL, err)
-					continue
+				var hlsMap = make(map[string]string)
+				var hlsMapLock sync.Mutex
+				if strings.Contains(mainfestUrl, ".mpd") || contentType == "application/dash+xml" {
+					body, err = modifyMpd(provider, u.tvgID, u.mainfestUrl, body)
+					if err != nil {
+						log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
+						continue
+					}
+					hlsMap, err = DashToHLS(u.mainfestUrl, body, u.tvgID)
+					if err != nil {
+						log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
+						continue
+					}
+					hlsByTvgId.Store(u.tvgID, hlsMap)
+				} else {
+					body = modifyHLS(body, tvgID, u.mainfestUrl, *config.BestQuality)
+					urls, err := HLSParse(body, finalURI)
+					if err != nil {
+						log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
+						continue
+					}
+					var wg sync.WaitGroup
+					for key, url := range urls {
+						wg.Add(1)
+						go func(_key string, _url string) {
+							defer wg.Done()
+							_, resp, err := fetchWithRedirect(u.client, _url, 5, u.config.Headers, *u.config.HttpTimeout)
+							if err != nil {
+								fmt.Println("请求失败:", _url, err)
+								return
+							}
+							modifyBody := modifyHLS(resp.Body(), u.tvgID, _url, *u.config.BestQuality)
+							hlsMapLock.Lock()
+							hlsMap[_key+".m3u8"] = string(modifyBody)
+							hlsMapLock.Unlock()
+							fasthttp.ReleaseResponse(resp)
+						}(key, url)
+					}
+					wg.Wait()
 				}
-				hlsMap, err := DashToHLS(u.mpdURL, body, u.tvgID)
-				if err != nil {
-					log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mpdURL, err)
-					continue
-				}
-				hlsByTvgId.Store(u.tvgID, hlsMap)
 				log.Println("Updated HLS for", u.tvgID)
 
+				for name, playlist := range hlsMap {
+					var segmentList []string
+					playlist = strings.ReplaceAll(playlist, "#EXT-X-MAP:URI=\"", "")
+					if !strings.HasSuffix(name, ".m3u8") {
+						continue // 只处理分片列表，不处理 master.m3u8 和 mpd
+					}
+
+					lines := strings.Split(playlist, "\n")
+					for _, line := range lines {
+						if strings.HasPrefix(line, "#") || line == "" {
+							continue
+						}
+						segmentList = append(segmentList, line)
+					}
+
+					//预加载最后三个分片
+					lastSegments := segmentList
+					if len(segmentList) > 3 {
+						lastSegments = segmentList[len(segmentList)-3:]
+					}
+					preloadSegments(provider, tvgID, lastSegments)
+				}
 			case <-u.stopCh:
 				log.Println("Updater stopped manually for", u.tvgID)
 				return
@@ -102,7 +144,6 @@ func startOrResetUpdater(provider, tvgID, mpdURL string, client *fasthttp.Client
 func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, error) {
 	doc := etree.NewDocument()
 	hlsMap := make(map[string]string)
-	hlsMap["mpd"] = mpdUrl
 
 	var masterBuilder strings.Builder
 	masterBuilder.WriteString("#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-INDEPENDENT-SEGMENTS\n")
@@ -205,4 +246,113 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (map[string]string, err
 
 	hlsMap["master.m3u8"] = masterBuilder.String()
 	return hlsMap, nil
+}
+
+func preloadSegments(provider string, tvgID string, segmentURLs []string) {
+	cache := segmentCacheByProvider[provider]
+	client := clientsByProvider[provider]
+	config := configsByProvider[provider]
+	for _, segURL := range segmentURLs {
+		segURL = strings.Replace(segURL, "/drm/proxy/m4s/"+tvgID, "", 1)
+		segURL = strings.Replace(segURL, "/http/", "http://", 1)
+		segURL = strings.Replace(segURL, "/https/", "https://", 1)
+
+		// 先看缓存
+		if data, _, _, _ := cache.Get(segURL); data != nil {
+			continue
+		}
+
+		if canRequest, _ := rm.TryRequest(segURL); canRequest {
+			go func(url string) {
+				defer func() {
+					rm.DoneRequest(url)
+					log.Printf("预加载结束：%s, %s，%s", "preloader", tvgID, url)
+				}()
+				log.Printf("下载开始(预加载）：%s, %s，%s", "preloader", tvgID, url)
+				start := time.Now()
+				_, resp, err := fetchWithRedirect(client, url, 5, config.Headers, *config.HttpTimeout)
+				log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, formatDuration(time.Since(start)))
+				if err != nil {
+					return
+				}
+				defer fasthttp.ReleaseResponse(resp)
+				body, err := fetchAndDecryptWidevineBody(client, config, tvgID, url, resp.Body(), nil)
+				if err != nil {
+					return
+				}
+				if cache != nil {
+					cache.Set(url, body, "application/octet-stream")
+				}
+			}(segURL)
+		}
+	}
+}
+
+func HLSParse(body []byte, baseURL string) (map[string]string, error) {
+	lines := strings.Split(string(body), "\n")
+	result := make(map[string]string)
+
+	var lastStreamInfo string
+	var streamCount, audioCount, subCount int
+
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if line == "" || strings.HasPrefix(line, "#EXTM3U") {
+			continue
+		}
+
+		// 多码率流
+		if strings.HasPrefix(line, "#EXT-X-STREAM-INF:") {
+			lastStreamInfo = line
+			continue
+		}
+
+		// STREAM-INF 对应的下一行是 URI
+		if lastStreamInfo != "" && !strings.HasPrefix(line, "#") {
+			streamCount++
+			key := fmt.Sprintf("stream-%d", streamCount)
+			result[key] = resolveURL(line, baseURL)
+			lastStreamInfo = ""
+			continue
+		}
+
+		// 音轨/字幕
+		if strings.HasPrefix(line, "#EXT-X-MEDIA:") {
+			attrs := parseAttrs(line[len("#EXT-X-MEDIA:"):])
+			if uri, ok := attrs["URI"]; ok {
+				switch attrs["TYPE"] {
+				case "AUDIO":
+					audioCount++
+					key := fmt.Sprintf("audio-%s", attrs["LANGUAGE"])
+					if key == "audio-" || result[key] != "" {
+						key = fmt.Sprintf("audio-%d", audioCount)
+					}
+					result[key] = resolveURL(uri, baseURL)
+				case "SUBTITLES":
+					subCount++
+					key := fmt.Sprintf("subtitle-%s", attrs["LANGUAGE"])
+					if key == "subtitle-" || result[key] != "" {
+						key = fmt.Sprintf("subtitle-%d", subCount)
+					}
+					result[key] = resolveURL(uri, baseURL)
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func parseAttrs(attrLine string) map[string]string {
+	attrs := map[string]string{}
+	parts := strings.Split(attrLine, ",")
+	for _, part := range parts {
+		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(kv) == 2 {
+			key := kv[0]
+			val := strings.Trim(kv[1], `"`)
+			attrs[key] = val
+		}
+	}
+	return attrs
 }

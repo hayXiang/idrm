@@ -5,11 +5,14 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/Eyevinn/mp4ff/mp4"
+	"github.com/valyala/fasthttp"
 )
 
 // 前补零 IV 到 16 字节，使用复用数组避免重复分配
@@ -167,6 +170,75 @@ func decryptWidevineFromFile(inPath, outPath string, key []byte) error {
 		return fmt.Errorf("写入 MP4 文件失败: %w", err)
 	}
 	return nil
+}
+
+func fetchAndDecryptWidevineBody(client *fasthttp.Client, config *StreamConfig, tvgID, proxyURL string, body []byte, ctx *fasthttp.RequestCtx) ([]byte, error) {
+	val, ok := clearKeysMap.Load(tvgID)
+	if !ok {
+		err := fmt.Errorf("key not found for tvgID %s", tvgID)
+		if ctx != nil {
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+			ctx.SetBodyString("密钥不存在")
+		}
+		return nil, err
+	}
+
+	// 如果已经有人在拉 license，可以直接返回，不等待
+	// 可用一个 requestManager 或 map 来标记是否在获取
+	if strings.HasPrefix(val.(string), "http") {
+		resp, err := HttpGetWithUA(client, val.(string), config.LicenseUrlHeaders, *config.HttpTimeout)
+		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
+			if ctx != nil {
+				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+				ctx.SetBodyString("无法获取 license")
+			}
+			return nil, fmt.Errorf("failed to fetch license: %v", err)
+		}
+		val = string(resp.Body())
+		clearKeysMap.Store(tvgID, val)
+		fasthttp.ReleaseResponse(resp)
+	}
+
+	// 解析 JWK
+	if strings.Contains(val.(string), "kty") && strings.Contains(val.(string), "keys") {
+		var jwk JWKSet
+		if err := json.Unmarshal([]byte(val.(string)), &jwk); err != nil {
+			return nil, err
+		}
+		for _, key := range jwk.Keys {
+			kid, _ := base64DecodeWithPad(key.Kid)
+			k, _ := base64DecodeWithPad(key.K)
+			val = hex.EncodeToString(kid) + ":" + hex.EncodeToString(k)
+		}
+	}
+
+	kidKey := strings.Split(val.(string), ":")
+	if len(kidKey) != 2 {
+		if ctx != nil {
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+			ctx.SetBodyString("密钥格式错误," + val.(string))
+		}
+		return nil, fmt.Errorf("invalid key format: %s", val)
+	}
+
+	keyBytes, err := hex.DecodeString(kidKey[1])
+	if err != nil {
+		if ctx != nil {
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+			ctx.SetBodyString("密钥格式错误")
+		}
+		return nil, err
+	}
+
+	body, err = decryptWidevineFromBody(body, keyBytes)
+	if err != nil {
+		if ctx != nil {
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+			ctx.SetBodyString("DRM 解密信息失败")
+		}
+		return nil, err
+	}
+	return body, nil
 }
 
 func xxxmain() {
