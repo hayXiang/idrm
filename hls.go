@@ -360,7 +360,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string) {
 					return
 				}
 				defer fasthttp.ReleaseResponse(resp)
-				body, err := fetchAndDecryptWidevineBody(client, config, tvgID, url, resp.Body(), nil)
+				body, err := fetchAndDecrypt(client, config, tvgID, resp.Body(), nil)
 				if err != nil {
 					return
 				}
