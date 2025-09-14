@@ -94,7 +94,7 @@ func decryptFromBody(drmType string, data []byte, key []byte) ([]byte, error) {
 	return encodeMP4ToBytes(mp4File)
 }
 
-type DecryptCallback func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) error
+type DecryptCallback func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error)
 
 func decrypt(mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error {
 	var traf *mp4.TrafBox = nil
@@ -164,11 +164,13 @@ func decrypt(mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error 
 			}
 		}
 	}
+	decryptList := make([][]byte, int(senc.SampleCount))
 	for i := 0; i < int(senc.SampleCount); i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			doDecryptFuc(block, mdata, senc, traf, i, offsets[i])
+			decrypt, _ := doDecryptFuc(block, mdata, senc, traf, i, offsets[i])
+			decryptList[i] = decrypt
 		}(i)
 	}
 	wg.Wait()
@@ -182,17 +184,36 @@ func decrypt(mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error 
 		}
 		frag.Moof.Children = newBoxes
 	}
+
+	if len(decryptList[0]) > 0 {
+		mdata.Data = joinDecryptedSamples(decryptList)
+	}
 	return nil
 }
 
+func joinDecryptedSamples(decryptedSamples [][]byte) []byte {
+	totalLen := 0
+	for _, s := range decryptedSamples {
+		totalLen += len(s)
+	}
+
+	result := make([]byte, totalLen)
+	offset := 0
+	for _, s := range decryptedSamples {
+		copy(result[offset:], s)
+		offset += len(s)
+	}
+
+	return result
+}
+
 func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte) error {
-	return decrypt(mp4File, key, func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) error {
+	return decrypt(mp4File, key, func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error) {
 		if drmType == "widevine" {
-			DecryptWidevineSample(block, mdat, senc, traf, i, offset)
+			return DecryptWidevineSample(block, mdat, senc, traf, i, offset)
 		} else {
-			DecryptFairplaySample(block, mdat, senc, traf, i, offset, -1, 1, 9)
+			return DecryptFairplaySample(block, mdat, senc, traf, i, offset, -1, 1, 9)
 		}
-		return nil
 	})
 }
 

@@ -20,52 +20,74 @@ func generateIV(mediaSequence int32, index int) [16]byte {
 	return iv
 }
 
-func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, mediaSequence int32, cryptByteBlock int, skipByteBlock int) {
+func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, mediaSequence int32, cryptByteBlock int, skipByteBlock int) ([]byte, error) {
 	encrypted := mdat.Data
 	iv := generateIV(mediaSequence, i)
 	if senc.SubSamples == nil {
 		size := traf.Trun.Samples[i].Size
-		DecryptCBCSInPlace(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock)
+		return decryptCBCSWithTail(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock)
 	} else {
+		var sampleData []byte
 		for _, sub := range senc.SubSamples[i] {
+			sampleData = append(sampleData, encrypted[offset:offset+uint32(sub.BytesOfClearData)]...)
 			offset += uint32(sub.BytesOfClearData)
 			size := uint32(sub.BytesOfProtectedData)
 			if size > 0 {
-				DecryptCBCSInPlace(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock)
+				dec, _ := decryptCBCSWithTail(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock)
+				sampleData = append(sampleData, dec...)
 				offset += size
 			}
 		}
+		return sampleData, nil
 	}
 }
 
-func DecryptCBCSInPlace(block cipher.Block, data []byte, iv [16]byte, cryptBlocks, skipBlocks int) {
+func decryptCBCSWithTail(block cipher.Block, subSampleData []byte, iv [16]byte, cryptByteBlock, skipByteBlock int) ([]byte, error) {
 	blockSize := block.BlockSize()
-	var prevCipher [16]byte
-	copy(prevCipher[:], iv[:])
-	var tmp [16]byte
-	var cipherBlock [16]byte
+	size := len(subSampleData)
+	decrypted := make([]byte, size)
+	copy(decrypted, subSampleData)
+
+	if cryptByteBlock <= 0 && skipByteBlock <= 0 {
+		return decrypted, nil
+	}
 
 	offset := 0
-	for offset+blockSize <= len(data) {
-		// 解密 cryptBlocks 个 block
-		for i := 0; i < cryptBlocks && offset+blockSize <= len(data); i++ {
-			// 保存密文到临时数组
-			copy(cipherBlock[:], data[offset:offset+blockSize])
+	prevCipher := make([]byte, blockSize)
+	copy(prevCipher, iv[:])
 
-			// AES 解密
-			block.Decrypt(tmp[:], cipherBlock[:])
-			for j := 0; j < blockSize; j++ {
-				data[offset+j] ^= prevCipher[j]
+	tmp := make([]byte, blockSize)
+	cipherBlock := make([]byte, blockSize)
+
+	for offset < size {
+		// 解密 cryptByteBlock 个 block
+		for i := 0; i < cryptByteBlock && offset < size; i++ {
+			remain := size - offset
+			if remain >= blockSize {
+				copy(cipherBlock, decrypted[offset:offset+blockSize])
+				block.Decrypt(tmp, decrypted[offset:offset+blockSize])
+				for j := 0; j < blockSize; j++ {
+					decrypted[offset+j] = tmp[j] ^ prevCipher[j]
+				}
+				copy(prevCipher, cipherBlock)
+				offset += blockSize
+			} else {
+				// 尾部不足 block，保留明文
+				offset += remain
 			}
-
-			// 更新 prevCipher 为密文
-			copy(prevCipher[:], cipherBlock[:])
-			offset += blockSize
 		}
 
-		// 跳过 skipBlocks 个 block
-		for i := 0; i < skipBlocks && offset+blockSize <= len(data); i++ {
-			offset += blockSize
+		// 跳过 skipByteBlock 个 block
+		for i := 0; i < skipByteBlock && offset < size; i++ {
+			remain := size - offset
+			if remain >= blockSize {
+				offset += blockSize
+			} else {
+				// 尾部不足 block，直接保留明文
+				offset += remain
+			}
 		}
 	}
+
+	return decrypted, nil
 }
