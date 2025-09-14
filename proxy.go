@@ -89,8 +89,8 @@ var (
 	configsByProvider       = make(map[string]*StreamConfig)
 	clientsByProvider       = make(map[string]*fasthttp.Client)
 	m3uClientByProvider     = make(map[string]*fasthttp.Client)
-	manifestCacheByProvider = make(map[string]*FileCache)
-	segmentCacheByProvider  = make(map[string]*FileCache)
+	manifestCacheByProvider = make(map[string]*MyCache)
+	segmentCacheByProvider  = make(map[string]*MyCache)
 	hlsByTvgId              = sync.Map{}
 	rawUrlByTvgId           = sync.Map{}
 	hlsTypeByTvgId          = sync.Map{}
@@ -363,14 +363,14 @@ func main() {
 		clientsByProvider[config.Name] = newFastHTTPClient(config.Proxy, *config.HttpTimeout)
 		m3uClientByProvider[config.Name] = newFastHTTPClient(config.M3uProxy, 30)
 		if *config.ManifestCacheExpire >= 0 {
-			manifestCacheByProvider[config.Name] = NewFileCache(cacheDir+"idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
+			manifestCacheByProvider[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
 		}
 
 		if *config.SegmentFileCacheExpire >= 0 || *config.SegmentMemoryCacheExpire >= 0 || *config.SpeedUp {
 			if *config.SegmentMemoryCacheExpire < 10 {
 				*config.SegmentMemoryCacheExpire = 10
 			}
-			segmentCacheByProvider[config.Name] = NewFileCache(cacheDir+"idrm-cache/"+config.Name, *config.SegmentMemoryCacheExpire, *config.SegmentFileCacheExpire)
+			segmentCacheByProvider[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name, *config.SegmentMemoryCacheExpire, *config.SegmentFileCacheExpire)
 		}
 	}
 
@@ -486,6 +486,8 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 		proxyStreamURL(ctx, path)
 	case strings.HasSuffix(path, ".m3u"):
 		loadM3u(ctx, "")
+	case strings.HasPrefix(path, "/stats/cache"):
+		CacheStatsHandler(ctx)
 	default:
 		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		ctx.SetBodyString("Not Found")
@@ -766,7 +768,7 @@ func joinBaseAndMedia(baseURLs []string, media string) string {
 	return base + media // media 不加 /
 }
 
-func formatSize(size int) string {
+func formatSize(size int64) string {
 	const (
 		KB = 1024
 		MB = 1024 * KB
@@ -1265,7 +1267,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			contentType = "text/plain; charset=utf-8"
 		}
 		if cache != nil {
-			cache.Set(proxy_url, body, contentType)
+			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "m3u8" {
 		body = modifyHLS(body, tvgID, proxy_url, *config.BestQuality)
@@ -1273,7 +1275,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			contentType = "text/plain; charset=utf-8"
 		}
 		if cache != nil {
-			cache.Set(proxy_url, body, contentType)
+			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "init-m4s" {
 		body, err = removePsshAndSinfFromBody(body)
@@ -1284,7 +1286,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			return
 		}
 		if cache != nil {
-			cache.Set(proxy_url, body, contentType)
+			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "m4s" {
 		body, err = fetchAndDecryptWidevineBody(client, configsByProvider[provider.(string)], tvgID, proxy_url, body, ctx)
@@ -1292,14 +1294,14 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			return
 		}
 		if cache != nil {
-			cache.Set(proxyURL, body, "application/octet-stream")
+			cache.Set(proxyURL, body, MyMetadata{"application/octet-stream", tvgID, 0})
 		}
 	}
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
-	log.Printf("解密结束: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
+	log.Printf("解密结束: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(int64(len(body))))
 	resposneBody(ctx, body, contentType)
-	log.Printf("代理结束: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(len(body)))
+	log.Printf("代理结束: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(int64(len(body))))
 }
 
 func startAutoGC(interval time.Duration) {

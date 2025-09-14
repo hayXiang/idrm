@@ -365,7 +365,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string) {
 					return
 				}
 				if cache != nil {
-					cache.Set(url, body, "application/octet-stream")
+					cache.Set(url, body, MyMetadata{"application/octet-stream", tvgID, 0})
 				}
 			}(segURL)
 		}
