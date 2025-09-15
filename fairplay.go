@@ -29,7 +29,7 @@ func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.Senc
 		skipByteBlock = int(sinf.Schi.Tenc.DefaultSkipByteBlock)
 	}
 
-	if senc.SubSamples == nil {
+	if senc == nil || senc.SubSamples == nil {
 		size := traf.Trun.Samples[i].Size
 		return decryptCBCSWithTail(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock)
 	} else {
@@ -58,12 +58,6 @@ func decryptCBCSWithTail(block cipher.Block, subSampleData []byte, iv []byte, cr
 	}
 	if skipByteBlock <= 0 {
 		skipByteBlock = 0
-	}
-
-	if cryptByteBlock == 1 && skipByteBlock == 0 {
-		mode := cipher.NewCBCDecrypter(block, iv[:])
-		mode.CryptBlocks(decrypted, subSampleData)
-		return decrypted, nil
 	}
 
 	copy(decrypted, subSampleData)

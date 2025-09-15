@@ -156,9 +156,6 @@ func decrypt(mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error 
 		}
 	}
 	traf.Children = newBoxes
-	if senc == nil {
-		return fmt.Errorf("未找到 senc box")
-	}
 
 	// AES block 只创建一次
 	block, err := aes.NewCipher(key)
@@ -171,21 +168,24 @@ func decrypt(mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error 
 		return fmt.Errorf("未找到 mdat")
 	}
 
+	sampleCount := len(traf.Trun.Samples)
 	var wg sync.WaitGroup
-	offsets := make([]uint32, int(senc.SampleCount))
+	offsets := make([]uint32, sampleCount)
 	curr := uint32(0)
-	for i := 0; i < int(senc.SampleCount); i++ {
-		offsets[i] = curr
-		if senc.SubSamples == nil {
-			curr += traf.Trun.Samples[i].Size
-		} else {
-			for _, sub := range senc.SubSamples[i] {
-				curr += uint32(sub.BytesOfClearData) + uint32(sub.BytesOfProtectedData)
+	if sampleCount > 0 {
+		for i := 0; i < int(sampleCount); i++ {
+			offsets[i] = curr
+			if senc == nil || senc.SubSamples == nil {
+				curr += traf.Trun.Samples[i].Size
+			} else {
+				for _, sub := range senc.SubSamples[i] {
+					curr += uint32(sub.BytesOfClearData) + uint32(sub.BytesOfProtectedData)
+				}
 			}
 		}
 	}
-	decryptList := make([][]byte, int(senc.SampleCount))
-	for i := 0; i < int(senc.SampleCount); i++ {
+	decryptList := make([][]byte, int(sampleCount))
+	for i := 0; i < int(sampleCount); i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()

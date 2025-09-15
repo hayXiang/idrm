@@ -12,7 +12,7 @@ func DecryptWidevineSample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.Senc
 	iv := getIV(senc, sinf, i, &iv16)
 	stream := cipher.NewCTR(block, iv)
 
-	if senc.SubSamples == nil {
+	if senc == nil || senc.SubSamples == nil {
 		size := traf.Trun.Samples[i].Size
 		stream.XORKeyStream(encrypted[offset:offset+size], encrypted[offset:offset+size])
 	} else {
