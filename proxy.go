@@ -1314,7 +1314,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "init-m4s" {
-		body, sinfBox, err := modifyInitM4sFromBody(body)
+		modifiedBody, sinfBox, err := modifyInitM4sFromBody(body)
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("移除 DRM 信息失败")
@@ -1325,6 +1325,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		if cache != nil {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
+		body = modifiedBody
 	} else if proxy_type == "m4s" {
 		var sinfBox *mp4.SinfBox = nil
 		if t, ok := sinfBoxByStreamId.Load(stream_uuid); ok {
