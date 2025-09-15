@@ -100,7 +100,7 @@ var (
 	sinfBoxByStreamId       = sync.Map{}
 )
 
-var version = "1.0.0.9"
+var version = "1.0.0.10"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -507,6 +507,8 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 var reTvg = regexp.MustCompile(`tvg-id="([^"]+)"`)
 var reDrm = regexp.MustCompile(`drm_legacy=org\.w3\.clearkey\|([0-9a-fA-F]+):([0-9a-fA-F]+)`)
 var reValidTvg = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`)
+var reBW = regexp.MustCompile(`BANDWIDTH=(\d+)`)
+var reLang = regexp.MustCompile(`LANGUAGE="([^"]+)"`)
 var clearKeysMap = sync.Map{} // map[tvgID]clearkey
 
 func GetForwardHeader(ctx *fasthttp.RequestCtx, header, fallback string) string {
@@ -867,21 +869,34 @@ func filterHighestAV(body string) string {
 	var bestAudioLine string
 	if bestAudioGroup != "" {
 		var maxABW int64 = -1
-		re := regexp.MustCompile(`BANDWIDTH=(\d+)`)
 		for _, line := range lines {
 			if strings.HasPrefix(line, "#EXT-X-MEDIA:") &&
 				strings.Contains(line, "TYPE=AUDIO") &&
 				strings.Contains(line, fmt.Sprintf("GROUP-ID=\"%s\"", bestAudioGroup)) {
-				m := re.FindStringSubmatch(line)
+
+				// 带宽
 				var bw int64
-				if len(m) == 2 {
+				if m := reBW.FindStringSubmatch(line); len(m) == 2 {
 					if v, err := strconv.ParseInt(m[1], 10, 64); err == nil {
 						bw = v
 					}
 				}
+
+				// 语言
+				lang := ""
+				if m := reLang.FindStringSubmatch(line); len(m) == 2 {
+					lang = strings.ToLower(m[1])
+				}
+
+				// 选择逻辑：先比带宽，再比语言
 				if bw > maxABW {
 					maxABW = bw
 					bestAudioLine = line
+				} else if bw == maxABW {
+					// 相同码率 → 英文优先
+					if strings.HasPrefix(lang, "en") {
+						bestAudioLine = line
+					}
 				}
 			}
 		}
