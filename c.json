@@ -15,7 +15,6 @@
 {
     "name": "ben",
     "url": "https://live.9528.eu.org/s/zn16IzSJ.m3u",
-    "proxy": "socks5://127.0.0.1:10708",
     "headers": [],
     "drm-type": "fairplay"
   }]

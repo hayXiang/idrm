@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/beevik/etree"
 	"github.com/valyala/fasthttp"
 )
@@ -133,9 +134,15 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 					continue
 				}
 				var segmentList []string
-				playlist = strings.ReplaceAll(playlist, "#EXT-X-MAP:URI=\"", "")
+				var initM4sUrl string = ""
 				lines := strings.Split(playlist, "\n")
 				for _, line := range lines {
+					if strings.HasPrefix(line, "#EXT-X-MAP:") {
+						matches := M3U8_INIT_REGEXP.FindStringSubmatch(line)
+						if len(matches) == 2 {
+							initM4sUrl = matches[1]
+						}
+					}
 					if strings.HasPrefix(line, "#") || line == "" {
 						continue
 					}
@@ -146,7 +153,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 				if len(segmentList) > 3 {
 					lastSegments = segmentList[len(segmentList)-3:]
 				}
-				preloadSegments(u.provider, u.tvgID, lastSegments)
+				preloadSegments(u.provider, u.tvgID, lastSegments, initM4sUrl)
 			}
 		}
 		update()
@@ -320,7 +327,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 			}
 
 			initURI := strings.ReplaceAll(segTemp.SelectAttrValue("initialization", ""), "$RepresentationID$", repID)
-			mediaBuilder.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", seq))
+			mediaBuilder.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", startNumber))
 			mediaBuilder.WriteString(fmt.Sprintf(`#EXT-X-MAP:URI="%s"`+"\n", initURI))
 			mediaBuilder.WriteString(segmentBuilder.String())
 			hlsMap[playlistName] = mediaBuilder.String()
@@ -331,12 +338,51 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 	return media_type, hlsMap, nil
 }
 
-func preloadSegments(provider string, tvgID string, segmentURLs []string) {
+func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4sUrl string) {
 	cache := segmentCacheByProvider[provider]
 	client := clientsByProvider[provider]
 	config := configsByProvider[provider]
+	//需要先下载initM4s，才能获取到解密需要的信息。
+	// 先确保 init.m4s 已下载并解析
+	initReaderChan := make(chan struct{})
+	if initM4sUrl != "" {
+		// 替换成真实 URL
+		url := strings.Replace(initM4sUrl, "/drm/proxy/init-m4s/"+tvgID, "", 1)
+		stream_uuid := strings.Split(url, "/")[1]
+		url = strings.Replace(url, "/"+stream_uuid, "", 1)
+		url = strings.Replace(url, "/http/", "http://", 1)
+		url = strings.Replace(url, "/https/", "https://", 1)
+		_, ok := tencBoxByStreamId.Load(stream_uuid)
+		if ok {
+			close(initReaderChan)
+		} else {
+			go func() {
+				defer func() {
+					close(initReaderChan)
+				}()
+				_, resp, err := fetchWithRedirect(client, url, 5, config.Headers, *config.HttpTimeout)
+				if err != nil {
+					log.Printf("init.m4s 下载失败: %v", err)
+					return
+				}
+				defer fasthttp.ReleaseResponse(resp)
+
+				body, _tencBox, err := modifyInitM4sFromBody(resp.Body())
+				if err != nil {
+					return
+				}
+				tencBoxByStreamId.Store(stream_uuid, _tencBox)
+				if cache != nil {
+					cache.Set(url, body, MyMetadata{string(resp.Header.ContentType()), tvgID, 0})
+				}
+			}()
+		}
+	}
+
 	for _, segURL := range segmentURLs {
 		segURL = strings.Replace(segURL, "/drm/proxy/m4s/"+tvgID, "", 1)
+		stream_uuid := strings.Split(segURL, "/")[1]
+		segURL = strings.Replace(segURL, "/"+stream_uuid, "", 1)
 		segURL = strings.Replace(segURL, "/http/", "http://", 1)
 		segURL = strings.Replace(segURL, "/https/", "https://", 1)
 
@@ -359,8 +405,15 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string) {
 				if err != nil {
 					return
 				}
-				defer fasthttp.ReleaseResponse(resp)
-				body, err := fetchAndDecrypt(client, config, tvgID, resp.Body(), nil)
+				responseBody := resp.Body()
+				fasthttp.ReleaseResponse(resp)
+				<-initReaderChan
+				var tenBox *mp4.TencBox
+				v, ok := tencBoxByStreamId.Load(stream_uuid)
+				if ok {
+					tenBox = v.(*mp4.TencBox)
+				}
+				body, err := fetchAndDecrypt(client, config, tvgID, responseBody, nil, tenBox)
 				if err != nil {
 					return
 				}

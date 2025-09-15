@@ -13,10 +13,10 @@
             "program": "${fileDirname}",
             //"args": ["mac.m4s", "output-de.m4s", "1c27808477121e784b9f6ee1224f374d"]
             //"args": ["v8_222-0-T-164918980225.m4s.1", "11.m4s", "b85491a27c2852323ac704a07cf7b779"]
-            //"args": ["-i", "https://live.9528.eu.org/subscribe/npl/mpd?token=rashhman","-name", "tvb","-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev", "-A", "Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/8.0 TV Safari/537.36"]
+            "args": ["-i", "https://live.9528.eu.org/subscribe/npl/mpd?token=rashhman","-name", "tvb","-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev", "-A", "Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/8.0 TV Safari/537.36", "-speed-up=true"]
             //"args": ["-i", "http://jp.haycker.eu.org:9528/dazn/live/index.m3u?token=92cfbe706ad62016ff64958d45e4de38"]
             //"args": ["-i", "https://live.9528.eu.org/mytvsuper?token=yueyue202592a2432ba65d3076a8cafe&player=tivimate"]
-            "args": ["-c", "./c.json", "-l", "127.0.0.1:1234", "-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev"]
+            //"args": ["-c", "./c.json", "-l", "127.0.0.1:1234", "-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev"]
             //"args": ["-i", "https://live.9528.eu.org/s/Dl1Jfxda", "-name", "tvb","-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev", "-proxy", "socks5://127.0.0.1:40808"]
             //"args": ["-i", "https://live.9528.eu.org/s/zn16IzSJ.m3u", "-name", "tvb","-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev", "-A", "Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/8.0 TV Safari/537.36", "-to-hls=true", "-speed-up=true","-cache-segment-file=60", "-cache-segment-memory=30"]
             //"args": ["-name", "nba", "-i", "https://live.9528.eu.org/subscribe/npl/mpd?token=yueyue2014", "-cache-segment-file=30", "-cache-segment-memory=10", "-speed-up=true"]

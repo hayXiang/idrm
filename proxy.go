@@ -27,6 +27,7 @@ import (
 
 	"os"
 
+	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/beevik/etree"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/proxy"
@@ -96,6 +97,7 @@ var (
 	hlsByTvgId              = sync.Map{}
 	rawUrlByTvgId           = sync.Map{}
 	hlsTypeByTvgId          = sync.Map{}
+	tencBoxByStreamId       = sync.Map{}
 )
 
 var version = "1.0.0.9"
@@ -742,8 +744,8 @@ func resolveURL(targetUrl string, baseUrl string) string {
 	return finalURI
 }
 
-func convert_to_proxy_url(proxy_type string, tvgID string, targetUrl string, baseUrl string) string {
-	return fmt.Sprintf("/drm/proxy/%s/%s/%s", proxy_type, tvgID, strings.Replace(resolveURL(targetUrl, baseUrl), "://", "/", 1))
+func convert_to_proxy_url(proxy_type string, tvgID string, targetUrl string, baseUrl string, stream_uuid string) string {
+	return fmt.Sprintf("/drm/proxy/%s/%s/%s/%s", proxy_type, tvgID, stream_uuid, strings.Replace(resolveURL(targetUrl, baseUrl), "://", "/", 1))
 }
 
 func collectBaseURLs(elem *etree.Element) []string {
@@ -964,6 +966,8 @@ func modifyHLS(body []byte, tvgID, proxyURL string, bestQuality bool) []byte {
 	var newLines []string
 	var lastLineWasExtInf bool
 
+	hash := md5.Sum([]byte(proxyURL))
+	stream_uuid := hex.EncodeToString(hash[:])
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -979,14 +983,14 @@ func modifyHLS(body []byte, tvgID, proxyURL string, bestQuality bool) []byte {
 		if strings.HasPrefix(line, "#EXT-X-MAP:") {
 			matches := M3U8_INIT_REGEXP.FindStringSubmatch(line)
 			if len(matches) == 2 {
-				newURI := convert_to_proxy_url("init-m4s", tvgID, matches[1], proxyURL)
+				newURI := convert_to_proxy_url("init-m4s", tvgID, matches[1], proxyURL, stream_uuid)
 				line = M3U8_INIT_REGEXP.ReplaceAllString(line, `URI="`+newURI+`"`)
 			}
 		}
 
 		// 如果上一行是 EXTINF → 当前行是分片地址
 		if lastLineWasExtInf && !strings.HasPrefix(line, "#") {
-			line = convert_to_proxy_url("m4s", tvgID, line, proxyURL)
+			line = convert_to_proxy_url("m4s", tvgID, line, proxyURL, stream_uuid)
 			lastLineWasExtInf = false
 		}
 
@@ -1042,6 +1046,7 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 
 	// 查找所有 SegmentTemplate 节点
 	segTemplates := doc.FindElements("//SegmentTemplate")
+	stream_index := 0
 	for _, st := range segTemplates {
 		media := st.SelectAttrValue("media", "")
 		if media != "" {
@@ -1051,15 +1056,16 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 				media_type = "jpg"
 			}
 			st.RemoveAttr("media")
-			st.CreateAttr("media", convert_to_proxy_url(media_type, tvgId, media, url))
+			st.CreateAttr("media", convert_to_proxy_url(media_type, tvgId, media, url, strconv.Itoa(stream_index)))
 		}
 
 		init := st.SelectAttrValue("initialization", "")
 		if init != "" {
 			init = joinBaseAndMedia(collectBaseURLs(st), init)
 			st.RemoveAttr("initialization")
-			st.CreateAttr("initialization", convert_to_proxy_url("init-m4s", tvgId, init, url))
+			st.CreateAttr("initialization", convert_to_proxy_url("init-m4s", tvgId, init, url, strconv.Itoa(stream_index)))
 		}
+		stream_index++
 	}
 
 	//删除BaseURL
@@ -1119,24 +1125,31 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	query := string(ctx.QueryArgs().QueryString())
 	proxy_type := parts[0]
 	tvgID := parts[1]
-	var proxy_url = ""
-	if !strings.HasPrefix(parts[2], "index.") {
-		proxy_url = strings.Replace(parts[2], "http/", "http://", 1)
-		proxy_url = strings.Replace(proxy_url, "https/", "https://", 1)
-		if query != "" {
-			proxy_url += "?" + query
+	var proxy_url = parts[2]
+	var stream_uuid string = "default"
+	if proxy_type == "m3u8" || proxy_type == "mpd" {
+		if strings.HasPrefix(parts[2], "index.") {
+			raw_url, ok := rawUrlByTvgId.Load(tvgID)
+			if !ok {
+				ctx.SetStatusCode(fasthttp.StatusBadRequest)
+				ctx.SetBodyString("invalid tvg id, not found")
+				return
+			}
+			proxy_url = raw_url.(string)
 		}
-		proxy_url = strings.Replace(proxy_url, "?debug", "", 1)
-		proxy_url = strings.Replace(proxy_url, "&debug", "", 1)
 	} else {
-		raw_url, ok := rawUrlByTvgId.Load(tvgID)
-		if !ok {
-			ctx.SetStatusCode(fasthttp.StatusBadRequest)
-			ctx.SetBodyString("invalid tvg id, not found")
-			return
+		if proxy_type == "m4s" || proxy_type == "init-m4s" {
+			stream_uuid = strings.Split(proxy_url, "/")[0]
+			proxy_url = strings.Replace(proxy_url, stream_uuid+"/", "", 1)
 		}
-		proxy_url = raw_url.(string)
 	}
+	proxy_url = strings.Replace(proxy_url, "http/", "http://", 1)
+	proxy_url = strings.Replace(proxy_url, "https/", "https://", 1)
+	if query != "" {
+		proxy_url += "?" + query
+	}
+	proxy_url = strings.Replace(proxy_url, "?debug", "", 1)
+	proxy_url = strings.Replace(proxy_url, "&debug", "", 1)
 
 	log.Printf("代理开始：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 
@@ -1286,18 +1299,23 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "init-m4s" {
-		body, err = removePsshAndSinfFromBody(body)
+		body, tencBox, err := modifyInitM4sFromBody(body)
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("移除 DRM 信息失败")
 			log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
 			return
 		}
+		tencBoxByStreamId.Store(stream_uuid, tencBox)
 		if cache != nil {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "m4s" {
-		body, err = fetchAndDecrypt(client, configsByProvider[provider.(string)], tvgID, body, ctx)
+		var tencBox *mp4.TencBox = nil
+		if t, ok := tencBoxByStreamId.Load(stream_uuid); ok {
+			tencBox = t.(*mp4.TencBox)
+		}
+		body, err = fetchAndDecrypt(client, configsByProvider[provider.(string)], tvgID, body, ctx, tencBox)
 		if err != nil {
 			return
 		}

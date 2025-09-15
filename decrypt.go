@@ -15,7 +15,27 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx) ([]byte, error) {
+// 前补零 IV 到 16 字节，使用复用数组避免重复分配
+func padIV(iv8 []byte, iv16 *[16]byte) []byte {
+	for i := range iv16 {
+		iv16[i] = 0
+	}
+	copy(iv16[:], iv8)
+	return iv16[:]
+}
+
+func getIV(senc *mp4.SencBox, tenc *mp4.TencBox, i int, iv16 *[16]byte) []byte {
+	if senc != nil && len(senc.IVs) > 0 {
+		return padIV(senc.IVs[i], iv16)
+	}
+
+	if tenc != nil {
+		return padIV(tenc.DefaultConstantIV, iv16)
+	}
+	return iv16[:]
+}
+
+func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, tencBox *mp4.TencBox) ([]byte, error) {
 	val, ok := clearKeysMap.Load(tvgID)
 	if !ok {
 		err := fmt.Errorf("key not found for tvgID %s", tvgID)
@@ -73,7 +93,7 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 		return nil, err
 	}
 
-	body, err = decryptFromBody(*config.DrmType, body, keyBytes)
+	body, err = decryptFromBody(*config.DrmType, body, keyBytes, tencBox)
 	if err != nil {
 		if ctx != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
@@ -84,13 +104,13 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 	return body, nil
 }
 
-func decryptFromBody(drmType string, data []byte, key []byte) ([]byte, error) {
+func decryptFromBody(drmType string, data []byte, key []byte, tencBox *mp4.TencBox) ([]byte, error) {
 	mp4File, err := mp4.DecodeFile(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("解析 MP4 文件失败: %w", err)
 	}
 
-	decrypFromMp4(drmType, mp4File, key)
+	decrypFromMp4(drmType, mp4File, key, tencBox)
 	return encodeMP4ToBytes(mp4File)
 }
 
@@ -207,12 +227,12 @@ func joinDecryptedSamples(decryptedSamples [][]byte) []byte {
 	return result
 }
 
-func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte) error {
+func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte, tencBox *mp4.TencBox) error {
 	return decrypt(mp4File, key, func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error) {
 		if drmType == "widevine" {
-			return DecryptWidevineSample(block, mdat, senc, traf, i, offset)
+			return DecryptWidevineSample(block, mdat, senc, traf, i, offset, tencBox)
 		} else {
-			return DecryptFairplaySample(block, mdat, senc, traf, i, offset, -1, 1, 9)
+			return DecryptFairplaySample(block, mdat, senc, traf, i, offset, -1, tencBox)
 		}
 	})
 }
@@ -230,7 +250,7 @@ func decryptFromFile(inPath, outPath string, key []byte, drmType string) error {
 		return fmt.Errorf("解析 MP4 文件失败: %w", err)
 	}
 
-	if err = decrypFromMp4(drmType, mp4File, key); err != nil {
+	if err = decrypFromMp4(drmType, mp4File, key, nil); err != nil {
 		return err
 	}
 

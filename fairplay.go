@@ -8,9 +8,6 @@ import (
 
 // 生成 16 字节 CBC IV
 func generateIV(mediaSequence int32, index int) [16]byte {
-	if mediaSequence == -1 {
-		return [16]byte{0}
-	}
 	var iv [16]byte
 	seq := uint32(mediaSequence) + uint32(index)
 	iv[12] = byte((seq >> 24) & 0xFF)
@@ -20,9 +17,18 @@ func generateIV(mediaSequence int32, index int) [16]byte {
 	return iv
 }
 
-func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, mediaSequence int32, cryptByteBlock int, skipByteBlock int) ([]byte, error) {
+func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, mediaSequence int32, tenc *mp4.TencBox) ([]byte, error) {
 	encrypted := mdat.Data
-	iv := generateIV(mediaSequence, i)
+	var iv16 [16]byte
+	iv := getIV(senc, tenc, i, &iv16)
+
+	var cryptByteBlock int = 1
+	var skipByteBlock int = 9
+	if tenc != nil {
+		cryptByteBlock = int(tenc.DefaultCryptByteBlock)
+		skipByteBlock = int(tenc.DefaultSkipByteBlock)
+	}
+
 	if senc.SubSamples == nil {
 		size := traf.Trun.Samples[i].Size
 		return decryptCBCSWithTail(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock)
@@ -42,16 +48,25 @@ func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.Senc
 	}
 }
 
-func decryptCBCSWithTail(block cipher.Block, subSampleData []byte, iv [16]byte, cryptByteBlock, skipByteBlock int) ([]byte, error) {
+func decryptCBCSWithTail(block cipher.Block, subSampleData []byte, iv []byte, cryptByteBlock, skipByteBlock int) ([]byte, error) {
 	blockSize := block.BlockSize()
 	size := len(subSampleData)
 	decrypted := make([]byte, size)
-	copy(decrypted, subSampleData)
 
-	if cryptByteBlock <= 0 && skipByteBlock <= 0 {
+	if cryptByteBlock <= 0 {
+		cryptByteBlock = 1
+	}
+	if skipByteBlock <= 0 {
+		skipByteBlock = 0
+	}
+
+	if cryptByteBlock == 1 && skipByteBlock == 0 {
+		mode := cipher.NewCBCDecrypter(block, iv[:])
+		mode.CryptBlocks(decrypted, subSampleData)
 		return decrypted, nil
 	}
 
+	copy(decrypted, subSampleData)
 	offset := 0
 	prevCipher := make([]byte, blockSize)
 	copy(prevCipher, iv[:])
@@ -88,6 +103,5 @@ func decryptCBCSWithTail(block cipher.Block, subSampleData []byte, iv [16]byte, 
 			}
 		}
 	}
-
 	return decrypted, nil
 }
