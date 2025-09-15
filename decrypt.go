@@ -24,18 +24,18 @@ func padIV(iv8 []byte, iv16 *[16]byte) []byte {
 	return iv16[:]
 }
 
-func getIV(senc *mp4.SencBox, tenc *mp4.TencBox, i int, iv16 *[16]byte) []byte {
+func getIV(senc *mp4.SencBox, sinf *mp4.SinfBox, i int, iv16 *[16]byte) []byte {
 	if senc != nil && len(senc.IVs) > 0 {
 		return padIV(senc.IVs[i], iv16)
 	}
 
-	if tenc != nil {
-		return padIV(tenc.DefaultConstantIV, iv16)
+	if sinf != nil && sinf.Schi != nil && sinf.Schi.Tenc != nil {
+		return padIV(sinf.Schi.Tenc.DefaultConstantIV, iv16)
 	}
 	return iv16[:]
 }
 
-func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, tencBox *mp4.TencBox) ([]byte, error) {
+func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, sinfBox *mp4.SinfBox) ([]byte, error) {
 	val, ok := clearKeysMap.Load(tvgID)
 	if !ok {
 		err := fmt.Errorf("key not found for tvgID %s", tvgID)
@@ -93,7 +93,7 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 		return nil, err
 	}
 
-	body, err = decryptFromBody(*config.DrmType, body, keyBytes, tencBox)
+	body, err = decryptFromBody(*config.DrmType, body, keyBytes, sinfBox)
 	if err != nil {
 		if ctx != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
@@ -104,13 +104,13 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 	return body, nil
 }
 
-func decryptFromBody(drmType string, data []byte, key []byte, tencBox *mp4.TencBox) ([]byte, error) {
+func decryptFromBody(drmType string, data []byte, key []byte, sinfBox *mp4.SinfBox) ([]byte, error) {
 	mp4File, err := mp4.DecodeFile(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("解析 MP4 文件失败: %w", err)
 	}
 
-	decrypFromMp4(drmType, mp4File, key, tencBox)
+	decrypFromMp4(drmType, mp4File, key, sinfBox)
 	return encodeMP4ToBytes(mp4File)
 }
 
@@ -227,12 +227,21 @@ func joinDecryptedSamples(decryptedSamples [][]byte) []byte {
 	return result
 }
 
-func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte, tencBox *mp4.TencBox) error {
+func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte, sinfBox *mp4.SinfBox) error {
 	return decrypt(mp4File, key, func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error) {
+		//自动检测加密类型
+		if sinfBox != nil && sinfBox.Schm != nil {
+			if sinfBox.Schm.SchemeType == "cbcs" {
+				drmType = "fairplay"
+			} else {
+				drmType = "widevine"
+			}
+		}
+
 		if drmType == "widevine" {
-			return DecryptWidevineSample(block, mdat, senc, traf, i, offset, tencBox)
+			return DecryptWidevineSample(block, mdat, senc, traf, i, offset, sinfBox)
 		} else {
-			return DecryptFairplaySample(block, mdat, senc, traf, i, offset, -1, tencBox)
+			return DecryptFairplaySample(block, mdat, senc, traf, i, offset, -1, sinfBox)
 		}
 	})
 }

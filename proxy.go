@@ -97,7 +97,7 @@ var (
 	hlsByTvgId              = sync.Map{}
 	rawUrlByTvgId           = sync.Map{}
 	hlsTypeByTvgId          = sync.Map{}
-	tencBoxByStreamId       = sync.Map{}
+	sinfBoxByStreamId       = sync.Map{}
 )
 
 var version = "1.0.0.9"
@@ -1299,23 +1299,23 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "init-m4s" {
-		body, tencBox, err := modifyInitM4sFromBody(body)
+		body, sinfBox, err := modifyInitM4sFromBody(body)
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("移除 DRM 信息失败")
 			log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
 			return
 		}
-		tencBoxByStreamId.Store(stream_uuid, tencBox)
+		sinfBoxByStreamId.Store(stream_uuid, sinfBox)
 		if cache != nil {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "m4s" {
-		var tencBox *mp4.TencBox = nil
-		if t, ok := tencBoxByStreamId.Load(stream_uuid); ok {
-			tencBox = t.(*mp4.TencBox)
+		var sinfBox *mp4.SinfBox = nil
+		if t, ok := sinfBoxByStreamId.Load(stream_uuid); ok {
+			sinfBox = t.(*mp4.SinfBox)
 		}
-		body, err = fetchAndDecrypt(client, configsByProvider[provider.(string)], tvgID, body, ctx, tencBox)
+		body, err = fetchAndDecrypt(client, configsByProvider[provider.(string)], tvgID, body, ctx, sinfBox)
 		if err != nil {
 			return
 		}

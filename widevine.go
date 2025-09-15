@@ -6,10 +6,10 @@ import (
 	"github.com/Eyevinn/mp4ff/mp4"
 )
 
-func DecryptWidevineSample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, tenc *mp4.TencBox) ([]byte, error) {
+func DecryptWidevineSample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, sinf *mp4.SinfBox) ([]byte, error) {
 	encrypted := mdat.Data
 	var iv16 [16]byte
-	iv := getIV(senc, tenc, i, &iv16)
+	iv := getIV(senc, sinf, i, &iv16)
 	stream := cipher.NewCTR(block, iv)
 
 	if senc.SubSamples == nil {

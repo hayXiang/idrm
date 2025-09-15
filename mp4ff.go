@@ -8,7 +8,7 @@ import (
 	"github.com/Eyevinn/mp4ff/mp4"
 )
 
-func modifyInitM4s(mp4File *mp4.File) *mp4.TencBox {
+func modifyInitM4s(mp4File *mp4.File) *mp4.SinfBox {
 	// 移除 pssh box
 	var newBoxes []mp4.Box
 	for _, box := range mp4File.Moov.Children {
@@ -17,7 +17,7 @@ func modifyInitM4s(mp4File *mp4.File) *mp4.TencBox {
 		}
 	}
 	mp4File.Moov.Children = newBoxes
-	var tencBox *mp4.TencBox
+	var sinfcBox *mp4.SinfBox
 	// 遍历 trak，移除 sinf box
 	for _, trak := range mp4File.Moov.Traks {
 		if trak.Mdia != nil && trak.Mdia.Minf != nil && trak.Mdia.Minf.Stbl != nil && trak.Mdia.Minf.Stbl.Stsd != nil && trak.Mdia.Minf.Stbl.Stsd.Encv != nil {
@@ -26,8 +26,8 @@ func modifyInitM4s(mp4File *mp4.File) *mp4.TencBox {
 			for _, box := range trak.Mdia.Minf.Stbl.Stsd.Encv.Children {
 				if box.Type() != "sinf" {
 					newBoxes = append(newBoxes, box)
-				} else if trak.Mdia.Minf.Stbl.Stsd.Encv.Sinf != nil && trak.Mdia.Minf.Stbl.Stsd.Encv.Sinf.Schi != nil {
-					tencBox = trak.Mdia.Minf.Stbl.Stsd.Encv.Sinf.Schi.Tenc
+				} else if trak.Mdia.Minf.Stbl.Stsd.Encv.Sinf != nil {
+					sinfcBox = trak.Mdia.Minf.Stbl.Stsd.Encv.Sinf
 				}
 			}
 			trak.Mdia.Minf.Stbl.Stsd.Encv.Children = newBoxes
@@ -40,15 +40,15 @@ func modifyInitM4s(mp4File *mp4.File) *mp4.TencBox {
 			for _, box := range trak.Mdia.Minf.Stbl.Stsd.Enca.Children {
 				if box.Type() != "sinf" {
 					newBoxes = append(newBoxes, box)
-				} else if trak.Mdia.Minf.Stbl.Stsd.Enca.Sinf != nil && trak.Mdia.Minf.Stbl.Stsd.Enca.Sinf.Schi != nil {
-					tencBox = trak.Mdia.Minf.Stbl.Stsd.Enca.Sinf.Schi.Tenc
+				} else if trak.Mdia.Minf.Stbl.Stsd.Enca.Sinf != nil {
+					sinfcBox = trak.Mdia.Minf.Stbl.Stsd.Enca.Sinf
 				}
 			}
 			trak.Mdia.Minf.Stbl.Stsd.Enca.Children = newBoxes
 			trak.Mdia.Minf.Stbl.Stsd.Enca.SetType(original_type)
 		}
 	}
-	return tencBox
+	return sinfcBox
 }
 
 func encodeMP4ToBytes(f *mp4.File) ([]byte, error) {
@@ -60,15 +60,15 @@ func encodeMP4ToBytes(f *mp4.File) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func modifyInitM4sFromBody(data []byte) ([]byte, *mp4.TencBox, error) {
+func modifyInitM4sFromBody(data []byte) ([]byte, *mp4.SinfBox, error) {
 	mp4File, err := mp4.DecodeFile(bytes.NewReader(data))
 	if err != nil {
 		return nil, nil, fmt.Errorf("解析 MP4 文件失败: %w", err)
 	}
 
-	tencbox := modifyInitM4s(mp4File)
+	sinfBox := modifyInitM4s(mp4File)
 	body, error := encodeMP4ToBytes(mp4File)
-	return body, tencbox, error
+	return body, sinfBox, error
 }
 
 func modifyInitM4sFromFile(inPath, outPath string) error {

@@ -17,16 +17,16 @@ func generateIV(mediaSequence int32, index int) [16]byte {
 	return iv
 }
 
-func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, mediaSequence int32, tenc *mp4.TencBox) ([]byte, error) {
+func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, mediaSequence int32, sinf *mp4.SinfBox) ([]byte, error) {
 	encrypted := mdat.Data
 	var iv16 [16]byte
-	iv := getIV(senc, tenc, i, &iv16)
+	iv := getIV(senc, sinf, i, &iv16)
 
 	var cryptByteBlock int = 1
 	var skipByteBlock int = 9
-	if tenc != nil {
-		cryptByteBlock = int(tenc.DefaultCryptByteBlock)
-		skipByteBlock = int(tenc.DefaultSkipByteBlock)
+	if sinf != nil && sinf.Schi != nil && sinf.Schi.Tenc != nil {
+		cryptByteBlock = int(sinf.Schi.Tenc.DefaultCryptByteBlock)
+		skipByteBlock = int(sinf.Schi.Tenc.DefaultSkipByteBlock)
 	}
 
 	if senc.SubSamples == nil {

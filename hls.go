@@ -22,6 +22,7 @@ type HLSUpdater struct {
 	lastAccess  time.Time
 	client      *fasthttp.Client
 	config      *StreamConfig
+	stopOnce    sync.Once
 }
 
 var updaters sync.Map
@@ -56,8 +57,10 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 		update := func() {
 			// 检查是否超时
 			if time.Since(u.lastAccess) > 30*time.Second {
-				close(u.stopCh)
-				updaters.Delete(u.tvgID)
+				u.stopOnce.Do(func() {
+					close(u.stopCh)
+					updaters.Delete(u.tvgID)
+				})
 				return
 			}
 
@@ -120,8 +123,10 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 
 			if mediaType, ok := hlsTypeByTvgId.Load(tvgID); ok && mediaType == "static" {
 				log.Printf("VOD资源，停止预加载 %s，%s", u.tvgID, u.mainfestUrl)
-				close(u.stopCh)
-				updaters.Delete(u.tvgID)
+				u.stopOnce.Do(func() {
+					close(u.stopCh)
+					updaters.Delete(u.tvgID)
+				})
 				return
 			}
 
@@ -352,7 +357,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 		url = strings.Replace(url, "/"+stream_uuid, "", 1)
 		url = strings.Replace(url, "/http/", "http://", 1)
 		url = strings.Replace(url, "/https/", "https://", 1)
-		_, ok := tencBoxByStreamId.Load(stream_uuid)
+		_, ok := sinfBoxByStreamId.Load(stream_uuid)
 		if ok {
 			close(initReaderChan)
 		} else {
@@ -367,11 +372,11 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				}
 				defer fasthttp.ReleaseResponse(resp)
 
-				body, _tencBox, err := modifyInitM4sFromBody(resp.Body())
+				body, sinfBox, err := modifyInitM4sFromBody(resp.Body())
 				if err != nil {
 					return
 				}
-				tencBoxByStreamId.Store(stream_uuid, _tencBox)
+				sinfBoxByStreamId.Store(stream_uuid, sinfBox)
 				if cache != nil {
 					cache.Set(url, body, MyMetadata{string(resp.Header.ContentType()), tvgID, 0})
 				}
@@ -408,12 +413,12 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				responseBody := resp.Body()
 				fasthttp.ReleaseResponse(resp)
 				<-initReaderChan
-				var tenBox *mp4.TencBox
-				v, ok := tencBoxByStreamId.Load(stream_uuid)
+				var sinfBox *mp4.SinfBox
+				v, ok := sinfBoxByStreamId.Load(stream_uuid)
 				if ok {
-					tenBox = v.(*mp4.TencBox)
+					sinfBox = v.(*mp4.SinfBox)
 				}
-				body, err := fetchAndDecrypt(client, config, tvgID, responseBody, nil, tenBox)
+				body, err := fetchAndDecrypt(client, config, tvgID, responseBody, nil, sinfBox)
 				if err != nil {
 					return
 				}
