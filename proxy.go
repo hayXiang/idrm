@@ -1125,13 +1125,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 					resposneBody(ctx, data, dataType)
 				},
 				//ON TIMEOUT
-				func() {
-					var location_302 string = path
-					if query != "" {
-						location_302 += ("?" + query)
-					}
-					ctx.Response.Header.Set("Location", location_302)
-				},
+				nil,
 			)
 			return
 		}
@@ -1256,7 +1250,9 @@ func WaitOrRedirect(
 			// 周期性检查缓存
 			if data, dataType, ok := cacheGetter(key); ok && data != nil {
 				ctx.Response.Header.Set("IDRM-CACHE", "HIT")
-				onHit(ctx, data, dataType)
+				if onHit != nil {
+					onHit(ctx, data, dataType)
+				}
 				return
 			}
 		case <-waitCh:
@@ -1267,15 +1263,18 @@ func WaitOrRedirect(
 				return
 			}
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
-			ctx.Response.Header.Set("Retry-After", "1")
+			ctx.Response.Header.Set("Retry-After", "2")
 			ctx.SetBodyString("资源下载失败，请过一会再试")
 			log.Printf("[ERROR] 资源请求失败：%s,%s", getClientIP(ctx), key)
 			return
 		case <-timeout:
-			ctx.SetStatusCode(302)
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+			ctx.Response.Header.Set("Retry-After", "2")
 			ctx.SetBodyString("资源正在下载中，请过一会再试")
 			log.Printf("[ERROR]资源正在下载中：%s,%s", getClientIP(ctx), key)
-			onTimeout()
+			if onTimeout != nil {
+				onTimeout()
+			}
 			return
 		}
 	}
