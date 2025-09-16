@@ -114,7 +114,7 @@ func decryptFromBody(drmType string, data []byte, key []byte, sinfBox *mp4.SinfB
 	return encodeMP4ToBytes(mp4File)
 }
 
-type DecryptCallback func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error)
+type DecryptCallback func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) error
 
 func decrypt(sinfBox *mp4.SinfBox, mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error {
 	var traf *mp4.TrafBox = nil
@@ -183,13 +183,11 @@ func decrypt(sinfBox *mp4.SinfBox, mp4File *mp4.File, key []byte, doDecryptFuc D
 			curr += traf.Trun.Samples[i].Size
 		}
 	}
-	decryptList := make([][]byte, int(sampleCount))
 	for i := 0; i < int(sampleCount); i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			decrypt, _ := doDecryptFuc(block, mdata, senc, traf, i, offsets[i])
-			decryptList[i] = decrypt
+			doDecryptFuc(block, mdata, senc, traf, i, offsets[i])
 		}(i)
 	}
 	wg.Wait()
@@ -203,31 +201,11 @@ func decrypt(sinfBox *mp4.SinfBox, mp4File *mp4.File, key []byte, doDecryptFuc D
 		}
 		frag.Moof.Children = newBoxes
 	}
-
-	if len(decryptList[0]) > 0 {
-		mdata.Data = joinDecryptedSamples(decryptList)
-	}
 	return nil
 }
 
-func joinDecryptedSamples(decryptedSamples [][]byte) []byte {
-	totalLen := 0
-	for _, s := range decryptedSamples {
-		totalLen += len(s)
-	}
-
-	result := make([]byte, totalLen)
-	offset := 0
-	for _, s := range decryptedSamples {
-		copy(result[offset:], s)
-		offset += len(s)
-	}
-
-	return result
-}
-
 func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte, sinfBox *mp4.SinfBox) error {
-	return decrypt(sinfBox, mp4File, key, func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error) {
+	return decrypt(sinfBox, mp4File, key, func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) error {
 		//自动检测加密类型
 		if sinfBox != nil && sinfBox.Schm != nil {
 			if sinfBox.Schm.SchemeType == "cbcs" {
@@ -238,10 +216,11 @@ func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte, sinfBox *mp4.S
 		}
 
 		if drmType == "widevine" {
-			return DecryptWidevineSample(block, mdat, senc, traf, i, offset, sinfBox)
+			DecryptWidevineSample(block, mdat, senc, traf, i, offset, sinfBox)
 		} else {
-			return DecryptFairplaySample(block, mdat, senc, traf, i, offset, sinfBox)
+			DecryptFairplaySample(block, mdat, senc, traf, i, offset, sinfBox)
 		}
+		return nil
 	})
 }
 

@@ -81,7 +81,7 @@ var (
 	SINF_BOX_BY_STREAM_ID      = sync.Map{}
 )
 
-var version = "1.0.0.11"
+var version = "1.0.0.12"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -1049,6 +1049,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id, not found provider")
+		log.Printf("[ERROR] invalid tvg id, %s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 		return
 	}
 
@@ -1056,6 +1057,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id")
+		log.Printf("[ERROR] invalid tvg id, %s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 		return
 	}
 
@@ -1064,6 +1066,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id")
+		log.Printf("[ERROR] invalid tvg id, %s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 		return
 	}
 
