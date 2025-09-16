@@ -17,4 +17,10 @@
     "url": "https://live.9528.eu.org/s/zn16IzSJ.m3u",
     "headers": [],
     "drm-type": "fairplay"
+},
+  {
+    "name": "stan-mini",
+    "url": "https://live.9528.eu.org/stan/mini/index.m3u?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+    "headers": [],
+    "to-hls":true
   }]

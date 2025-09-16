@@ -65,42 +65,23 @@ func (m *multiFlag) Set(value string) error {
 	return nil
 }
 
+// 全局变量
 var (
-	configFile               string
-	name                     string
-	bindAddr                 string
-	singleInput              string
-	headers                  multiFlag
-	proxyURL                 string
-	publishAddr              string
-	userAgent                string
-	m3uProxy                 string
-	m3uUserAgent             string
-	bestQuality              bool
-	toFmp4OverHls            bool
-	speedUp                  bool
-	maxMemory                int64
-	gcInterval               int
-	httpTimeout              int
-	manifestCacheExpire      int
-	segmentMemoryCacheExpire int
-	segmentFileCacheExpire   int
-	cacheDir                 string
-	drmType                  string
-
-	providerByTvgId         = sync.Map{} // map[tvgID]providerName
-	configsByProvider       = make(map[string]*StreamConfig)
-	clientsByProvider       = make(map[string]*fasthttp.Client)
-	m3uClientByProvider     = make(map[string]*fasthttp.Client)
-	manifestCacheByProvider = make(map[string]*MyCache)
-	segmentCacheByProvider  = make(map[string]*MyCache)
-	hlsByTvgId              = sync.Map{}
-	rawUrlByTvgId           = sync.Map{}
-	hlsTypeByTvgId          = sync.Map{}
-	sinfBoxByStreamId       = sync.Map{}
+	PUBLISH_ADDRESS            string
+	BIND_ADDRESS               string
+	PROVIDER_BY_TVG_ID         = sync.Map{} // map[tvgID]providerName
+	CONFIGS_BY_PROVIDER        = make(map[string]*StreamConfig)
+	CLIENTS_BY_PROVIDER        = make(map[string]*fasthttp.Client)
+	M3U_CLIENT_BY_PROVIDER     = make(map[string]*fasthttp.Client)
+	MANIFEST_CACHE_BY_PROVIDER = make(map[string]*MyCache)
+	SEGMENT_CACHE_BY_PROVIDER  = make(map[string]*MyCache)
+	HLS_BY_TVG_ID              = sync.Map{}
+	RAW_URL_BY_TVG_ID          = sync.Map{}
+	HLS_TYPE_BY_TVG_ID         = sync.Map{}
+	SINF_BOX_BY_STREAM_ID      = sync.Map{}
 )
 
-var version = "1.0.0.10"
+var version = "1.0.0.11"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -183,11 +164,34 @@ func validateHeaderLine(line string) error {
 }
 
 func main() {
+
+	var (
+		configFile               string
+		name                     string
+		singleInput              string
+		headers                  multiFlag
+		proxyURL                 string
+		userAgent                string
+		m3uProxy                 string
+		m3uUserAgent             string
+		bestQuality              bool
+		toFmp4OverHls            bool
+		speedUp                  bool
+		maxMemory                int64
+		gcInterval               int
+		httpTimeout              int
+		manifestCacheExpire      int
+		segmentMemoryCacheExpire int
+		segmentFileCacheExpire   int
+		cacheDir                 string
+		drmType                  string
+	)
+
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
 	flag.StringVar(&configFile, "c", "", "配置文件 (JSON)。使用这种模式，下面的--name, --input, --header, --proxy --user-agent 将无效")
-	flag.StringVar(&bindAddr, "listen", "127.0.0.1:1234", "代理服务器监听端口")
-	flag.StringVar(&bindAddr, "l", "127.0.0.1:1234", "代理服务器监听端口 (简写)")
+	flag.StringVar(&BIND_ADDRESS, "listen", "127.0.0.1:1234", "代理服务器监听端口")
+	flag.StringVar(&BIND_ADDRESS, "l", "127.0.0.1:1234", "代理服务器监听端口 (简写)")
 	flag.StringVar(&name, "name", "default", "provider 的名称")
 	flag.StringVar(&singleInput, "input", "", "单个流 URL")
 	flag.StringVar(&singleInput, "i", "", "单个流 URL（简写）")
@@ -195,7 +199,7 @@ func main() {
 	flag.StringVar(&userAgent, "user-agent", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header")
 	flag.StringVar(&userAgent, "A", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header (简写)")
 	flag.StringVar(&proxyURL, "proxy", "", "MPD或者M3U8代理设置 (SOCKS5)")
-	flag.StringVar(&publishAddr, "publish", "", "发布地址的前缀(公网可以访问的地址）,例如:https://live.9999.eu.org:443")
+	flag.StringVar(&PUBLISH_ADDRESS, "publish", "", "发布地址的前缀(公网可以访问的地址）,例如:https://live.9999.eu.org:443")
 	flag.StringVar(&m3uProxy, "m3u-proxy", "", "M3U 请求的代理设置 (SOCKS5)")
 	flag.StringVar(&m3uUserAgent, "m3u-user-agent", "okhttp/4.12.0", "M3U 请求的 User-Agent")
 	flag.BoolVar(&bestQuality, "best-quality", true, "仅保留最高码率的音视频")
@@ -240,14 +244,14 @@ func main() {
 
 	name = strings.TrimSpace(name)
 	proxyURL = strings.TrimSpace(proxyURL)
-	bindAddr = strings.TrimSpace(bindAddr)
-	publishAddr = strings.TrimSpace(publishAddr)
+	BIND_ADDRESS = strings.TrimSpace(BIND_ADDRESS)
+	PUBLISH_ADDRESS = strings.TrimSpace(PUBLISH_ADDRESS)
 
 	// 处理监听地址
-	if !strings.Contains(bindAddr, ":") {
-		bindAddr = "127.0.0.1:" + bindAddr
-	} else if strings.HasPrefix(bindAddr, ":") {
-		bindAddr = "127.0.0.1" + bindAddr
+	if !strings.Contains(BIND_ADDRESS, ":") {
+		BIND_ADDRESS = "127.0.0.1:" + BIND_ADDRESS
+	} else if strings.HasPrefix(BIND_ADDRESS, ":") {
+		BIND_ADDRESS = "127.0.0.1" + BIND_ADDRESS
 	}
 
 	var configs []StreamConfig
@@ -369,18 +373,18 @@ func main() {
 		cacheDir += "/"
 	}
 	for _, config := range configs {
-		configsByProvider[config.Name] = &config
-		clientsByProvider[config.Name] = newFastHTTPClient(config.Proxy, *config.HttpTimeout)
-		m3uClientByProvider[config.Name] = newFastHTTPClient(config.M3uProxy, 30)
+		CONFIGS_BY_PROVIDER[config.Name] = &config
+		CLIENTS_BY_PROVIDER[config.Name] = newFastHTTPClient(config.Proxy, *config.HttpTimeout)
+		M3U_CLIENT_BY_PROVIDER[config.Name] = newFastHTTPClient(config.M3uProxy, 30)
 		if *config.ManifestCacheExpire >= 0 {
-			manifestCacheByProvider[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
+			MANIFEST_CACHE_BY_PROVIDER[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
 		}
 
 		if *config.SegmentFileCacheExpire >= 0 || *config.SegmentMemoryCacheExpire >= 0 || *config.SpeedUp {
 			if *config.SegmentMemoryCacheExpire < 10 {
 				*config.SegmentMemoryCacheExpire = 10
 			}
-			segmentCacheByProvider[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name, *config.SegmentMemoryCacheExpire, *config.SegmentFileCacheExpire)
+			SEGMENT_CACHE_BY_PROVIDER[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name, *config.SegmentMemoryCacheExpire, *config.SegmentFileCacheExpire)
 		}
 	}
 
@@ -399,93 +403,10 @@ func main() {
 		}()
 	}
 
-	log.Printf("代理服务器启动在：%s, 当前版本：%s", bindAddr, version)
-	if err := fasthttp.ListenAndServe(bindAddr, requestHandler); err != nil {
+	log.Printf("代理服务器启动在：%s, 当前版本：%s", BIND_ADDRESS, version)
+	if err := fasthttp.ListenAndServe(BIND_ADDRESS, requestHandler); err != nil {
 		log.Fatalf("ListenAndServe error: %s", err)
 	}
-}
-
-// fetchWithRedirect 发起 GET 请求，自动跟随重定向（最多 maxRedirects 次）
-func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects int, headers []string, timeout int) (string, *fasthttp.Response, error) {
-	currentURL := startURL
-
-	for i := 0; i < maxRedirects; i++ {
-		req := fasthttp.AcquireRequest()
-		resp := fasthttp.AcquireResponse()
-
-		req.SetRequestURI(currentURL)
-		req.Header.SetMethod("GET")
-		for _, head := range headers {
-			key_value := strings.Split(head, ":")
-			if len(key_value) == 2 {
-				req.Header.Set(key_value[0], strings.TrimSpace(key_value[1]))
-			}
-		}
-
-		err := client.DoTimeout(req, resp, time.Duration(timeout)*time.Second)
-		fasthttp.ReleaseRequest(req)
-		if err != nil {
-			fasthttp.ReleaseResponse(resp)
-			return currentURL, nil, fmt.Errorf("request failed: %w", err)
-		}
-
-		statusCode := resp.StatusCode()
-		if statusCode >= 300 && statusCode < 400 {
-			location := string(resp.Header.Peek("Location"))
-			if location == "" {
-				fasthttp.ReleaseResponse(resp)
-				return currentURL, nil, fmt.Errorf("redirect without Location header")
-			}
-
-			if strings.Contains(location, "/http://") {
-				location = strings.ReplaceAll(location, "/http://", "/http%3A%2F%2F")
-			}
-
-			if strings.Contains(location, "/https://") {
-				location = strings.ReplaceAll(location, "/https://", "/https%3A%2F%2F")
-			}
-
-			u, err := url.Parse(location)
-			if err != nil {
-				fasthttp.ReleaseResponse(resp)
-				return currentURL, nil, fmt.Errorf("invalid redirect URL: %v", err)
-			}
-			if !u.IsAbs() {
-				base, _ := url.Parse(currentURL)
-				location = base.ResolveReference(u).String()
-			}
-			currentURL = location
-			fasthttp.ReleaseResponse(resp)
-			continue
-		}
-
-		// 不是 3xx，直接返回
-		return currentURL, resp, nil
-	}
-
-	return currentURL, nil, fmt.Errorf("too many redirects")
-}
-
-func HttpGetWithUA(client *fasthttp.Client, url string, headers []string, timeout int) (*fasthttp.Response, error) {
-	req := fasthttp.AcquireRequest()
-	resp := fasthttp.AcquireResponse()
-
-	req.SetRequestURI(url)
-	for _, head := range headers {
-		key_value := strings.Split(head, ":")
-		if len(key_value) == 2 {
-			req.Header.Set(key_value[0], strings.TrimSpace(key_value[1]))
-		}
-	}
-
-	if err := client.DoTimeout(req, resp, time.Duration(timeout)*time.Second); err != nil {
-		fasthttp.ReleaseRequest(req)
-		fasthttp.ReleaseResponse(resp)
-		return nil, err
-	}
-
-	fasthttp.ReleaseRequest(req) // 只释放请求，响应交给调用方
-	return resp, nil
 }
 
 func requestHandler(ctx *fasthttp.RequestCtx) {
@@ -511,39 +432,12 @@ var reBW = regexp.MustCompile(`BANDWIDTH=(\d+)`)
 var reLang = regexp.MustCompile(`LANGUAGE="([^"]+)"`)
 var clearKeysMap = sync.Map{} // map[tvgID]clearkey
 
-func GetForwardHeader(ctx *fasthttp.RequestCtx, header, fallback string) string {
-	if ctx == nil {
-		return ""
-	}
-	if val := ctx.Request.Header.Peek(header); val != nil {
-		return string(val)
-	}
-	return fallback
-}
-
-func getAliasFromPath(path string) string {
-	// 去掉查询参数
-	if idx := strings.Index(path, "?"); idx != -1 {
-		path = path[:idx]
-	}
-	// 获取最后一个 /
-	idx := strings.LastIndex(path, "/")
-	name := path
-	if idx != -1 {
-		name = path[idx+1:]
-	}
-	// 去掉 .m3u8 后缀
-	name = strings.TrimSuffix(name, ".m3u")
-	name = strings.TrimSuffix(name, ".m3u8")
-	return name
-}
-
 // 使用示例
 func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	if ctx != nil {
 		name = getAliasFromPath(string(ctx.URI().Path()))
 	}
-	config, ok := configsByProvider[name]
+	config, ok := CONFIGS_BY_PROVIDER[name]
 	if !ok {
 		if ctx != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
@@ -555,7 +449,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	var count = 0
 	var body []byte
 	if strings.HasPrefix(config.URL, "http") {
-		resp, err := HttpGetWithUA(m3uClientByProvider[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent}, 30)
+		resp, err := HttpGetWithUA(M3U_CLIENT_BY_PROVIDER[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent}, 30)
 		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 			if ctx != nil {
 				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
@@ -679,14 +573,14 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 			}
 
 			clearKeysMap.Store(tvgID, clearkey)
-			providerByTvgId.Store(tvgID, name)
+			PROVIDER_BY_TVG_ID.Store(tvgID, name)
 
 			prefixAddress := fmt.Sprintf("%s://%s:%s", schema, serverName, port)
-			if publishAddr != "" {
-				prefixAddress = publishAddr
+			if PUBLISH_ADDRESS != "" {
+				prefixAddress = PUBLISH_ADDRESS
 			}
 			var proxyPath = ""
-			if *(configsByProvider[name].ToFmp4OverHls) && content_type == "mpd" {
+			if *(CONFIGS_BY_PROVIDER[name].ToFmp4OverHls) && content_type == "mpd" {
 				var suffix = ""
 				if strings.Contains(suffix, ".m3u8") {
 					suffix = ".m3u8"
@@ -694,7 +588,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 				if strings.Contains(suffix, ".mpd") {
 					suffix = ".mpd"
 				}
-				if *configsByProvider[name].ToFmp4OverHls {
+				if *CONFIGS_BY_PROVIDER[name].ToFmp4OverHls {
 					suffix = ".m3u8"
 				}
 				proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/index%s",
@@ -710,16 +604,16 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 					tvgID,
 					strings.Replace(u.String(), "://", "/", 1))
 			}
-			rawUrlByTvgId.Store(tvgID, u.String())
+			RAW_URL_BY_TVG_ID.Store(tvgID, u.String())
 			newLines = append(newLines, proxyPath)
 			count = count + 1
 		}
 	}
 	var extra = ""
-	if publishAddr != "" {
-		extra += fmt.Sprintf(", 发布地址: %s/%s.m3u", publishAddr, name)
+	if PUBLISH_ADDRESS != "" {
+		extra += fmt.Sprintf(", 发布地址: %s/%s.m3u", PUBLISH_ADDRESS, name)
 	}
-	log.Printf("结束加载M3u: %s, 一共%d个频道, 访问地址: http://%s/%s.m3u%s", name, count, bindAddr, name, extra)
+	log.Printf("结束加载M3u: %s, 一共%d个频道, 访问地址: http://%s/%s.m3u%s", name, count, BIND_ADDRESS, name, extra)
 
 	if ctx != nil {
 		ctx.SetStatusCode(fasthttp.StatusOK)
@@ -728,23 +622,6 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 }
 
 var M3U8_INIT_REGEXP = regexp.MustCompile(`URI="([^"]+)"`)
-
-func resolveURL(targetUrl string, baseUrl string) string {
-	var finalURI string
-	if strings.HasPrefix(targetUrl, "/") {
-		u, err := url.Parse(baseUrl)
-		if err == nil {
-			base := u.Scheme + "://" + u.Host
-			finalURI = base + targetUrl
-		}
-	} else if strings.HasPrefix(targetUrl, "http") {
-		finalURI = targetUrl
-	} else {
-		idx := strings.LastIndex(baseUrl, "/")
-		finalURI = baseUrl[:idx] + "/" + targetUrl
-	}
-	return finalURI
-}
 
 func convert_to_proxy_url(proxy_type string, tvgID string, targetUrl string, baseUrl string, stream_uuid string) string {
 	return fmt.Sprintf("/drm/proxy/%s/%s/%s/%s", proxy_type, tvgID, stream_uuid, strings.Replace(resolveURL(targetUrl, baseUrl), "://", "/", 1))
@@ -969,7 +846,7 @@ func periodHasSubtitle(period *etree.Element) bool {
 	return false
 }
 
-func modifyHLS(body []byte, tvgID, proxyURL string, bestQuality bool) []byte {
+func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 	strBody := string(body)
 
 	// 如果启用最高画质过滤
@@ -981,7 +858,7 @@ func modifyHLS(body []byte, tvgID, proxyURL string, bestQuality bool) []byte {
 	var newLines []string
 	var lastLineWasExtInf bool
 
-	hash := md5.Sum([]byte(proxyURL))
+	hash := md5.Sum([]byte(url))
 	stream_uuid := hex.EncodeToString(hash[:])
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -998,14 +875,14 @@ func modifyHLS(body []byte, tvgID, proxyURL string, bestQuality bool) []byte {
 		if strings.HasPrefix(line, "#EXT-X-MAP:") {
 			matches := M3U8_INIT_REGEXP.FindStringSubmatch(line)
 			if len(matches) == 2 {
-				newURI := convert_to_proxy_url("init-m4s", tvgID, matches[1], proxyURL, stream_uuid)
+				newURI := convert_to_proxy_url("init-m4s", tvgID, matches[1], url, stream_uuid)
 				line = M3U8_INIT_REGEXP.ReplaceAllString(line, `URI="`+newURI+`"`)
 			}
 		}
 
 		// 如果上一行是 EXTINF → 当前行是分片地址
 		if lastLineWasExtInf && !strings.HasPrefix(line, "#") {
-			line = convert_to_proxy_url("m4s", tvgID, line, proxyURL, stream_uuid)
+			line = convert_to_proxy_url("m4s", tvgID, line, url, stream_uuid)
 			lastLineWasExtInf = false
 		}
 
@@ -1092,7 +969,7 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 		}
 	}
 
-	if *(configsByProvider[provider].BestQuality) {
+	if *(CONFIGS_BY_PROVIDER[provider].BestQuality) {
 		// --- 保留最高码率 Representation ---
 		for _, period := range doc.FindElements("//Period") {
 			for _, aset := range period.FindElements("AdaptationSet") {
@@ -1144,7 +1021,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	var stream_uuid string = "default"
 	if proxy_type == "m3u8" || proxy_type == "mpd" {
 		if strings.HasPrefix(parts[2], "index.") {
-			raw_url, ok := rawUrlByTvgId.Load(tvgID)
+			raw_url, ok := RAW_URL_BY_TVG_ID.Load(tvgID)
 			if !ok {
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
 				ctx.SetBodyString("invalid tvg id, not found")
@@ -1168,22 +1045,22 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 
 	log.Printf("代理开始：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 
-	provider, ok := providerByTvgId.Load(tvgID)
+	provider, ok := PROVIDER_BY_TVG_ID.Load(tvgID)
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id, not found provider")
 		return
 	}
 
-	client, ok := clientsByProvider[provider.(string)]
+	client, ok := CLIENTS_BY_PROVIDER[provider.(string)]
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id")
 		return
 	}
 
-	config := configsByProvider[provider.(string)]
-	raw_url, ok := rawUrlByTvgId.Load(tvgID)
+	config := CONFIGS_BY_PROVIDER[provider.(string)]
+	raw_url, ok := RAW_URL_BY_TVG_ID.Load(tvgID)
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("invalid tvg id")
@@ -1195,7 +1072,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 
 	if proxy_type == "hls" {
-		hls_list, ok := hlsByTvgId.Load(tvgID)
+		hls_list, ok := HLS_BY_TVG_ID.Load(tvgID)
 		if ok {
 			body := []byte(hls_list.(map[string]string)[proxy_url])
 			contentType := "application/vnd.apple.mpegurl"
@@ -1211,9 +1088,9 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		return
 	}
 
-	cache := manifestCacheByProvider[provider.(string)]
+	cache := MANIFEST_CACHE_BY_PROVIDER[provider.(string)]
 	if proxy_type == "m4s" {
-		cache = segmentCacheByProvider[provider.(string)]
+		cache = SEGMENT_CACHE_BY_PROVIDER[provider.(string)]
 	}
 
 	if cache != nil {
@@ -1294,7 +1171,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		}
 		if *config.ToFmp4OverHls {
 			_, hls_list, _ := DashToHLS(proxy_url, body, tvgID)
-			hlsByTvgId.Store(tvgID, hls_list)
+			HLS_BY_TVG_ID.Store(tvgID, hls_list)
 			body = []byte(hls_list["master.m3u8"])
 			contentType = "application/vnd.apple.mpegurl"
 		}
@@ -1321,22 +1198,22 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
 			return
 		}
-		sinfBoxByStreamId.Store(stream_uuid, sinfBox)
+		SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinfBox)
 		if cache != nil {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 		body = modifiedBody
 	} else if proxy_type == "m4s" {
 		var sinfBox *mp4.SinfBox = nil
-		if t, ok := sinfBoxByStreamId.Load(stream_uuid); ok {
+		if t, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); ok {
 			sinfBox = t.(*mp4.SinfBox)
 		}
-		body, err = fetchAndDecrypt(client, configsByProvider[provider.(string)], tvgID, body, ctx, sinfBox)
+		body, err = fetchAndDecrypt(client, CONFIGS_BY_PROVIDER[provider.(string)], tvgID, body, ctx, sinfBox)
 		if err != nil {
 			return
 		}
 		if cache != nil {
-			cache.Set(proxyURL, body, MyMetadata{"application/octet-stream", tvgID, 0})
+			cache.Set(proxy_url, body, MyMetadata{"application/octet-stream", tvgID, 0})
 		}
 	}
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")

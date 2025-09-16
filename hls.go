@@ -31,7 +31,7 @@ var updaters sync.Map
 
 func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.Client, config *StreamConfig, interval time.Duration) {
 
-	if mediaType, ok := hlsTypeByTvgId.Load(tvgID); ok && mediaType == "static" {
+	if mediaType, ok := HLS_TYPE_BY_TVG_ID.Load(tvgID); ok && mediaType == "static" {
 		return
 	}
 
@@ -89,8 +89,8 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 					log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
 				}
-				hlsByTvgId.Store(u.tvgID, hlsMap)
-				hlsTypeByTvgId.Store(u.tvgID, mediaType)
+				HLS_BY_TVG_ID.Store(u.tvgID, hlsMap)
+				HLS_TYPE_BY_TVG_ID.Store(u.tvgID, mediaType)
 			} else {
 				body = modifyHLS(body, u.tvgID, u.mainfestUrl, *u.config.BestQuality)
 				urls, err := HLSParse(body, finalURI)
@@ -113,7 +113,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 						m3u8Content := string(modifyBody)
 						hlsMap[_key+".m3u8"] = m3u8Content
 						if strings.Contains(m3u8Content, "#ENDLIST") {
-							hlsTypeByTvgId.Store(u.tvgID, "static")
+							HLS_TYPE_BY_TVG_ID.Store(u.tvgID, "static")
 						}
 						hlsMapLock.Unlock()
 						fasthttp.ReleaseResponse(resp)
@@ -123,7 +123,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 			}
 			log.Println("Updated HLS for", u.tvgID)
 
-			if mediaType, ok := hlsTypeByTvgId.Load(tvgID); ok && mediaType == "static" {
+			if mediaType, ok := HLS_TYPE_BY_TVG_ID.Load(tvgID); ok && mediaType == "static" {
 				log.Printf("VOD资源，停止预加载 %s，%s", u.tvgID, u.mainfestUrl)
 				u.stopOnce.Do(func() {
 					close(u.stopCh)
@@ -365,9 +365,9 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 }
 
 func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4sUrl string) {
-	cache := segmentCacheByProvider[provider]
-	client := clientsByProvider[provider]
-	config := configsByProvider[provider]
+	cache := SEGMENT_CACHE_BY_PROVIDER[provider]
+	client := CLIENTS_BY_PROVIDER[provider]
+	config := CONFIGS_BY_PROVIDER[provider]
 	//需要先下载initM4s，才能获取到解密需要的信息。
 	// 先确保 init.m4s 已下载并解析
 	initReaderChan := make(chan struct{})
@@ -378,7 +378,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 		url = strings.Replace(url, "/"+stream_uuid, "", 1)
 		url = strings.Replace(url, "/http/", "http://", 1)
 		url = strings.Replace(url, "/https/", "https://", 1)
-		_, ok := sinfBoxByStreamId.Load(stream_uuid)
+		_, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid)
 		if ok {
 			close(initReaderChan)
 		} else {
@@ -397,7 +397,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				if err != nil {
 					return
 				}
-				sinfBoxByStreamId.Store(stream_uuid, sinfBox)
+				SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinfBox)
 				if cache != nil {
 					cache.Set(url, body, MyMetadata{string(resp.Header.ContentType()), tvgID, 0})
 				}
@@ -435,7 +435,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				fasthttp.ReleaseResponse(resp)
 				<-initReaderChan
 				var sinfBox *mp4.SinfBox
-				v, ok := sinfBoxByStreamId.Load(stream_uuid)
+				v, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid)
 				if ok {
 					sinfBox = v.(*mp4.SinfBox)
 				}

@@ -406,7 +406,7 @@ func generateFullCacheReport(filterProvider string, filterTvgId string) CacheRep
 		Providers: make(map[string]map[string]CacheReportItem),
 	}
 	if filterTvgId != "" {
-		val, ok := providerByTvgId.Load(filterTvgId)
+		val, ok := PROVIDER_BY_TVG_ID.Load(filterTvgId)
 		if !ok {
 			return report
 		}
@@ -414,21 +414,21 @@ func generateFullCacheReport(filterProvider string, filterTvgId string) CacheRep
 	}
 
 	if filterTvgId != "" {
-		if _, ok := configsByProvider[filterProvider]; !ok {
+		if _, ok := CONFIGS_BY_PROVIDER[filterProvider]; !ok {
 			return report
 		}
 	}
 
 	// 遍历所有 provider
-	for provider := range configsByProvider {
+	for provider := range CONFIGS_BY_PROVIDER {
 		if filterProvider != "" && filterProvider != provider {
 			continue
 		}
 
 		report.Providers[provider] = make(map[string]CacheReportItem)
 
-		manifestReports := generateProviderCacheReport(manifestCacheByProvider[provider])
-		segmentReports := generateProviderCacheReport(segmentCacheByProvider[provider])
+		manifestReports := generateProviderCacheReport(MANIFEST_CACHE_BY_PROVIDER[provider])
+		segmentReports := generateProviderCacheReport(SEGMENT_CACHE_BY_PROVIDER[provider])
 
 		// 遍历 tvgId
 		tvgSet := make(map[string]struct{})
@@ -475,7 +475,7 @@ func CacheStatsHandler(ctx *fasthttp.RequestCtx) {
 	switch {
 	case tvgID != "":
 		// 根据 tvgId 找 provider
-		p, ok := providerByTvgId.Load(tvgID)
+		p, ok := PROVIDER_BY_TVG_ID.Load(tvgID)
 		if !ok {
 			ctx.SetStatusCode(404)
 			fmt.Fprintf(ctx, "tvgId not found")
