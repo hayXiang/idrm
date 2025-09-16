@@ -1207,7 +1207,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			return
 		}
 		if cache != nil {
-			cache.Set(proxy_url, body, MyMetadata{"application/octet-stream", tvgID, 0})
+			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	}
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")

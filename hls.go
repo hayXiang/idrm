@@ -432,6 +432,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 					return
 				}
 				responseBody := resp.Body()
+				contentType := string(resp.Header.ContentType())
 				fasthttp.ReleaseResponse(resp)
 				<-initReaderChan
 				var sinfBox *mp4.SinfBox
@@ -444,7 +445,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 					return
 				}
 				if cache != nil {
-					cache.Set(url, body, MyMetadata{"application/octet-stream", tvgID, 0})
+					cache.Set(url, body, MyMetadata{contentType, tvgID, 0})
 				}
 			}(segURL)
 		}
