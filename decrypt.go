@@ -175,13 +175,7 @@ func decrypt(mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error 
 	if sampleCount > 0 {
 		for i := 0; i < int(sampleCount); i++ {
 			offsets[i] = curr
-			if senc == nil || senc.SubSamples == nil {
-				curr += traf.Trun.Samples[i].Size
-			} else {
-				for _, sub := range senc.SubSamples[i] {
-					curr += uint32(sub.BytesOfClearData) + uint32(sub.BytesOfProtectedData)
-				}
-			}
+			curr += traf.Trun.Samples[i].Size
 		}
 	}
 	decryptList := make([][]byte, int(sampleCount))

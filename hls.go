@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -178,8 +180,8 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 	}(upd)
 }
 
-func GetMaxSegmentDuration(adp *etree.Element) float64 {
-	var maxDur float64 = 0
+func GetMaxSegmentDurationInt(adp *etree.Element) int {
+	var maxDur float64
 	timescale := 1.0
 
 	for _, segTpl := range adp.FindElements("//SegmentTemplate") {
@@ -198,7 +200,6 @@ func GetMaxSegmentDuration(adp *etree.Element) float64 {
 				}
 			}
 		} else {
-			// fallback: 单个 duration
 			durAttr := segTpl.SelectAttrValue("duration", "")
 			if durAttr != "" {
 				dur, _ := strconv.ParseFloat(durAttr, 64)
@@ -209,7 +210,7 @@ func GetMaxSegmentDuration(adp *etree.Element) float64 {
 			}
 		}
 	}
-	return maxDur
+	return int(math.Ceil(maxDur))
 }
 
 // 返回 HLS playlists 内容，key = filename, value = m3u8 内容
@@ -234,7 +235,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 		adaps := period.FindElements("AdaptationSet")
 
 		for _, adap := range adaps {
-			maxDuration := int(GetMaxSegmentDuration(adap))
+			maxDuration := GetMaxSegmentDurationInt(adap)
 			contentType := adap.SelectAttrValue("contentType", "")
 			if contentType == "" {
 				mimeType := adap.SelectAttrValue("mimeType", "")
@@ -325,6 +326,26 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 						seq++
 					}
 					lastT = t
+				}
+			} else {
+				periodDurationStr := mpd.SelectAttrValue("mediaPresentationDuration", "")
+				periodDuration := 0.0
+				if periodDurationStr != "" {
+					periodDuration, _ = parseDuration(periodDurationStr) // ISO 8601 转秒
+				}
+				peridoDurationTotal := periodDuration * float64(timescale)
+				// SegmentTimeline 缺失 -> fallback
+				duration, _ := strconv.Atoi(segTemp.SelectAttrValue("duration", "0"))
+				durSec := float64(duration) / float64(timescale)
+				for peridoDurationTotal > 0 {
+					segURI := strings.ReplaceAll(mediaTemplate, "$Number$", strconv.Itoa(seq))
+					segDur := durSec
+					if peridoDurationTotal < float64(duration) {
+						segDur = peridoDurationTotal / float64(timescale)
+					}
+					segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", segDur, segURI))
+					seq++
+					peridoDurationTotal -= float64(duration)
 				}
 			}
 			if is_static {
@@ -497,4 +518,34 @@ func parseAttrs(attrLine string) map[string]string {
 		}
 	}
 	return attrs
+}
+
+var ptReg = regexp.MustCompile(`PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?`)
+
+func parseDuration(d string) (float64, error) {
+	// 示例: PT1H2M10.5S -> 3730.5 秒
+	m := ptReg.FindStringSubmatch(d)
+	if len(m) != 4 {
+		return 0, fmt.Errorf("invalid duration: %s", d)
+	}
+	hours := AtoiOrZero(m[1])
+	mins := AtoiOrZero(m[2])
+	secs := ParseFloatOrZero(m[3])
+	return float64(hours)*3600 + float64(mins)*60 + secs, nil
+}
+
+func AtoiOrZero(s string) int {
+	if s == "" {
+		return 0
+	}
+	i, _ := strconv.Atoi(s)
+	return i
+}
+
+func ParseFloatOrZero(s string) float64 {
+	if s == "" {
+		return 0
+	}
+	f, _ := strconv.ParseFloat(s, 64)
+	return f
 }
