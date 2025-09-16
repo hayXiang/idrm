@@ -116,7 +116,7 @@ func decryptFromBody(drmType string, data []byte, key []byte, sinfBox *mp4.SinfB
 
 type DecryptCallback func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error)
 
-func decrypt(mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error {
+func decrypt(sinfBox *mp4.SinfBox, mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error {
 	var traf *mp4.TrafBox = nil
 	var frag *mp4.Fragment = nil
 
@@ -157,15 +157,20 @@ func decrypt(mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error 
 	}
 	traf.Children = newBoxes
 
-	// AES block 只创建一次
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return err
+	if sinfBox == nil && senc == nil {
+		//没有sinfBox,同时m4f也没有加密信息，判断为不用解密
+		return nil
 	}
 
 	mdata := frag.Mdat
 	if mdata == nil {
 		return fmt.Errorf("未找到 mdat")
+	}
+
+	// AES block 只创建一次
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return err
 	}
 
 	sampleCount := len(traf.Trun.Samples)
@@ -222,7 +227,7 @@ func joinDecryptedSamples(decryptedSamples [][]byte) []byte {
 }
 
 func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte, sinfBox *mp4.SinfBox) error {
-	return decrypt(mp4File, key, func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error) {
+	return decrypt(sinfBox, mp4File, key, func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) ([]byte, error) {
 		//自动检测加密类型
 		if sinfBox != nil && sinfBox.Schm != nil {
 			if sinfBox.Schm.SchemeType == "cbcs" {
