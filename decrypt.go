@@ -240,7 +240,7 @@ func decrypFromMp4(drmType string, mp4File *mp4.File, key []byte, sinfBox *mp4.S
 		if drmType == "widevine" {
 			return DecryptWidevineSample(block, mdat, senc, traf, i, offset, sinfBox)
 		} else {
-			return DecryptFairplaySample(block, mdat, senc, traf, i, offset, -1, sinfBox)
+			return DecryptFairplaySample(block, mdat, senc, traf, i, offset, sinfBox)
 		}
 	})
 }
