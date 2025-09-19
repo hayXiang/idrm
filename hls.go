@@ -79,12 +79,12 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 			var hlsMapLock sync.Mutex
 			var mediaType = "dynamic"
 			if strings.Contains(u.mainfestUrl, ".mpd") || contentType == "application/dash+xml" {
-				body, err = modifyMpd(u.provider, u.tvgID, u.mainfestUrl, body)
+				body, err = modifyMpd(u.provider, u.tvgID, finalURI, body)
 				if err != nil {
 					log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
 				}
-				mediaType, hlsMap, err = DashToHLS(u.mainfestUrl, body, u.tvgID)
+				mediaType, hlsMap, err = DashToHLS(finalURI, body, u.tvgID)
 				if err != nil {
 					log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
@@ -92,7 +92,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 				HLS_BY_TVG_ID.Store(u.tvgID, hlsMap)
 				HLS_TYPE_BY_TVG_ID.Store(u.tvgID, mediaType)
 			} else {
-				body = modifyHLS(body, u.tvgID, u.mainfestUrl, *u.config.BestQuality)
+				body = modifyHLS(body, u.tvgID, finalURI, *u.config.BestQuality)
 				urls, err := HLSParse(body, finalURI)
 				if err != nil {
 					log.Printf("[ERROR] HLS解析错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
@@ -103,12 +103,12 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 					wg.Add(1)
 					go func(_key, _url string) {
 						defer wg.Done()
-						_, resp, err := fetchWithRedirect(u.client, _url, 5, u.config.Headers, *u.config.HttpTimeout)
+						finalURI, resp, err := fetchWithRedirect(u.client, _url, 5, u.config.Headers, *u.config.HttpTimeout)
 						if err != nil {
 							fmt.Println("请求失败:", _url, err)
 							return
 						}
-						modifyBody := modifyHLS(resp.Body(), u.tvgID, _url, *u.config.BestQuality)
+						modifyBody := modifyHLS(resp.Body(), u.tvgID, finalURI, *u.config.BestQuality)
 						hlsMapLock.Lock()
 						m3u8Content := string(modifyBody)
 						hlsMap[_key+".m3u8"] = m3u8Content

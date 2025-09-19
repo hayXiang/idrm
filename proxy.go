@@ -1180,7 +1180,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	// 直接重定向到原始 URL
 	log.Printf("下载开始：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 	start := time.Now()
-	proxy_url, resp, err := fetchWithRedirect(client, proxy_url, 5, config.Headers, *config.HttpTimeout)
+	finalURI, resp, err := fetchWithRedirect(client, proxy_url, 5, config.Headers, *config.HttpTimeout)
 	log.Printf("下载结束：%s, %s，%s, 耗时：%s", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)))
 	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
 		ctx.SetBodyString("无法获取内容")
@@ -1197,15 +1197,15 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	body := resp.Body()
 	contentType := string(resp.Header.ContentType())
 	if proxy_type == "mpd" || contentType == "application/dash+xml" {
-		body, err = modifyMpd(provider.(string), tvgID, proxy_url, resp.Body())
+		body, err = modifyMpd(provider.(string), tvgID, finalURI, resp.Body())
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("xml 重写错误")
-			log.Printf("[ERROR] xml 重写错误 %s，%s, %s", tvgID, proxy_url, err)
+			log.Printf("[ERROR] xml 重写错误 %s，%s, %s", tvgID, finalURI, err)
 			return
 		}
 		if *config.ToFmp4OverHls {
-			_, hls_list, _ := DashToHLS(proxy_url, body, tvgID)
+			_, hls_list, _ := DashToHLS(finalURI, body, tvgID)
 			HLS_BY_TVG_ID.Store(tvgID, hls_list)
 			body = []byte(hls_list["master.m3u8"])
 			contentType = "application/vnd.apple.mpegurl"
@@ -1218,7 +1218,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "m3u8" {
-		body = modifyHLS(body, tvgID, proxy_url, *config.BestQuality)
+		body = modifyHLS(body, tvgID, finalURI, *config.BestQuality)
 		if strings.Contains(query, "debug") {
 			contentType = "text/plain; charset=utf-8"
 		}
