@@ -397,7 +397,6 @@ func processNALU(block cipher.Block, naluMap map[int]*NALU, ts *TSPacket, iv []b
 		if startPayloadIdx < 0 {
 			break
 		}
-		currentNALU.Type = currentNALU.Payloads[startPayloadIdx][startPos+startCodeLen] & 0x1F
 
 		nextPayloadIdx, nextPos, _ := findNextNALUStartAcrossTS(currentNALU.Payloads, startPayloadIdx, startPos+startCodeLen)
 
@@ -405,6 +404,8 @@ func processNALU(block cipher.Block, naluMap map[int]*NALU, ts *TSPacket, iv []b
 			// 剩余半个 NALU，保留到下一个 TS
 			break
 		}
+
+		currentNALU.Type = currentNALU.Payloads[startPayloadIdx][startPos+startCodeLen] & 0x1F
 
 		// 拼接完整 NALU 数据
 		naluData := []byte{}
