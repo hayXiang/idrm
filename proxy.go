@@ -1046,6 +1046,7 @@ var rm = NewRequestManager()
 
 // 代理流 URL
 func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
+	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	parts := strings.SplitN(strings.TrimPrefix(path, "/drm/proxy/"), "/", 3)
 	if len(parts) < 3 {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
@@ -1118,7 +1119,6 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			body := []byte(hls_list.(map[string]string)[proxy_url])
 			contentType := "application/vnd.apple.mpegurl"
 			ctx.Response.Header.Set("Cache-Control", "no-cache")
-			ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 			ctx.SetStatusCode(fasthttp.StatusOK)
 			ctx.SetBody(body)
 			if strings.Contains(query, "debug") {
@@ -1263,7 +1263,6 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	}
-	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	log.Printf("解密结束: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)), formatSize(int64(len(body))))
 	resposneBody(ctx, body, contentType)

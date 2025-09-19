@@ -106,7 +106,9 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 
 func decryptFromBody(proxy_type string, data []byte, key []byte, sinfBox *mp4.SinfBox) ([]byte, error) {
 	if proxy_type == "ts" {
-		decryptTS(data, key, sinfBox.Schi.Tenc.DefaultConstantIV)
+		if sinfBox != nil {
+			decryptTS(data, key, sinfBox.Schi.Tenc.DefaultConstantIV)
+		}
 		return data, nil
 	} else {
 		mp4File, err := mp4.DecodeFile(bytes.NewReader(data))
