@@ -403,10 +403,16 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				}
 			}()
 		}
+	} else {
+		close(initReaderChan)
 	}
 
 	for _, segURL := range segmentURLs {
-		segURL = strings.Replace(segURL, "/drm/proxy/m4s/"+tvgID, "", 1)
+		proxy_type := "m4s"
+		if strings.HasPrefix(segURL, "/drm/proxy/ts") {
+			proxy_type = "ts"
+		}
+		segURL = strings.Replace(segURL, "/drm/proxy/"+proxy_type+"/"+tvgID, "", 1)
 		stream_uuid := strings.Split(segURL, "/")[1]
 		segURL = strings.Replace(segURL, "/"+stream_uuid, "", 1)
 		segURL = strings.Replace(segURL, "/http/", "http://", 1)
@@ -440,7 +446,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				if ok {
 					sinfBox = v.(*mp4.SinfBox)
 				}
-				body, err := fetchAndDecrypt(client, config, tvgID, responseBody, nil, sinfBox)
+				body, err := fetchAndDecrypt(client, config, tvgID, responseBody, nil, sinfBox, proxy_type)
 				if err != nil {
 					return
 				}

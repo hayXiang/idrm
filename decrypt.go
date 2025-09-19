@@ -35,7 +35,7 @@ func getIV(senc *mp4.SencBox, sinf *mp4.SinfBox, i int, iv16 *[16]byte) []byte {
 	return iv16[:]
 }
 
-func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, sinfBox *mp4.SinfBox) ([]byte, error) {
+func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, sinfBox *mp4.SinfBox, proxy_type string) ([]byte, error) {
 	val, ok := clearKeysMap.Load(tvgID)
 	if !ok {
 		err := fmt.Errorf("key not found for tvgID %s", tvgID)
@@ -93,7 +93,7 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 		return nil, err
 	}
 
-	body, err = decryptFromBody(*config.DrmType, body, keyBytes, sinfBox)
+	body, err = decryptFromBody(proxy_type, body, keyBytes, sinfBox)
 	if err != nil {
 		if ctx != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
@@ -104,14 +104,18 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 	return body, nil
 }
 
-func decryptFromBody(drmType string, data []byte, key []byte, sinfBox *mp4.SinfBox) ([]byte, error) {
-	mp4File, err := mp4.DecodeFile(bytes.NewReader(data))
-	if err != nil {
-		return nil, fmt.Errorf("解析 MP4 文件失败: %w", err)
+func decryptFromBody(proxy_type string, data []byte, key []byte, sinfBox *mp4.SinfBox) ([]byte, error) {
+	if proxy_type == "ts" {
+		decryptTS(data, key, sinfBox.Schi.Tenc.DefaultConstantIV)
+		return data, nil
+	} else {
+		mp4File, err := mp4.DecodeFile(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("解析 MP4 文件失败: %w", err)
+		}
+		decrypFromMp4("widevine", mp4File, key, sinfBox)
+		return encodeMP4ToBytes(mp4File)
 	}
-
-	decrypFromMp4(drmType, mp4File, key, sinfBox)
-	return encodeMP4ToBytes(mp4File)
 }
 
 type DecryptCallback func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) error

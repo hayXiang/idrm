@@ -81,7 +81,7 @@ var (
 	SINF_BOX_BY_STREAM_ID      = sync.Map{}
 )
 
-var version = "1.0.0.12"
+var version = "1.0.0.13"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -164,7 +164,6 @@ func validateHeaderLine(line string) error {
 }
 
 func main() {
-
 	var (
 		configFile               string
 		name                     string
@@ -622,6 +621,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 }
 
 var M3U8_INIT_REGEXP = regexp.MustCompile(`URI="([^"]+)"`)
+var M3U8_IV_REGEXP = regexp.MustCompile(`IV=0x([0-9A-Fa-f]+)`)
 
 func convert_to_proxy_url(proxy_type string, tvgID string, targetUrl string, baseUrl string, stream_uuid string) string {
 	return fmt.Sprintf("/drm/proxy/%s/%s/%s/%s", proxy_type, tvgID, stream_uuid, strings.Replace(resolveURL(targetUrl, baseUrl), "://", "/", 1))
@@ -846,6 +846,29 @@ func periodHasSubtitle(period *etree.Element) bool {
 	return false
 }
 
+// parseIV 从 #EXT-X-KEY 行解析 IV，返回 []byte
+func parseIV(line string) ([]byte, error) {
+	matches := M3U8_IV_REGEXP.FindStringSubmatch(line)
+	if len(matches) < 2 {
+		return nil, fmt.Errorf("IV not found in line: %s", line)
+	}
+
+	hexStr := matches[1]
+
+	// 转成字节数组
+	iv, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid IV hex: %v", err)
+	}
+
+	// 确保长度为 16 字节
+	if len(iv) != 16 {
+		return nil, fmt.Errorf("IV length must be 16 bytes, got %d", len(iv))
+	}
+
+	return iv, nil
+}
+
 func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 	strBody := string(body)
 
@@ -867,7 +890,18 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 		}
 
 		// 跳过 KEY（你这里是直接忽略的）
-		if strings.HasPrefix(line, "#EXT-X-KEY") {
+		if strings.HasPrefix(line, "#EXT-X-KEY:METHOD=") {
+			if _, exists := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); !exists {
+				sinBox := new(mp4.SinfBox)
+				sinBox.Schm = new(mp4.SchmBox)
+				sinBox.Schi = new(mp4.SchiBox)
+				sinBox.Schi.Tenc = new(mp4.TencBox)
+				if iv, err := parseIV(line); err == nil {
+					sinBox.Schi.Tenc.DefaultConstantIV = iv
+				}
+				sinBox.Schm.SchemeType = "cbcs"
+				SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinBox)
+			}
 			continue
 		}
 
@@ -882,7 +916,11 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 
 		// 如果上一行是 EXTINF → 当前行是分片地址
 		if lastLineWasExtInf && !strings.HasPrefix(line, "#") {
-			line = convert_to_proxy_url("m4s", tvgID, line, url, stream_uuid)
+			media_type := "m4s"
+			if strings.Contains(line, ".ts") {
+				media_type = "ts"
+			}
+			line = convert_to_proxy_url(media_type, tvgID, line, url, stream_uuid)
 			lastLineWasExtInf = false
 		}
 
@@ -1030,7 +1068,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			proxy_url = raw_url.(string)
 		}
 	} else {
-		if proxy_type == "m4s" || proxy_type == "init-m4s" {
+		if proxy_type == "m4s" || proxy_type == "init-m4s" || proxy_type == "ts" {
 			stream_uuid = strings.Split(proxy_url, "/")[0]
 			proxy_url = strings.Replace(proxy_url, stream_uuid+"/", "", 1)
 		}
@@ -1092,7 +1130,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 
 	cache := MANIFEST_CACHE_BY_PROVIDER[provider.(string)]
-	if proxy_type == "m4s" {
+	if proxy_type == "m4s" || proxy_type == "ts" {
 		cache = SEGMENT_CACHE_BY_PROVIDER[provider.(string)]
 	}
 
@@ -1205,7 +1243,19 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		if t, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); ok {
 			sinfBox = t.(*mp4.SinfBox)
 		}
-		body, err = fetchAndDecrypt(client, CONFIGS_BY_PROVIDER[provider.(string)], tvgID, body, ctx, sinfBox)
+		body, err = fetchAndDecrypt(client, CONFIGS_BY_PROVIDER[provider.(string)], tvgID, body, ctx, sinfBox, proxy_type)
+		if err != nil {
+			return
+		}
+		if cache != nil {
+			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
+		}
+	} else if proxy_type == "ts" {
+		var sinfBox *mp4.SinfBox = nil
+		if t, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); ok {
+			sinfBox = t.(*mp4.SinfBox)
+		}
+		body, err = fetchAndDecrypt(client, CONFIGS_BY_PROVIDER[provider.(string)], tvgID, body, ctx, sinfBox, proxy_type)
 		if err != nil {
 			return
 		}
