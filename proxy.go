@@ -183,7 +183,6 @@ func main() {
 		segmentMemoryCacheExpire int
 		segmentFileCacheExpire   int
 		cacheDir                 string
-		drmType                  string
 	)
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
@@ -211,7 +210,6 @@ func main() {
 	flag.IntVar(&manifestCacheExpire, "cache-manifest", -1, "mpd或者m3u8缓存过期时间，单位秒,-1 表示不开启")
 	flag.IntVar(&segmentMemoryCacheExpire, "cache-segment-memory", -1, "ts或者m4s缓存短期过期时间，单位秒, -1 表示不开启")
 	flag.IntVar(&segmentFileCacheExpire, "cache-segment-file", -1, "ts或者m4s缓存文件最大存活时间，单位秒,-1 表示不开启")
-	flag.StringVar(&drmType, "drm-type", "widevine", "DRM的类型，决定了默认的解密方式，程序也会去校验m3u8的DRM类型，自动调整")
 
 	var enablePprof bool
 	var pprofAddr string
@@ -293,10 +291,6 @@ func main() {
 			if configs[i].SpeedUp == nil {
 				configs[i].SpeedUp = &speedUp
 			}
-
-			if configs[i].DrmType == nil {
-				configs[i].DrmType = &drmType
-			}
 		}
 	} else if singleInput != "" {
 		var us *string = nil
@@ -319,7 +313,6 @@ func main() {
 				SegmentFileCacheExpire:   &segmentFileCacheExpire,
 				ManifestCacheExpire:      &manifestCacheExpire,
 				SpeedUp:                  &speedUp,
-				DrmType:                  &drmType,
 			},
 		}
 	} else {
