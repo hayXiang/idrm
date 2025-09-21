@@ -802,33 +802,119 @@ func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (int, 
 	return -1, -1, 0, 0
 }
 
-func findNextADTSHeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (int, int, int, int) {
+// isValidADTSHeaderFast 是一个简化版的 isValidADTSHeader，
+// 用于检查一个固定大小的切片（至少7字节）。
+// 它避免了重复的长度检查，适用于已知数据足够的情况。
+func isValidADTSHeaderFast(header []byte) bool {
+	if len(header) < 7 { // 这个检查在调用前应已保证
+		return false
+	}
+	if header[0] != 0xFF || (header[1]&0xF0) != 0xF0 {
+		return false
+	}
+	layer := (header[1] >> 1) & 0x03
+	if layer != 0 {
+		return false
+	}
+	sampleIdx := (header[2] >> 2) & 0x0F
+	channelCfg := ((header[2]&0x01)<<2 | (header[3] >> 6)) & 0x07
+	if sampleIdx >= 13 || channelCfg == 0 || channelCfg > 7 {
+		return false
+	}
+	return true
+}
+
+// findNextADTSHeaderAcrossTS 在 payloads 中查找下一个有效的 ADTS header。
+// 它从 payloads[startIdx] 的 startPos 位置开始查找。
+// 返回值:
+// payloadIdx: 找到头部的 payload 索引 (-1 表示未找到)
+// pos: 找到头部在该 payload 中的起始位置
+// headerLen: ADTS 头部的长度 (7 or 9 bytes)
+// frameLen: 整个 ADTS 帧的长度
+func findNextADTSHeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (payloadIdx int, pos int, headerLen int, frameLen int) {
+	// 如果起始索引无效，则直接返回未找到
+	if startIdx < 0 || startIdx >= len(payloads) {
+		return -1, -1, 0, 0
+	}
+
+	// 用于跨 payload 检查时拼接数据的小 buffer
+	var buf [16]byte // 7字节header + 一些额外空间以确保安全
+
 	for i := startIdx; i < len(payloads); i++ {
 		data := payloads[i]
-		pos := 0
+		p := 0
+		// 对于起始 payload，从指定的 startPos 开始
 		if i == startIdx {
-			pos = startPos
-		}
-		for pos+7 <= len(data) {
-			if data[pos] == 0xFF && (data[pos+1]&0xF0) == 0xF0 {
-				// CRC 判断
-				headerLen := 7
-				if (data[pos+1] & 0x01) == 0 { // protection_absent = 0
-					headerLen = 9
-				}
-
-				// header 跨 payload
-				if pos+headerLen > len(data) {
-					// header 不完整，等待下一 payload
-					break
-				}
-
-				frameLen := int((uint16(data[pos+3]&0x03) << 11) | (uint16(data[pos+4]) << 3) | (uint16(data[pos+5]&0xE0) >> 5))
-				return i, pos, headerLen, frameLen
+			p = startPos
+			// 如果起始位置就无效，则跳到下一个 payload
+			if p >= len(data) {
+				continue
 			}
-			pos++
+		}
+
+		// 遍历当前 payload 中的字节
+		for p < len(data) {
+			// 快速跳过明显不是同步字开头的字节，提高效率
+			if data[p] != 0xFF {
+				p++
+				continue
+			}
+
+			var headerData []byte
+
+			// 情况 1: 当前 payload 剩余字节足够容纳一个 ADTS header
+			if len(data)-p >= 7 {
+				headerData = data[p : p+7]
+			} else {
+				// 情况 2: header 跨越了当前 payload 和后续 payload
+				// 计算需要从后续 payload 拿多少字节
+				bytesNeeded := 7 - (len(data) - p)
+				n := copy(buf[:], data[p:]) // 先复制当前 payload 剩余部分
+
+				// 从后续 payloads 中复制所需字节
+				payloadIdxForCopy := i + 1
+				for bytesNeeded > 0 && payloadIdxForCopy < len(payloads) {
+					bytesToCopy := len(payloads[payloadIdxForCopy])
+					if bytesToCopy > bytesNeeded {
+						bytesToCopy = bytesNeeded
+					}
+					n += copy(buf[n:], payloads[payloadIdxForCopy][:bytesToCopy])
+					bytesNeeded -= bytesToCopy
+					payloadIdxForCopy++
+				}
+
+				// 如果拼接后的数据不足 7 字节，则无法构成 header
+				if n < 7 {
+					// 移动到下一个可能的同步字位置
+					p++
+					continue
+				}
+				headerData = buf[:7]
+			}
+
+			// 使用快速验证函数检查拼接后的数据是否为有效 header
+			if isValidADTSHeaderFast(headerData) {
+				// 提取 header 长度和帧长度
+				prot := headerData[1] & 0x01
+				hLen := 7
+				if prot == 0 {
+					hLen = 9
+				}
+				fLen := int((uint16(headerData[3]&0x03) << 11) |
+					(uint16(headerData[4]) << 3) |
+					(uint16(headerData[5]&0xE0) >> 5))
+
+				// 最终验证帧长度是否合理
+				if fLen >= hLen {
+					return i, p, hLen, fLen
+				}
+			}
+			// 如果不是有效 header，移动到下一个字节继续查找
+			p++
 		}
 	}
+
+	// 遍历完所有 payloads 都未找到有效 header
 	return -1, -1, 0, 0
 }
 
