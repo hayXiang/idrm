@@ -438,6 +438,46 @@ func findNextNALUStartAcrossTS(tsList [][]byte, startTS int, startPos int) (int,
 	return -1, -1, 0
 }
 
+// EBSPtoRBSP_Strict 将 EBSP 转回 RBSP
+// 规则：
+// 连续两个0x00后，如果遇到0x03，
+// 且03后面的字节存在且 <=0x03，则删除当前0x03
+func EBSPtoRBSP(ebsp []byte) []byte {
+	rbsp := make([]byte, 0, len(ebsp))
+	zeroCount := 0
+	i := 0
+
+	for i < len(ebsp) {
+		b := ebsp[i]
+
+		// 检查连续两个0x00后是否遇到防止字节 0x03
+		if zeroCount == 2 && b == 0x03 {
+			// 看下一个字节是否存在且 <=0x03
+			if i+1 < len(ebsp) && ebsp[i+1] <= 0x03 {
+				// 当前0x03是防止字节，跳过
+				zeroCount = 0
+				i++
+				continue
+			}
+			// 如果不存在或 >0x03，则保留当前0x03
+		}
+
+		// 写入当前字节
+		rbsp = append(rbsp, b)
+
+		// 更新 zeroCount
+		if b == 0x00 {
+			zeroCount++
+		} else {
+			zeroCount = 0
+		}
+
+		i++
+	}
+
+	return rbsp
+}
+
 // processNALU 解析 PES->NALU 并解密 I/P 帧
 func processNALU(block cipher.Block, naluMap map[int]*NALU, ts *TSPacket, iv []byte, packageIndex int) {
 	if ts.PES == nil || len(ts.PES.ES) == 0 {
@@ -459,7 +499,6 @@ func processNALU(block cipher.Block, naluMap map[int]*NALU, ts *TSPacket, iv []b
 
 	// 拼接当前 TS payload
 	currentNALU.Payloads = append(currentNALU.Payloads, es)
-
 	for {
 		startPayloadIdx, startPos, startCodeLen := findNextNALUStartAcrossTS(currentNALU.Payloads, 0, 0)
 		if startPayloadIdx < 0 {
@@ -487,10 +526,21 @@ func processNALU(block cipher.Block, naluMap map[int]*NALU, ts *TSPacket, iv []b
 		}
 		currentNALU.Type = naluData[startCodeLen] & 0x1F
 
+		naluData = EBSPtoRBSP(naluData)
+
 		// 只解密 I/P 帧
 		if (len(naluData) > startCodeLen+1+31) && (currentNALU.Type == 5 || currentNALU.Type == 1) {
-			decryptCBCSInPlace(block, naluData[startCodeLen+1+31:], iv, 1, 9)
 
+			decryptCBCSInPlace(block, naluData[startCodeLen+1+31:], iv, 1, 9)
+			// len1 := len(naluDataChanged)
+			// len2 := len(naluData)
+			// if len1 > len2 {
+			// 	fmt.Printf("naluData len incr, %d,%d\n", len1, len2)
+			// }
+
+			// if len1 < len2 {
+			// 	fmt.Printf("naluData len desc, %d,%d\n", len1, len2)
+			// }
 			// 回填原始 Payloads
 			offset := 0
 			for i := startPayloadIdx; i <= nextPayloadIdx; i++ {
@@ -870,16 +920,16 @@ func processAudio(block cipher.Block, audioMap map[int]*AudioFrame, ts *TSPacket
 // }
 
 // func test() {
-// 	data, err := os.ReadFile("D://audio.ts")
+// 	data, err := os.ReadFile("D:\\drm\\ggg\\raw\\4086066.ts")
 // 	if err != nil {
 // 		fmt.Println(err)
 // 		return
 // 	}
-// 	key := hexToBytes("ca960e1c8e8294a31ab1d28e6848fcc5") // 示例 AES key
-// 	iv := hexToBytes("3E75EE53CB87366AD4EF3A2CBA2E0636")
+// 	key := hexToBytes("8bcdab76c02b341fb3658d912b0def9c") // 示例 AES key
+// 	iv := hexToBytes("A2CC00BBA65B2DB60728B7168F5F4B9A")
 // 	decryptTS(data, key, iv)
 
-// 	os.WriteFile("D://de.ts", data, 0644)
+// 	os.WriteFile("D://drm/de.ts", data, 0644)
 // 	fmt.Println("Done")
 // 	os.Exit(1)
 // }
