@@ -519,7 +519,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 		}
 
 		// 解析 EXTINF 行
-		if strings.HasPrefix(line, "#EXTINF") && strings.Contains(line, "group-title") {
+		if strings.HasPrefix(line, "#EXTINF") && (strings.Contains(line, "tvg-logo") || strings.Contains(line, "group-title") || strings.Contains(line, "tvg-id")) {
 			matches := reTvg.FindStringSubmatch(line)
 			if len(matches) == 2 {
 				tvgID = matches[1]
