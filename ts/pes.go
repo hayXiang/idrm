@@ -104,7 +104,11 @@ func (pes *PES) SplitToTS(pid int, rawTsList []*TSPacket) {
 			offset += len(adaptField)
 
 			for i := 0; i < stuffingSize; i++ {
-				tsBuffer[offset] = 0xFF
+				if i == 0 {
+					tsBuffer[offset] = 0x00
+				} else {
+					tsBuffer[offset] = 0xFF
+				}
 				offset++
 			}
 		} else if stuffingSize > 0 {
@@ -115,7 +119,11 @@ func (pes *PES) SplitToTS(pid int, rawTsList []*TSPacket) {
 			offset++
 
 			for i := 0; i < stuffingSize; i++ {
-				tsBuffer[offset] = 0xFF
+				if i == 0 {
+					tsBuffer[offset] = 0x00
+				} else {
+					tsBuffer[offset] = 0xFF
+				}
 				offset++
 			}
 		}
