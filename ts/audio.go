@@ -83,23 +83,43 @@ func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (int, 
 	return -1, -1, 0, 0
 }
 
-// isValidADTSHeaderFast 是一个简化版的 isValidADTSHeader，
-// 用于检查一个固定大小的切片（至少7字节）。
-// 它避免了重复的长度检查，适用于已知数据足够的情况。
-func isValidADTSHeaderFast(header []byte) bool {
-	if len(header) < 7 { // 这个检查在调用前应已保证
+func isValidADTSHeaderStrict(header []byte) bool {
+	if len(header) < 7 {
 		return false
 	}
+	// syncword
 	if header[0] != 0xFF || (header[1]&0xF0) != 0xF0 {
 		return false
 	}
-	layer := (header[1] >> 1) & 0x03
-	if layer != 0 {
+	// MPEG version (ID)
+	id := (header[1] >> 3) & 0x01
+	if id != 0 && id != 1 {
 		return false
 	}
+	// Layer 固定为 00
+	if (header[1]>>1)&0x03 != 0 {
+		return false
+	}
+	// Profile (AAC object type)
+	profile := (header[2] >> 6) & 0x03
+	if profile == 3 {
+		return false
+	}
+	// Sampling freq
 	sampleIdx := (header[2] >> 2) & 0x0F
+	if sampleIdx > 12 {
+		return false
+	}
+	// Channel cfg
 	channelCfg := ((header[2]&0x01)<<2 | (header[3] >> 6)) & 0x07
-	if sampleIdx >= 13 || channelCfg == 0 || channelCfg > 7 {
+	if channelCfg == 0 || channelCfg > 7 {
+		return false
+	}
+	// Frame length
+	frameLen := int((uint16(header[3]&0x03) << 11) |
+		(uint16(header[4]) << 3) |
+		(uint16(header[5]) >> 5))
+	if frameLen < 7 || frameLen > 8191 {
 		return false
 	}
 	return true
@@ -174,7 +194,7 @@ func findNextADTSHeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (payl
 			}
 
 			// 使用快速验证函数检查拼接后的数据是否为有效 header
-			if isValidADTSHeaderFast(headerData) {
+			if isValidADTSHeaderStrict(headerData) {
 				// 提取 header 长度和帧长度
 				prot := headerData[1] & 0x01
 				hLen := 7
