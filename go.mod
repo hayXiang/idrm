@@ -1,4 +1,4 @@
-module nbaProxy
+module idrm
 
 go 1.24.5
 

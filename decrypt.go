@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"idrm/ts"
 	"os"
 	"strings"
 	"sync"
@@ -107,7 +108,7 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 func decryptFromBody(proxy_type string, data []byte, key []byte, sinfBox *mp4.SinfBox) ([]byte, error) {
 	if proxy_type == "ts" {
 		if sinfBox != nil {
-			decryptTS(data, key, sinfBox.Schi.Tenc.DefaultConstantIV)
+			ts.DecryptTS(data, key, sinfBox.Schi.Tenc.DefaultConstantIV)
 		}
 		return data, nil
 	} else {
