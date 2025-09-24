@@ -81,7 +81,7 @@ var (
 	SINF_BOX_BY_STREAM_ID      = sync.Map{}
 )
 
-var version = "1.0.0.14"
+var version = "1.0.0.15"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
