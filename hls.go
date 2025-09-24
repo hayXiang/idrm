@@ -98,6 +98,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 					log.Printf("[ERROR] HLS解析错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
 				}
+				manifestCache := MANIFEST_CACHE_BY_PROVIDER[u.provider]
 				var wg sync.WaitGroup
 				for key, url := range urls {
 					wg.Add(1)
@@ -111,9 +112,13 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 						modifyBody := modifyHLS(resp.Body(), u.tvgID, finalURI, *u.config.BestQuality)
 						hlsMapLock.Lock()
 						m3u8Content := string(modifyBody)
+						m3u8ContentType := string(resp.Header.ContentType())
 						hlsMap[_key+".m3u8"] = m3u8Content
 						if strings.Contains(m3u8Content, "#ENDLIST") {
 							HLS_TYPE_BY_TVG_ID.Store(u.tvgID, "static")
+						}
+						if manifestCache != nil {
+							manifestCache.Set(_url, modifyBody, MyMetadata{m3u8ContentType, u.tvgID, 0})
 						}
 						hlsMapLock.Unlock()
 						fasthttp.ReleaseResponse(resp)
