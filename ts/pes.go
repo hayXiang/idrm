@@ -21,8 +21,6 @@ func (p *PES) add(ts *TSPacket) {
 	p.payload = append(p.payload, ts.PES.ES...)
 }
 
-var count = 0
-
 func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	// 老的PES 结束
 	var newPES *PES = nil
