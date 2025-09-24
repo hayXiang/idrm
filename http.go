@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -19,15 +21,32 @@ func getClientIP(ctx *fasthttp.RequestCtx) string {
 	return ctx.RemoteAddr().String()
 }
 
+func isSameFileName(url1, url2 string) bool {
+	u1, err1 := url.Parse(url1)
+	u2, err2 := url.Parse(url2)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+
+	// 获取 URL 的最后一个路径段（文件名）
+	file1 := path.Base(u1.Path)
+	file2 := path.Base(u2.Path)
+
+	return file1 == file2
+}
+
 // fetchWithRedirect 发起 GET 请求，自动跟随重定向（最多 maxRedirects 次）
 func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects int, headers []string, timeout int) (string, *fasthttp.Response, error) {
 	currentURL := startURL
+	if v, ok := CACHE_302_REDIRECT_URL.Get(startURL); ok {
+		currentURL = v.(string)
+		log.Printf("使用缓存的302地址：%s", currentURL)
+	}
 
 	for i := 0; i < maxRedirects; i++ {
 		req := fasthttp.AcquireRequest()
 		resp := fasthttp.AcquireResponse()
 
-		req.SetRequestURI(currentURL)
 		req.Header.SetMethod("GET")
 		for _, head := range headers {
 			key_value := strings.Split(head, ":")
@@ -36,10 +55,14 @@ func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects in
 			}
 		}
 
+		req.SetRequestURI(currentURL)
+
 		err := client.DoTimeout(req, resp, time.Duration(timeout)*time.Second)
 		fasthttp.ReleaseRequest(req)
 		if err != nil {
 			fasthttp.ReleaseResponse(resp)
+			CACHE_302_REDIRECT_URL.Delete(startURL)
+			log.Printf("请求失败，清楚缓存的302地址：%s", currentURL)
 			return currentURL, nil, fmt.Errorf("request failed: %w", err)
 		}
 
@@ -72,7 +95,9 @@ func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects in
 			fasthttp.ReleaseResponse(resp)
 			continue
 		}
-
+		if startURL != currentURL && isSameFileName(startURL, currentURL) {
+			CACHE_302_REDIRECT_URL.Add(startURL, currentURL, 1*time.Hour)
+		}
 		// 不是 3xx，直接返回
 		return currentURL, resp, nil
 	}

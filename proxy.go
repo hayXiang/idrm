@@ -29,6 +29,7 @@ import (
 
 	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/beevik/etree"
+	"github.com/patrickmn/go-cache"
 	"github.com/valyala/fasthttp"
 	"golang.org/x/net/proxy"
 )
@@ -79,6 +80,7 @@ var (
 	RAW_URL_BY_TVG_ID          = sync.Map{}
 	HLS_TYPE_BY_TVG_ID         = sync.Map{}
 	SINF_BOX_BY_STREAM_ID      = sync.Map{}
+	CACHE_302_REDIRECT_URL     = cache.New(60*time.Second, 30*time.Second)
 )
 
 var version = "1.0.0.15"
