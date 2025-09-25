@@ -83,7 +83,8 @@ func (pes *PES) SplitToTS(pid int, rawTsList []*TSPacket) {
 
 		offset := tsHeaderSize
 		var adaptField []byte
-		if tsPackageIndex < len(rawTsList) {
+		//只在PES开头copy adapField
+		if tsPackageIndex < len(rawTsList) && tsPackageIndex == 0 {
 			rawTs := rawTsList[tsPackageIndex]
 			aFlen := len(rawTs.AdaptationField) - rawTs.suffingLength
 			adaptField = append(adaptField, rawTs.AdaptationField[:aFlen]...)
