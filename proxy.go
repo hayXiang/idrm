@@ -83,7 +83,7 @@ var (
 	CACHE_302_REDIRECT_URL     = cache.New(60*time.Second, 30*time.Second)
 )
 
-var version = "1.0.0.15"
+var version = "1.0.0.16"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
