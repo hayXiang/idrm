@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -60,6 +61,10 @@ func HttpGet(client *http.Client, startURL string, headers []string) (statusCode
 		return 503, nil, err, "", startURL
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		CACHE_302_REDIRECT_URL.Delete(startURL)
+		return resp.StatusCode, nil, errors.New("http get failed," + resp.Status), "", startURL
+	}
 	currentURL = resp.Request.URL.String()
 	if startURL != currentURL && isSameFileName(startURL, currentURL) {
 		CACHE_302_REDIRECT_URL.Add(startURL, currentURL, 1*time.Hour)
