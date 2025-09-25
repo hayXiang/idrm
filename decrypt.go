@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"idrm/ts"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -36,7 +37,7 @@ func getIV(senc *mp4.SencBox, sinf *mp4.SinfBox, i int, iv16 *[16]byte) []byte {
 	return iv16[:]
 }
 
-func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, sinfBox *mp4.SinfBox, proxy_type string) ([]byte, error) {
+func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, sinfBox *mp4.SinfBox, proxy_type string) ([]byte, error) {
 	val, ok := clearKeysMap.Load(tvgID)
 	if !ok {
 		err := fmt.Errorf("key not found for tvgID %s", tvgID)
@@ -50,17 +51,15 @@ func fetchAndDecrypt(client *fasthttp.Client, config *StreamConfig, tvgID string
 	// 如果已经有人在拉 license，可以直接返回，不等待
 	// 可用一个 requestManager 或 map 来标记是否在获取
 	if strings.HasPrefix(val.(string), "http") {
-		resp, err := HttpGetWithUA(client, val.(string), config.LicenseUrlHeaders, *config.HttpTimeout)
-		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
+		_, body, err, _, _ := HttpGet(client, val.(string), config.LicenseUrlHeaders)
+		if err != nil {
 			if ctx != nil {
 				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				ctx.SetBodyString("无法获取 license")
 			}
 			return nil, fmt.Errorf("failed to fetch license: %v", err)
 		}
-		val = string(resp.Body())
-		clearKeysMap.Store(tvgID, val)
-		fasthttp.ReleaseResponse(resp)
+		clearKeysMap.Store(tvgID, body)
 	}
 
 	// 解析 JWK

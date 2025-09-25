@@ -143,16 +143,12 @@ func (fc *MyCache) writeFile(key string, item CacheItem) {
 
 // Set 缓存数据
 func (fc *MyCache) Set(key string, data []byte, metadat MyMetadata) {
-	// fasthttp 的 body 可能复用，必须深拷贝
-	copyData := make([]byte, len(data))
-	copy(copyData, data)
-
 	if fc.memTTL < 0 && fc.fileTTL < 0 {
 		return
 	}
 
 	key = fileNameFromKey(key)
-	item := CacheItem{Data: copyData, Metadata: metadat}
+	item := CacheItem{Data: data, Metadata: metadat}
 	if fc.memTTL >= 0 {
 		// 存内存
 		fc.memCache.Set(key, item, time.Duration(fc.memTTL)*time.Second)

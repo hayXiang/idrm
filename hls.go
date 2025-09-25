@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/beevik/etree"
-	"github.com/valyala/fasthttp"
 )
 
 type HLSUpdater struct {
@@ -22,14 +22,14 @@ type HLSUpdater struct {
 	interval    time.Duration
 	stopCh      chan struct{}
 	lastAccess  time.Time
-	client      *fasthttp.Client
+	client      *http.Client
 	config      *StreamConfig
 	stopOnce    sync.Once
 }
 
 var updaters sync.Map
 
-func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.Client, config *StreamConfig, interval time.Duration) {
+func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Client, config *StreamConfig, interval time.Duration) {
 
 	if mediaType, ok := HLS_TYPE_BY_TVG_ID.Load(tvgID); ok && mediaType == "static" {
 		return
@@ -66,15 +66,11 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 				return
 			}
 
-			finalURI, resp, err := fetchWithRedirect(u.client, u.mainfestUrl, 5, u.config.Headers, *u.config.HttpTimeout)
-			if err != nil || resp.StatusCode() != fasthttp.StatusOK {
+			_, body, err, contentType, finalURI := HttpGet(u.client, u.mainfestUrl, u.config.Headers)
+			if err != nil {
 				log.Printf("[ERROR] 更新manifest失败 %s，%s, %v", u.tvgID, u.mainfestUrl, err)
 				return
 			}
-			body := append([]byte(nil), resp.Body()...)
-			contentType := string(resp.Header.ContentType())
-			fasthttp.ReleaseResponse(resp)
-
 			var hlsMap = make(map[string]string)
 			var hlsMapLock sync.Mutex
 			var mediaType = "dynamic"
@@ -104,15 +100,14 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 					wg.Add(1)
 					go func(_key, _url string) {
 						defer wg.Done()
-						finalURI, resp, err := fetchWithRedirect(u.client, _url, 5, u.config.Headers, *u.config.HttpTimeout)
+						_, body, err, m3u8ContentType, finalURI := HttpGet(u.client, _url, u.config.Headers)
 						if err != nil {
 							fmt.Println("请求失败:", _url, err)
 							return
 						}
-						modifyBody := modifyHLS(resp.Body(), u.tvgID, finalURI, *u.config.BestQuality)
+						modifyBody := modifyHLS(body, u.tvgID, finalURI, *u.config.BestQuality)
 						hlsMapLock.Lock()
 						m3u8Content := string(modifyBody)
-						m3u8ContentType := string(resp.Header.ContentType())
 						hlsMap[_key+".m3u8"] = m3u8Content
 						if strings.Contains(m3u8Content, "#ENDLIST") {
 							HLS_TYPE_BY_TVG_ID.Store(u.tvgID, "static")
@@ -121,7 +116,6 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *fasthttp.C
 							manifestCache.Set(_url, modifyBody, MyMetadata{m3u8ContentType, u.tvgID, 0})
 						}
 						hlsMapLock.Unlock()
-						fasthttp.ReleaseResponse(resp)
 					}(key, url)
 				}
 				wg.Wait()
@@ -391,20 +385,19 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				defer func() {
 					close(initReaderChan)
 				}()
-				_, resp, err := fetchWithRedirect(client, url, 5, config.Headers, *config.HttpTimeout)
+				_, responseBody, err, contentType, _ := HttpGet(client, url, config.Headers)
 				if err != nil {
 					log.Printf("init.m4s 下载失败: %v", err)
 					return
 				}
-				defer fasthttp.ReleaseResponse(resp)
 
-				body, sinfBox, err := modifyInitM4sFromBody(resp.Body())
+				body, sinfBox, err := modifyInitM4sFromBody(responseBody)
 				if err != nil {
 					return
 				}
 				SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinfBox)
 				if cache != nil {
-					cache.Set(url, body, MyMetadata{string(resp.Header.ContentType()), tvgID, 0})
+					cache.Set(url, body, MyMetadata{contentType, tvgID, 0})
 				}
 			}()
 		}
@@ -437,21 +430,18 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				}()
 				log.Printf("下载开始(预加载）：%s, %s，%s", "preloader", tvgID, url)
 				start := time.Now()
-				_, resp, err := fetchWithRedirect(client, url, 5, config.Headers, *config.HttpTimeout)
+				_, body, err, contentType, _ := HttpGet(client, url, config.Headers)
 				log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, formatDuration(time.Since(start)))
 				if err != nil {
 					return
 				}
-				responseBody := resp.Body()
-				contentType := string(resp.Header.ContentType())
-				fasthttp.ReleaseResponse(resp)
 				<-initReaderChan
 				var sinfBox *mp4.SinfBox
 				v, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid)
 				if ok {
 					sinfBox = v.(*mp4.SinfBox)
 				}
-				body, err := fetchAndDecrypt(client, config, tvgID, responseBody, nil, sinfBox, proxy_type)
+				body, err = fetchAndDecrypt(client, config, tvgID, body, nil, sinfBox, proxy_type)
 				if err != nil {
 					return
 				}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
@@ -72,8 +73,8 @@ var (
 	BIND_ADDRESS               string
 	PROVIDER_BY_TVG_ID         = sync.Map{} // map[tvgID]providerName
 	CONFIGS_BY_PROVIDER        = make(map[string]*StreamConfig)
-	CLIENTS_BY_PROVIDER        = make(map[string]*fasthttp.Client)
-	M3U_CLIENT_BY_PROVIDER     = make(map[string]*fasthttp.Client)
+	CLIENTS_BY_PROVIDER        = make(map[string]*http.Client)
+	M3U_CLIENT_BY_PROVIDER     = make(map[string]*http.Client)
 	MANIFEST_CACHE_BY_PROVIDER = make(map[string]*MyCache)
 	SEGMENT_CACHE_BY_PROVIDER  = make(map[string]*MyCache)
 	HLS_BY_TVG_ID              = sync.Map{}
@@ -83,7 +84,7 @@ var (
 	CACHE_302_REDIRECT_URL     = cache.New(60*time.Second, 30*time.Second)
 )
 
-var version = "1.0.0.16"
+var version = "1.0.0.17"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -97,40 +98,55 @@ func loadConfigFile(path string) ([]StreamConfig, error) {
 	return cfg, nil
 }
 
-func newFastHTTPClient(socks5_url string, timeout int) *fasthttp.Client {
-	client := &fasthttp.Client{
-		ReadTimeout:     time.Second * time.Duration(timeout),
-		WriteTimeout:    10 * time.Second,
-		MaxConnsPerHost: 500,
+// newHTTPClient 创建支持 SOCKS5 或 HTTP 代理的 net/http Client
+func newHTTPClient(proxyURL string, timeout int) *http.Client {
+	transport := &http.Transport{}
+
+	if proxyURL != "" {
+		u, err := url.Parse(proxyURL)
+		if err != nil {
+			log.Fatalf("无法解析代理地址: %v", err)
+		}
+
+		switch u.Scheme {
+		case "socks5", "socks5h":
+			// SOCKS5 代理
+			var auth *proxy.Auth
+			if u.User != nil {
+				password, _ := u.User.Password()
+				auth = &proxy.Auth{
+					User:     u.User.Username(),
+					Password: password,
+				}
+			}
+			dialer, err := proxy.SOCKS5("tcp", u.Host, auth, proxy.Direct)
+			if err != nil {
+				log.Fatalf("无法创建 SOCKS5 代理: %v", err)
+			}
+
+			transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+				conn, err := dialer.Dial(network, addr)
+				if err != nil {
+					return nil, err
+				}
+				conn.SetDeadline(time.Now().Add(30 * time.Second))
+				return conn, nil
+			}
+
+		case "http", "https":
+			// HTTP/HTTPS 代理
+			transport.Proxy = http.ProxyURL(u)
+
+		default:
+			log.Fatalf("不支持的代理协议: %s", u.Scheme)
+		}
 	}
 
-	if socks5_url != "" {
-		u, err := url.Parse(socks5_url)
-		if err != nil {
-			log.Fatalf("无法创建 SOCKS5 代理: %v", err)
-		}
-		var auth *proxy.Auth = nil
-		if u.User != nil {
-			password, _ := u.User.Password()
-			auth = &proxy.Auth{
-				User:     u.User.Username(),
-				Password: password,
-			}
-		}
-		dialer, err := proxy.SOCKS5("tcp", u.Host, auth, proxy.Direct)
-		if err != nil {
-			log.Fatalf("无法创建 SOCKS5 代理: %v", err)
-		}
-		client.Dial = func(addr string) (net.Conn, error) {
-			conn, err := dialer.Dial("tcp", addr)
-			if err != nil {
-				return nil, err
-			}
-			// 给连接设置读取和写入超时
-			conn.SetDeadline(time.Now().Add(30 * time.Second))
-			return conn, nil
-		}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   time.Duration(timeout) * time.Second,
 	}
+
 	return client
 }
 
@@ -368,8 +384,8 @@ func main() {
 	}
 	for _, config := range configs {
 		CONFIGS_BY_PROVIDER[config.Name] = &config
-		CLIENTS_BY_PROVIDER[config.Name] = newFastHTTPClient(config.Proxy, *config.HttpTimeout)
-		M3U_CLIENT_BY_PROVIDER[config.Name] = newFastHTTPClient(config.M3uProxy, 30)
+		CLIENTS_BY_PROVIDER[config.Name] = newHTTPClient(config.Proxy, *config.HttpTimeout)
+		M3U_CLIENT_BY_PROVIDER[config.Name] = newHTTPClient(config.M3uProxy, 30)
 		if *config.ManifestCacheExpire >= 0 {
 			MANIFEST_CACHE_BY_PROVIDER[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
 		}
@@ -443,8 +459,8 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	var count = 0
 	var body []byte
 	if strings.HasPrefix(config.URL, "http") {
-		resp, err := HttpGetWithUA(M3U_CLIENT_BY_PROVIDER[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent}, 30)
-		if err != nil || resp.StatusCode() != fasthttp.StatusOK {
+		_, resonseBody, err, _, _ := HttpGet(M3U_CLIENT_BY_PROVIDER[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent})
+		if err != nil {
 			if ctx != nil {
 				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				ctx.SetBodyString("无法获取 M3U")
@@ -452,8 +468,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 			log.Printf("[ERROR]无法获取 M3U: %s, %s, %v", name, config.URL, err)
 			return
 		}
-		defer fasthttp.ReleaseResponse(resp)
-		body = resp.Body()
+		body = resonseBody
 	} else {
 		// 本地文件
 		f, err := os.ReadFile(config.URL)
@@ -1175,24 +1190,22 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	// 直接重定向到原始 URL
 	log.Printf("下载开始：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 	start := time.Now()
-	finalURI, resp, err := fetchWithRedirect(client, proxy_url, 5, config.Headers, *config.HttpTimeout)
+	statusCode, responseBody, err, contentType, finalURI := HttpGet(client, proxy_url, config.Headers)
 	log.Printf("下载结束：%s, %s，%s, 耗时：%s", getClientIP(ctx), tvgID, proxy_url, formatDuration(time.Since(start)))
-	if err != nil || resp.StatusCode() != fasthttp.StatusOK {
+	if err != nil {
 		ctx.SetBodyString("无法获取内容")
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			log.Printf("[ERROR] 下载错误：%s，%s, %v", tvgID, proxy_url, err)
 		} else {
-			ctx.SetStatusCode(resp.StatusCode())
-			log.Printf("[ERROR] 下载错误：%s，%s, 状态码: %d", tvgID, proxy_url, resp.StatusCode())
+			ctx.SetStatusCode(statusCode)
+			log.Printf("[ERROR] 下载错误：%s，%s, 状态码: %d", tvgID, proxy_url, statusCode)
 		}
 		return
 	}
-	defer fasthttp.ReleaseResponse(resp)
-	body := resp.Body()
-	contentType := string(resp.Header.ContentType())
+	body := responseBody
 	if proxy_type == "mpd" || contentType == "application/dash+xml" {
-		body, err = modifyMpd(provider.(string), tvgID, finalURI, resp.Body())
+		body, err = modifyMpd(provider.(string), tvgID, finalURI, body)
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("xml 重写错误")

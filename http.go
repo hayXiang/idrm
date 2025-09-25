@@ -1,8 +1,9 @@
 package main
 
 import (
-	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"path"
 	"strings"
@@ -35,96 +36,37 @@ func isSameFileName(url1, url2 string) bool {
 	return file1 == file2
 }
 
-// fetchWithRedirect 发起 GET 请求，自动跟随重定向（最多 maxRedirects 次）
-func fetchWithRedirect(client *fasthttp.Client, startURL string, maxRedirects int, headers []string, timeout int) (string, *fasthttp.Response, error) {
+func HttpGet(client *http.Client, startURL string, headers []string) (statusCode int, body []byte, err error, contentType string, url_302 string) {
 	currentURL := startURL
 	if v, ok := CACHE_302_REDIRECT_URL.Get(startURL); ok {
 		currentURL = v.(string)
 		log.Printf("使用缓存的302地址：%s", currentURL)
 	}
-
-	for i := 0; i < maxRedirects; i++ {
-		req := fasthttp.AcquireRequest()
-		resp := fasthttp.AcquireResponse()
-
-		req.Header.SetMethod("GET")
-		for _, head := range headers {
-			key_value := strings.Split(head, ":")
-			if len(key_value) == 2 {
-				req.Header.Set(key_value[0], strings.TrimSpace(key_value[1]))
-			}
-		}
-
-		req.SetRequestURI(currentURL)
-
-		err := client.DoTimeout(req, resp, time.Duration(timeout)*time.Second)
-		fasthttp.ReleaseRequest(req)
-		if err != nil {
-			fasthttp.ReleaseResponse(resp)
-			CACHE_302_REDIRECT_URL.Delete(startURL)
-			log.Printf("请求失败，清楚缓存的302地址：%s", currentURL)
-			return currentURL, nil, fmt.Errorf("request failed: %w", err)
-		}
-
-		statusCode := resp.StatusCode()
-		if statusCode >= 300 && statusCode < 400 {
-			location := string(resp.Header.Peek("Location"))
-			if location == "" {
-				fasthttp.ReleaseResponse(resp)
-				return currentURL, nil, fmt.Errorf("redirect without Location header")
-			}
-
-			if strings.Contains(location, "/http://") {
-				location = strings.ReplaceAll(location, "/http://", "/http%3A%2F%2F")
-			}
-
-			if strings.Contains(location, "/https://") {
-				location = strings.ReplaceAll(location, "/https://", "/https%3A%2F%2F")
-			}
-
-			u, err := url.Parse(location)
-			if err != nil {
-				fasthttp.ReleaseResponse(resp)
-				return currentURL, nil, fmt.Errorf("invalid redirect URL: %v", err)
-			}
-			if !u.IsAbs() {
-				base, _ := url.Parse(currentURL)
-				location = base.ResolveReference(u).String()
-			}
-			currentURL = location
-			fasthttp.ReleaseResponse(resp)
-			continue
-		}
-		if startURL != currentURL && isSameFileName(startURL, currentURL) {
-			CACHE_302_REDIRECT_URL.Add(startURL, currentURL, 1*time.Hour)
-		}
-		// 不是 3xx，直接返回
-		return currentURL, resp, nil
+	req, err := http.NewRequest("GET", currentURL, nil)
+	if err != nil {
+		return 503, nil, err, "", startURL
 	}
 
-	return currentURL, nil, fmt.Errorf("too many redirects")
-}
-
-func HttpGetWithUA(client *fasthttp.Client, url string, headers []string, timeout int) (*fasthttp.Response, error) {
-	req := fasthttp.AcquireRequest()
-	resp := fasthttp.AcquireResponse()
-
-	req.SetRequestURI(url)
 	for _, head := range headers {
-		key_value := strings.Split(head, ":")
-		if len(key_value) == 2 {
-			req.Header.Set(key_value[0], strings.TrimSpace(key_value[1]))
+		kv := strings.SplitN(head, ":", 2)
+		if len(kv) == 2 {
+			req.Header.Set(strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1]))
 		}
 	}
 
-	if err := client.DoTimeout(req, resp, time.Duration(timeout)*time.Second); err != nil {
-		fasthttp.ReleaseRequest(req)
-		fasthttp.ReleaseResponse(resp)
-		return nil, err
+	resp, err := client.Do(req)
+	if err != nil {
+		CACHE_302_REDIRECT_URL.Delete(startURL)
+		return 503, nil, err, "", startURL
 	}
-
-	fasthttp.ReleaseRequest(req) // 只释放请求，响应交给调用方
-	return resp, nil
+	defer resp.Body.Close()
+	currentURL = resp.Request.URL.String()
+	if startURL != currentURL && isSameFileName(startURL, currentURL) {
+		CACHE_302_REDIRECT_URL.Add(startURL, currentURL, 1*time.Hour)
+	}
+	_body, _ := io.ReadAll(resp.Body)
+	contentType = resp.Header.Get("Content-Type")
+	return resp.StatusCode, _body, err, contentType, currentURL
 }
 
 func GetForwardHeader(ctx *fasthttp.RequestCtx, header, fallback string) string {

@@ -27,7 +27,7 @@
   {
     "name": "my-test",
     "url": "https://live.9528.eu.org/s/lR7XUle0.m3u",
-    "proxy": "socks5://127.0.0.1:7897",
+    "proxy": "http://127.0.0.1:7897",
     "headers": ["User-Agent: MovistarApp-iOS/9.6.1/iPhone/iPhone15,2/18.3.2"],
     "cache-manifest": 6
   }
