@@ -14,6 +14,9 @@ type PES struct {
 }
 
 func (p *PES) add(ts *TSPacket) {
+	if ts == nil {
+		return
+	}
 	p.tsPayload = append(p.tsPayload, ts)
 	if len(ts.PES.header) > 0 {
 		p.header = append(p.header, ts.PES.header...)
@@ -24,7 +27,7 @@ func (p *PES) add(ts *TSPacket) {
 func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	// 老的PES 结束
 	var newPES *PES = nil
-	if len(p.tsPayload) > 1 && p.tsPayload[0].Start && ts.Start {
+	if len(p.tsPayload) > 0 && (ts == nil || (p.tsPayload[0].Start && ts.Start)) {
 		nalus := splitNalu(p.payload)
 		for _, nalu := range nalus {
 			nalu.Decrypt(block, iv)
@@ -41,7 +44,7 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 		UpdatePESLength(newPES.header, len(newPayload))
 
 		//PES 分包
-		newPES.SplitToTS(ts.PID, p.tsPayload)
+		newPES.SplitToTS(p.tsPayload[0].PID, p.tsPayload)
 		p.tsPayload = []*TSPacket{}
 		p.payload = []byte{}
 		p.continuity = newPES.continuity

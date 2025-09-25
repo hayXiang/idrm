@@ -27,6 +27,7 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 
 	var allTS []*TSPacket
 	for offset := 0; offset+tsPacketSize <= len(data); offset += tsPacketSize {
+		isLastPacket := (offset+tsPacketSize >= len(data))
 		tsData := data[offset : offset+tsPacketSize]
 		packageIndex++
 		var ts TSPacket
@@ -91,24 +92,52 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 		}
 
 		// 视频流按 NALU 解密
-		switch streamType {
-		case STREAM_TYPE_VIDEO_H265, STREAM_TYPE_VIDEO_H264:
-			pes, exists := currentPESMap[ts.PID]
-			if !exists {
-				pes = &PES{continuity: 0}
-				currentPESMap[ts.PID] = pes
+		if streamType == STREAM_TYPE_VIDEO_H265 || streamType == STREAM_TYPE_VIDEO_H264 || isLastPacket {
+			if streamType == STREAM_TYPE_VIDEO_H265 || streamType == STREAM_TYPE_VIDEO_H264 {
+				pes, exists := currentPESMap[ts.PID]
+				if !exists {
+					pes = &PES{continuity: 0}
+					currentPESMap[ts.PID] = pes
+				}
+				if newPES := pes.Process(block, &ts, iv); newPES != nil {
+					allTS = append(allTS, newPES.tsPayload...)
+				}
 			}
-			if newPES := pes.Process(block, &ts, iv); newPES != nil {
-				allTS = append(allTS, newPES.tsPayload...)
+
+			if isLastPacket {
+				for _, pes := range currentPESMap {
+					if newPES := pes.Process(block, nil, iv); newPES != nil {
+						allTS = append(allTS, newPES.tsPayload...)
+					}
+				}
 			}
-			continue
-		case STREAM_TYPE_AUDIO_AAC_ADTS, STREAM_TYPE_AUDIO_AC3, STREAM_TYPE_AUDIO_EAC3:
-			processAudio(block, currentAudioMap, &ts, iv, streamType, packageIndex)
+
+		} else if streamType == STREAM_TYPE_AUDIO_AAC_ADTS ||
+			streamType == STREAM_TYPE_AUDIO_AC3 ||
+			streamType == STREAM_TYPE_AUDIO_EAC3 ||
+			isLastPacket {
+			if streamType == STREAM_TYPE_AUDIO_AAC_ADTS ||
+				streamType == STREAM_TYPE_AUDIO_AC3 ||
+				streamType == STREAM_TYPE_AUDIO_EAC3 {
+				pid := ts.PID
+				audioFrame, exists := currentAudioMap[pid]
+				if !exists {
+					audioFrame = &AudioFrame{
+						PID:      pid,
+						Payloads: [][]byte{},
+					}
+					currentAudioMap[pid] = audioFrame
+				}
+				audioFrame.Process(block, &ts, iv, streamType, packageIndex)
+			}
+			if isLastPacket {
+				for _, audioFrame := range currentAudioMap {
+					audioFrame.Process(block, nil, iv, streamType, packageIndex)
+				}
+			}
 			allTS = append(allTS, &ts)
-			continue
-		default:
+		} else {
 			allTS = append(allTS, &ts)
-			continue
 		}
 	}
 	//fmt.Print(count)
@@ -125,7 +154,7 @@ func hexToBytes(s string) []byte {
 }
 
 func Test() {
-	data, err := os.ReadFile("D://drm/ggg/raw/all.ts")
+	data, err := os.ReadFile("D://drm/ggg/raw/4086066.ts")
 	//data, err := os.ReadFile("D://drm/012_mute_60s.ts")
 	if err != nil {
 		fmt.Println(err)
@@ -135,7 +164,7 @@ func Test() {
 	iv := hexToBytes("A2CC00BBA65B2DB60728B7168F5F4B9A")
 	body := DecryptTS(data, key, iv)
 
-	os.WriteFile("D://drm/de-new.ts", body, 0644)
+	os.WriteFile("D://drm/audio-dec.ts", body, 0644)
 	fmt.Println("Done")
 	os.Exit(1)
 }

@@ -51,36 +51,23 @@ type AudioFrame struct {
 	Payloads [][]byte // 跨 TS 包累积的 ES 数据片段
 }
 
-func findAudioNextHeaderAcrossTS(streamType byte, payloads [][]byte, startIdx, startPos int) (int, int, int, int) {
+func findAudioNextHeaderAcrossTS(streamType byte, payloads [][]byte, startIdx, startPos int, twoFrameCheck bool) (firstPayloadIdx, firstPos int,
+	headerLen, frameLen int,
+	nextPayloadIdx, nextPos int,
+	ok bool,
+) {
 	if streamType == STREAM_TYPE_AUDIO_AAC_ADTS {
-		return findNextADTSHeaderAcrossTS(payloads, startIdx, startPos)
+		return findNextADTSHeaderAcrossTS(payloads, startIdx, startPos, twoFrameCheck)
 	} else {
-		return findNextAC3HeaderAcrossTS(payloads, startIdx, startPos)
+		return findNextAC3HeaderAcrossTS(payloads, startIdx, startPos, twoFrameCheck)
 	}
 }
 
-func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (int, int, int, int) {
-	for i := startIdx; i < len(payloads); i++ {
-		data := payloads[i]
-		pos := 0
-		if i == startIdx {
-			pos = startPos
-		}
-		for pos+5 <= len(data) {
-			if data[pos] == 0x0B && data[pos+1] == 0x77 {
-				fscod := (data[pos+2] >> 6) & 0x03
-				frmsizecod := data[pos+2] & 0x3F // 0–37
-				if fscod == 3 || frmsizecod >= 38 {
-					pos++
-					continue
-				}
-				frameLen := AC3_FRAME_SZIE_TABLE[frmsizecod][fscod]
-				return i, pos, 5, frameLen
-			}
-			pos++
-		}
-	}
-	return -1, -1, 0, 0
+func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int, twoFrameCheck bool) (firstPayloadIdx, firstPos int,
+	headerLen, frameLen int,
+	nextPayloadIdx, nextPos int,
+	ok bool) {
+	return -1, -1, -1, -1, -1, -1, false
 }
 
 func isValidADTSHeaderStrict(header []byte) bool {
@@ -125,144 +112,162 @@ func isValidADTSHeaderStrict(header []byte) bool {
 	return true
 }
 
-// findNextADTSHeaderAcrossTS 在 payloads 中查找下一个有效的 ADTS header。
-// 它从 payloads[startIdx] 的 startPos 位置开始查找。
-// 返回值:
-// payloadIdx: 找到头部的 payload 索引 (-1 表示未找到)
-// pos: 找到头部在该 payload 中的起始位置
-// headerLen: ADTS 头部的长度 (7 or 9 bytes)
-// frameLen: 整个 ADTS 帧的长度
-func findNextADTSHeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (payloadIdx int, pos int, headerLen int, frameLen int) {
-	// 如果起始索引无效，则直接返回未找到
+// findNextADTSHeaderAcrossTS 查找 ADTS header
+// twoFrameCheck: 是否开启双帧检测
+func findNextADTSHeaderAcrossTS(payloads [][]byte, startIdx, startPos int, twoFrameCheck bool) (
+	firstPayloadIdx, firstPos int,
+	headerLen, frameLen int,
+	nextPayloadIdx, nextPos int,
+	ok bool,
+) {
 	if startIdx < 0 || startIdx >= len(payloads) {
-		return -1, -1, 0, 0
+		return -1, -1, 0, 0, -1, -1, false
 	}
 
-	// 用于跨 payload 检查时拼接数据的小 buffer
-	var buf [16]byte // 7字节header + 一些额外空间以确保安全
+	var buf [16]byte
 
 	for i := startIdx; i < len(payloads); i++ {
 		data := payloads[i]
 		p := 0
-		// 对于起始 payload，从指定的 startPos 开始
 		if i == startIdx {
 			p = startPos
-			// 如果起始位置就无效，则跳到下一个 payload
 			if p >= len(data) {
 				continue
 			}
 		}
 
-		// 遍历当前 payload 中的字节
 		for p < len(data) {
-			// 快速跳过明显不是同步字开头的字节，提高效率
 			if data[p] != 0xFF {
 				p++
 				continue
 			}
 
-			var headerData []byte
-
-			// 情况 1: 当前 payload 剩余字节足够容纳一个 ADTS header
-			if len(data)-p >= 7 {
-				headerData = data[p : p+7]
-			} else {
-				// 情况 2: header 跨越了当前 payload 和后续 payload
-				// 计算需要从后续 payload 拿多少字节
-				bytesNeeded := 7 - (len(data) - p)
-				n := copy(buf[:], data[p:]) // 先复制当前 payload 剩余部分
-
-				// 从后续 payloads 中复制所需字节
-				payloadIdxForCopy := i + 1
-				for bytesNeeded > 0 && payloadIdxForCopy < len(payloads) {
-					bytesToCopy := len(payloads[payloadIdxForCopy])
-					if bytesToCopy > bytesNeeded {
-						bytesToCopy = bytesNeeded
-					}
-					n += copy(buf[n:], payloads[payloadIdxForCopy][:bytesToCopy])
-					bytesNeeded -= bytesToCopy
-					payloadIdxForCopy++
-				}
-
-				// 如果拼接后的数据不足 7 字节，则无法构成 header
-				if n < 7 {
-					// 移动到下一个可能的同步字位置
-					p++
-					continue
-				}
-				headerData = buf[:7]
+			header := getADTSHeader(payloads, i, p, buf[:])
+			if header == nil || !isValidADTSHeaderStrict(header) {
+				p++
+				continue
 			}
 
-			// 使用快速验证函数检查拼接后的数据是否为有效 header
-			if isValidADTSHeaderStrict(headerData) {
-				// 提取 header 长度和帧长度
-				prot := headerData[1] & 0x01
-				hLen := 7
-				if prot == 0 {
-					hLen = 9
-				}
-				fLen := int((uint16(headerData[3]&0x03) << 11) |
-					(uint16(headerData[4]) << 3) |
-					(uint16(headerData[5]&0xE0) >> 5))
+			hLen1, fLen1 := parseADTSLen(header)
+			if fLen1 < hLen1 || fLen1 > 8191 {
+				p++
+				continue
+			}
 
-				// 最终验证帧长度是否合理
-				if fLen >= hLen {
-					return i, p, hLen, fLen
+			if !twoFrameCheck {
+				// 只返回第一帧，不做双帧验证
+				nextIdx, nextPos := advancePos(payloads, i, p, fLen1)
+				return i, p, hLen1, fLen1, nextIdx, nextPos, true
+			}
+
+			// ---- 两帧检测 ----
+			nextIdx, nextPos := advancePos(payloads, i, p, fLen1)
+			if nextIdx == -1 {
+				p++
+				continue
+			}
+			header2 := getADTSHeader(payloads, nextIdx, nextPos, buf[:])
+			if header2 != nil && isValidADTSHeaderStrict(header2) {
+				hLen2, fLen2 := parseADTSLen(header2)
+				if fLen2 >= hLen2 && fLen2 <= 8191 {
+					return i, p, hLen1, fLen1, nextIdx, nextPos, true
 				}
 			}
-			// 如果不是有效 header，移动到下一个字节继续查找
+
 			p++
 		}
 	}
 
-	// 遍历完所有 payloads 都未找到有效 header
-	return -1, -1, 0, 0
+	return -1, -1, 0, 0, -1, -1, false
 }
 
-func processAudio(block cipher.Block, audioMap map[int]*AudioFrame, ts *TSPacket, iv []byte, streamType byte, packageIndex int) {
-	if ts.PES == nil || len(ts.PES.ES) == 0 {
-		return
-	}
-
-	pid := ts.PID
-	es := ts.PES.ES
-
-	currenAudioFrame, exists := audioMap[pid]
-	if !exists {
-		currenAudioFrame = &AudioFrame{
-			PID:      pid,
-			Payloads: [][]byte{},
+// advancePos 计算跨 payload 下一帧位置
+func advancePos(payloads [][]byte, idx, pos, frameLen int) (nextIdx, nextPos int) {
+	remain := frameLen
+	nextIdx, nextPos = idx, pos
+	for remain > 0 && nextIdx < len(payloads) {
+		data := payloads[nextIdx]
+		avail := len(data) - nextPos
+		if remain <= avail {
+			nextPos += remain
+			return nextIdx, nextPos
 		}
-		audioMap[pid] = currenAudioFrame
+		remain -= avail
+		nextIdx++
+		nextPos = 0
 	}
+	return -1, -1
+}
 
-	currenAudioFrame.Payloads = append(currenAudioFrame.Payloads, es)
+// getADTSHeader 跨 payload 获取 header
+func getADTSHeader(payloads [][]byte, idx, pos int, buf []byte) []byte {
+	data := payloads[idx]
+	if len(data)-pos >= 7 {
+		return data[pos : pos+7]
+	}
+	n := copy(buf, data[pos:])
+	bytesNeeded := 7 - n
+	idx++
+	for bytesNeeded > 0 && idx < len(payloads) {
+		toCopy := len(payloads[idx])
+		if toCopy > bytesNeeded {
+			toCopy = bytesNeeded
+		}
+		n += copy(buf[n:], payloads[idx][:toCopy])
+		bytesNeeded -= toCopy
+		idx++
+	}
+	if n < 7 {
+		return nil
+	}
+	return buf[:7]
+}
+
+// parseADTSLen 解析 headerLen / frameLen
+func parseADTSLen(header []byte) (headerLen, frameLen int) {
+	prot := header[1] & 0x01
+	headerLen = 7
+	if prot == 0 {
+		headerLen = 9
+	}
+	frameLen = int((uint16(header[3]&0x03) << 11) |
+		(uint16(header[4]) << 3) |
+		(uint16(header[5]&0xE0) >> 5))
+	return
+}
+
+func (audioFrame *AudioFrame) Process(block cipher.Block, ts *TSPacket, iv []byte, streamType byte, packageIndex int) {
+	isEnd := ts == nil
+	if !isEnd {
+		if ts.PES == nil || len(ts.PES.ES) == 0 {
+			return
+		}
+		audioFrame.Payloads = append(audioFrame.Payloads, ts.PES.ES)
+	}
 
 	for {
-		startPayloadIdx, startPos, headerLen, _ := findAudioNextHeaderAcrossTS(streamType, currenAudioFrame.Payloads, 0, 0)
-		if startPayloadIdx < 0 {
-			break
-		}
-
-		nextPayloadIdx, nextPos, _, _ := findAudioNextHeaderAcrossTS(streamType, currenAudioFrame.Payloads, startPayloadIdx, startPos+headerLen)
-
-		if nextPayloadIdx < 0 {
-			// 剩余半个 AUDIO TS
-			break
+		startPayloadIdx, startPos, headerLen, _, nextPayloadIdx, nextPos, ok := findAudioNextHeaderAcrossTS(streamType, audioFrame.Payloads, 0, 0, true)
+		if !ok {
+			if isEnd {
+				startPayloadIdx, startPos, headerLen, _, nextPayloadIdx, nextPos, ok = findAudioNextHeaderAcrossTS(streamType, audioFrame.Payloads, 0, 0, false)
+			}
+			if !ok {
+				break
+			}
 		}
 
 		// 拼接完整 AUDIO 数据
 		audioData := []byte{}
 		for i := startPayloadIdx; i <= nextPayloadIdx; i++ {
 			start := 0
-			end := len(currenAudioFrame.Payloads[i])
+			end := len(audioFrame.Payloads[i])
 			if i == startPayloadIdx {
 				start = startPos
 			}
 			if i == nextPayloadIdx {
 				end = nextPos
 			}
-			audioData = append(audioData, currenAudioFrame.Payloads[i][start:end]...)
+			audioData = append(audioData, audioFrame.Payloads[i][start:end]...)
 		}
 
 		if len(audioData) > headerLen+16 {
@@ -272,7 +277,7 @@ func processAudio(block cipher.Block, audioMap map[int]*AudioFrame, ts *TSPacket
 			offset := 0
 			for i := startPayloadIdx; i <= nextPayloadIdx; i++ {
 				start := 0
-				end := len(currenAudioFrame.Payloads[i])
+				end := len(audioFrame.Payloads[i])
 				if i == startPayloadIdx {
 					start = startPos
 				}
@@ -280,12 +285,12 @@ func processAudio(block cipher.Block, audioMap map[int]*AudioFrame, ts *TSPacket
 					end = nextPos
 				}
 				size := end - start
-				copy(currenAudioFrame.Payloads[i][start:end], audioData[offset:offset+size])
+				copy(audioFrame.Payloads[i][start:end], audioData[offset:offset+size])
 				offset += size
 			}
 		}
 
-		oldPayloads := currenAudioFrame.Payloads
+		oldPayloads := audioFrame.Payloads
 		newPayloads := [][]byte{}
 
 		if nextPayloadIdx < len(oldPayloads) {
@@ -296,7 +301,6 @@ func processAudio(block cipher.Block, audioMap map[int]*AudioFrame, ts *TSPacket
 		for i := nextPayloadIdx + 1; i < len(oldPayloads); i++ {
 			newPayloads = append(newPayloads, oldPayloads[i])
 		}
-
-		currenAudioFrame.Payloads = newPayloads
+		audioFrame.Payloads = newPayloads
 	}
 }
