@@ -15,7 +15,7 @@ type NALU struct {
 // 规则：
 // 连续两个0x00后，如果遇到0x03，
 // 且03后面的字节存在且 <=0x03，则删除当前0x03
-func EBSPtoRBSP(ebsp []byte) []byte {
+func Emulation(ebsp []byte) []byte {
 	rbsp := make([]byte, 0, len(ebsp))
 	zeroCount := 0
 	i := 0
@@ -51,7 +51,7 @@ func EBSPtoRBSP(ebsp []byte) []byte {
 	return rbsp
 }
 
-func RBSPToEBSP(rbsp []byte) []byte {
+func DeEmulation(rbsp []byte) []byte {
 	ebsp := []byte{}
 	zeros := 0
 	for _, b := range rbsp {
@@ -78,14 +78,13 @@ func (nalu *NALU) Decrypt(block cipher.Block, iv []byte) {
 
 	// 只解密 I/P 帧
 	if (len(naluData) > naluPayloadOffset+unencryptedLeaderBytes) && (naluType == 5 || naluType == 1) {
-		naluRBSP := EBSPtoRBSP(naluData[naluPayloadOffset:])
-		if len(naluRBSP) > 31 {
-			utils.DecryptCBCSInPlace(block, naluRBSP[unencryptedLeaderBytes:], iv, 1, 9)
+		naluEBSP := DeEmulation(naluData[naluPayloadOffset:])
+		if len(naluEBSP) > 31 {
+			utils.DecryptCBCSInPlace(block, naluEBSP[unencryptedLeaderBytes:], iv, 1, 9)
 		}
-		//ebsp := RBSPToEBSP(naluRBSP)
-		changedNaluData := make([]byte, naluPayloadOffset+len(naluRBSP))
+		changedNaluData := make([]byte, naluPayloadOffset+len(naluEBSP))
 		copy(changedNaluData, naluData[:naluPayloadOffset])
-		copy(changedNaluData[naluPayloadOffset:], naluRBSP)
+		copy(changedNaluData[naluPayloadOffset:], naluEBSP)
 		nalu.buffer = changedNaluData
 	}
 }
