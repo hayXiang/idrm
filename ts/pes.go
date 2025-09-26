@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"fmt"
-	"sync"
 )
 
 type PES struct {
@@ -25,13 +24,6 @@ func (p *PES) add(ts *TSPacket) {
 	p.payload = append(p.payload, ts.PES.ES...)
 }
 
-var payloadPool = sync.Pool{
-	New: func() any {
-		buf := make([]byte, 100*1024) // 默认 100K
-		return &buf
-	},
-}
-
 func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	// 老的PES 结束
 	var newPES *PES = nil
@@ -43,18 +35,9 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 			nalu.Decrypt(block, iv)
 			totalLen += len(nalu.buffer)
 		}
-		// 从 pool 获取 buffer
-		bufPtr := payloadPool.Get().(*[]byte)
-		if cap(*bufPtr) < totalLen {
-			*bufPtr = make([]byte, totalLen)
-		}
-		newPayload := (*bufPtr)[:totalLen]
-
-		// 拷贝 NALU 数据
-		offset := 0
+		newPayload := make([]byte, 0, totalLen)
 		for _, nalu := range nalus {
-			copy(newPayload[offset:], nalu.buffer)
-			offset += len(nalu.buffer)
+			newPayload = append(newPayload, nalu.buffer...)
 		}
 
 		newPES = &PES{continuity: p.continuity}
@@ -66,7 +49,6 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 
 		//PES 分包
 		newPES.SplitToTS(p.tsPayload[0].PID, p.tsPayload)
-		payloadPool.Put(bufPtr)
 		p.tsPayload = p.tsPayload[:0]
 		p.payload = p.payload[:0]
 		p.continuity = newPES.continuity
