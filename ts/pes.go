@@ -208,19 +208,25 @@ func UpdatePESLength(pesHeader []byte, payloadLength int) error {
 		return fmt.Errorf("PES header too short")
 	}
 
-	// 读取原来的 PES_packet_length
 	origLength := int(pesHeader[4])<<8 | int(pesHeader[5])
 	if origLength == 0 {
-		// 原来为0，不需要修改
+		// PES length = 0 表示未知长度，视频流可以直接保持
 		return nil
 	}
 
-	newLength := payloadLength + (len(pesHeader) - 6) // payload + header extension
-	if newLength > 0xFFFF {
-		newLength = 0xFFFF // 最大允许 65535
+	newLength := payloadLength
+	if len(pesHeader) > 6 {
+		newLength += len(pesHeader) - 6
 	}
 
-	pesHeader[4] = byte(newLength >> 8)
-	pesHeader[5] = byte(newLength & 0xFF)
+	if newLength > 0xFFFF {
+		// 对于大视频帧，推荐直接设为0
+		pesHeader[4] = 0
+		pesHeader[5] = 0
+	} else {
+		pesHeader[4] = byte(newLength >> 8)
+		pesHeader[5] = byte(newLength & 0xFF)
+	}
+
 	return nil
 }
