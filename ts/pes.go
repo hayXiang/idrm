@@ -219,14 +219,19 @@ func UpdatePESLength(pesHeader []byte, payloadLength int) error {
 		newLength += len(pesHeader) - 6
 	}
 
-	if newLength > 0xFFFF {
-		// 对于大视频帧，推荐直接设为0
-		pesHeader[4] = 0
-		pesHeader[5] = 0
-	} else {
-		pesHeader[4] = byte(newLength >> 8)
-		pesHeader[5] = byte(newLength & 0xFF)
-	}
+	pesHeader[4] = 0
+	pesHeader[5] = 0
+
+	/*
+		if newLength > 0xFFFF {
+			// 对于大视频帧，推荐直接设为0
+			pesHeader[4] = 0
+			pesHeader[5] = 0
+		} else {
+			pesHeader[4] = byte(newLength >> 8)
+			pesHeader[5] = byte(newLength & 0xFF)
+		}
+	*/
 
 	return nil
 }
