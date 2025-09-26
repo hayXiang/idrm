@@ -29,14 +29,17 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	var newPES *PES = nil
 	if len(p.tsPayload) > 0 && (ts == nil || (p.tsPayload[0].Start && ts.Start)) {
 		nalus := splitNalu(p.payload)
+		// 计算总长度，一次性分配
+		totalLen := 0
 		for _, nalu := range nalus {
 			nalu.Decrypt(block, iv)
+			totalLen += len(nalu.buffer)
 		}
-
-		var newPayload []byte
+		newPayload := make([]byte, 0, totalLen)
 		for _, nalu := range nalus {
 			newPayload = append(newPayload, nalu.buffer...)
 		}
+
 		newPES = &PES{continuity: p.continuity}
 		newPES.header = append(newPES.header, p.tsPayload[0].PES.header...)
 		newPES.payload = newPayload
