@@ -15,7 +15,7 @@ type NALU struct {
 // 规则：
 // 连续两个0x00后，如果遇到0x03，
 // 且03后面的字节存在且 <=0x03，则删除当前0x03
-func Emulation(ebsp []byte) []byte {
+func DeEmulation(ebsp []byte) []byte {
 	rbsp := make([]byte, 0, len(ebsp))
 	zeroCount := 0
 	i := 0
@@ -51,7 +51,7 @@ func Emulation(ebsp []byte) []byte {
 	return rbsp
 }
 
-func DeEmulation(rbsp []byte) []byte {
+func Emulation(rbsp []byte) []byte {
 	ebsp := []byte{}
 	zeros := 0
 	for _, b := range rbsp {
