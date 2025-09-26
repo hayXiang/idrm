@@ -43,7 +43,6 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 			nalu.Decrypt(block, iv)
 			totalLen += len(nalu.buffer)
 		}
-
 		// 从 pool 获取 buffer
 		bufPtr := payloadPool.Get().(*[]byte)
 		if cap(*bufPtr) < totalLen {
@@ -62,6 +61,7 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 		//必须用append，会修改长度
 		newPES.header = make([]byte, len(p.tsPayload[0].PES.header))
 		copy(newPES.header, p.tsPayload[0].PES.header)
+		newPES.payload = newPayload
 		UpdatePESLength(newPES.header, len(newPayload))
 
 		//PES 分包
