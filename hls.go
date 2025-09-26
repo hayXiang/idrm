@@ -225,6 +225,9 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 	}
 
 	mpd := doc.FindElement("//MPD")
+	if mpd == nil {
+		return "", nil, fmt.Errorf("not found MPD")
+	}
 	media_type := mpd.SelectAttrValue("type", "")
 	is_static := media_type == "static"
 

@@ -140,10 +140,19 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 			allTS = append(allTS, &ts)
 		}
 	}
-	//fmt.Print(count)
-	var ret []byte
+	totalSize := 0
 	for _, _ts := range allTS {
-		ret = append(ret, _ts.buffer...)
+		totalSize += len(_ts.buffer)
+	}
+
+	// 预分配切片
+	ret := make([]byte, totalSize)
+
+	// 复制数据到切片
+	pos := 0
+	for _, _ts := range allTS {
+		copy(ret[pos:], _ts.buffer)
+		pos += len(_ts.buffer)
 	}
 	return ret
 }
