@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/cipher"
 	"fmt"
+	"sync"
 )
 
 type PES struct {
@@ -24,6 +25,13 @@ func (p *PES) add(ts *TSPacket) {
 	p.payload = append(p.payload, ts.PES.ES...)
 }
 
+var payloadPool = sync.Pool{
+	New: func() any {
+		buf := make([]byte, 100*1024) // 默认 100K
+		return &buf
+	},
+}
+
 func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	// 老的PES 结束
 	var newPES *PES = nil
@@ -35,21 +43,32 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 			nalu.Decrypt(block, iv)
 			totalLen += len(nalu.buffer)
 		}
-		newPayload := make([]byte, 0, totalLen)
+
+		// 从 pool 获取 buffer
+		bufPtr := payloadPool.Get().(*[]byte)
+		if cap(*bufPtr) < totalLen {
+			*bufPtr = make([]byte, totalLen)
+		}
+		newPayload := (*bufPtr)[:totalLen]
+
+		// 拷贝 NALU 数据
+		offset := 0
 		for _, nalu := range nalus {
-			newPayload = append(newPayload, nalu.buffer...)
+			copy(newPayload[offset:], nalu.buffer)
+			offset += len(nalu.buffer)
 		}
 
 		newPES = &PES{continuity: p.continuity}
-		newPES.header = append(newPES.header, p.tsPayload[0].PES.header...)
-		newPES.payload = newPayload
-
+		//必须用append，会修改长度
+		newPES.header = make([]byte, len(p.tsPayload[0].PES.header))
+		copy(newPES.header, p.tsPayload[0].PES.header)
 		UpdatePESLength(newPES.header, len(newPayload))
 
 		//PES 分包
 		newPES.SplitToTS(p.tsPayload[0].PID, p.tsPayload)
-		p.tsPayload = []*TSPacket{}
-		p.payload = []byte{}
+		payloadPool.Put(bufPtr)
+		p.tsPayload = p.tsPayload[:0]
+		p.payload = p.payload[:0]
 		p.continuity = newPES.continuity
 	}
 	p.add(ts)
@@ -90,7 +109,7 @@ func (pes *PES) SplitToTS(pid int, rawTsList []*TSPacket) {
 		if tsPackageIndex < len(rawTsList) && tsPackageIndex == 0 {
 			rawTs := rawTsList[tsPackageIndex]
 			aFlen := len(rawTs.AdaptationField) - rawTs.suffingLength
-			adaptField = append(adaptField, rawTs.AdaptationField[:aFlen]...)
+			adaptField = rawTs.AdaptationField[:aFlen:aFlen]
 		}
 
 		stuffingSize := tsPacketSize - tsHeaderSize - len(adaptField) - len(data)
