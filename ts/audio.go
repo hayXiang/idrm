@@ -63,13 +63,6 @@ func findAudioNextHeaderAcrossTS(streamType byte, payloads [][]byte, startIdx, s
 	}
 }
 
-func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int, twoFrameCheck bool) (firstPayloadIdx, firstPos int,
-	headerLen, frameLen int,
-	nextPayloadIdx, nextPos int,
-	ok bool) {
-	return -1, -1, -1, -1, -1, -1, false
-}
-
 func isValidADTSHeaderStrict(header []byte) bool {
 	if len(header) < 7 {
 		return false
@@ -303,4 +296,139 @@ func (audioFrame *AudioFrame) Process(block cipher.Block, ts *TSPacket, iv []byt
 		}
 		audioFrame.Payloads = newPayloads
 	}
+}
+
+// AC3 header 长度
+const AC3_HEADER_SIZE = 5
+
+// 检查 AC3 帧头是否有效
+func isValidAC3Header(header []byte) bool {
+	if len(header) < AC3_HEADER_SIZE {
+		return false
+	}
+	// syncword 0x0B77
+	if header[0] != 0x0B || header[1] != 0x77 {
+		return false
+	}
+	// fscod 采样率 index
+	fscod := (header[4] >> 6) & 0x03
+	if fscod > 2 {
+		return false
+	}
+	// frmsizecod 码率 index
+	frmsizecod := header[4] & 0x3F
+	if frmsizecod > 37 {
+		return false
+	}
+	return true
+}
+
+// 解析 AC3 header，返回 headerLen / frameLen
+func parseAC3Header(header []byte) (headerLen, frameLen int) {
+	headerLen = AC3_HEADER_SIZE
+	fscod := (header[4] >> 6) & 0x03
+	frmsizecod := header[4] & 0x3F
+	frameLen = 0
+	if fscod < 3 && frmsizecod < 38 {
+		frameLen = AC3_FRAME_SZIE_TABLE[frmsizecod][fscod] * 2 // 单位字节
+	}
+	return
+}
+
+// 跨 payload 查找 AC3 帧头
+func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int, twoFrameCheck bool) (
+	firstPayloadIdx, firstPos int,
+	headerLen, frameLen int,
+	nextPayloadIdx, nextPos int,
+	ok bool,
+) {
+	if startIdx < 0 || startIdx >= len(payloads) {
+		return -1, -1, 0, 0, -1, -1, false
+	}
+
+	var buf [16]byte
+	for i := startIdx; i < len(payloads); i++ {
+		data := payloads[i]
+		p := 0
+		if i == startIdx {
+			p = startPos
+			if p >= len(data) {
+				continue
+			}
+		}
+
+		for p < len(data)-1 {
+			// syncword 0x0B77
+			if data[p] != 0x0B || data[p+1] != 0x77 {
+				p++
+				continue
+			}
+
+			// 复制 header 跨 payload
+			n := copy(buf[:], data[p:])
+			if n < AC3_HEADER_SIZE && i+1 < len(payloads) {
+				n += copy(buf[n:], payloads[i+1][:AC3_HEADER_SIZE-n])
+			}
+			if n < AC3_HEADER_SIZE {
+				p++
+				continue
+			}
+
+			if !isValidAC3Header(buf[:]) {
+				p++
+				continue
+			}
+
+			hLen, fLen := parseAC3Header(buf[:])
+			if fLen < hLen || fLen > 8191 {
+				p++
+				continue
+			}
+
+			if !twoFrameCheck {
+				nextIdx, nextPos := advancePos(payloads, i, p, fLen)
+				return i, p, hLen, fLen, nextIdx, nextPos, true
+			}
+
+			// 两帧检测
+			nextIdx, nextPos := advancePos(payloads, i, p, fLen)
+			if nextIdx == -1 {
+				p++
+				continue
+			}
+			// 第二帧头
+			header2 := getAC3Header(payloads, nextIdx, nextPos, buf[:])
+			if header2 != nil && isValidAC3Header(header2) {
+				h2, f2 := parseAC3Header(header2)
+				if f2 >= h2 && f2 <= 8191 {
+					return i, p, hLen, fLen, nextIdx, nextPos, true
+				}
+			}
+			p++
+		}
+	}
+
+	return -1, -1, 0, 0, -1, -1, false
+}
+
+// 获取跨 payload AC3 header
+func getAC3Header(payloads [][]byte, idx, pos int, buf []byte) []byte {
+	data := payloads[idx]
+	if len(data)-pos >= AC3_HEADER_SIZE {
+		return data[pos : pos+AC3_HEADER_SIZE]
+	}
+	n := copy(buf, data[pos:])
+	idx++
+	for n < AC3_HEADER_SIZE && idx < len(payloads) {
+		toCopy := AC3_HEADER_SIZE - n
+		if toCopy > len(payloads[idx]) {
+			toCopy = len(payloads[idx])
+		}
+		n += copy(buf[n:], payloads[idx][:toCopy])
+		idx++
+	}
+	if n < AC3_HEADER_SIZE {
+		return nil
+	}
+	return buf[:AC3_HEADER_SIZE]
 }
