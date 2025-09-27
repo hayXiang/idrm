@@ -11,65 +11,37 @@ type NALU struct {
 	buffer       []byte
 }
 
-// EBSPtoRBSP_Strict 将 EBSP 转回 RBSP
-// 规则：
-// 连续两个0x00后，如果遇到0x03，
-// 且03后面的字节存在且 <=0x03，则删除当前0x03
-func DeEmulation(ebsp []byte) []byte {
-	rbsp := make([]byte, 0, len(ebsp))
+// DeEmulationInPlace 去掉 emulation_prevention_three_byte (0x03)
+// strict = true  -> 严格模式 (仅当后续字节 <= 0x03 时跳过)
+// strict = false -> 宽松模式 (只要遇到 0x000003 就跳过)
+func DeEmulationInPlace(ebsp []byte, strict bool) []byte {
+	w := 0
 	zeroCount := 0
-	i := 0
+	for r := 0; r < len(ebsp); r++ {
+		b := ebsp[r]
 
-	for i < len(ebsp) {
-		b := ebsp[i]
-
-		// 检查连续两个0x00后是否遇到防止字节 0x03
 		if zeroCount == 2 && b == 0x03 {
-			// 看下一个字节是否存在且 <=0x03
-			if i+1 < len(ebsp) && ebsp[i+1] <= 0x03 {
-				// 当前0x03是防止字节，跳过
+			if !strict || (r+1 < len(ebsp) && ebsp[r+1] <= 0x03) {
+				// 跳过当前 0x03
 				zeroCount = 0
-				i++
 				continue
 			}
-			// 如果不存在或 >0x03，则保留当前0x03
 		}
 
-		// 写入当前字节
-		rbsp = append(rbsp, b)
+		// 写入有效字节
+		ebsp[w] = b
+		w++
 
-		// 更新 zeroCount
 		if b == 0x00 {
 			zeroCount++
 		} else {
 			zeroCount = 0
 		}
-
-		i++
 	}
-
-	return rbsp
+	return ebsp[:w]
 }
 
-func Emulation(rbsp []byte) []byte {
-	ebsp := []byte{}
-	zeros := 0
-	for _, b := range rbsp {
-		if zeros == 2 && b <= 0x03 {
-			ebsp = append(ebsp, 0x03) // 插入防错字节
-			zeros = 0
-		}
-		ebsp = append(ebsp, b)
-		if b == 0x00 {
-			zeros++
-		} else {
-			zeros = 0
-		}
-	}
-	return ebsp
-}
 
-// processNALU 解析 PES->NALU 并解密 I/P 帧
 func (nalu *NALU) Decrypt(block cipher.Block, iv []byte) {
 	naluType := nalu.buffer[nalu.startCodeLen] & 0x1F
 	naluData := nalu.buffer
@@ -78,13 +50,10 @@ func (nalu *NALU) Decrypt(block cipher.Block, iv []byte) {
 
 	// 只解密 I/P 帧
 	if (len(naluData) > naluPayloadOffset) && (naluType == 5 || naluType == 1) {
-		naluEBSP := DeEmulation(naluData[naluPayloadOffset:])
+		naluEBSP := DeEmulationInPlace(naluData[naluPayloadOffset:], false)
 		if len(naluEBSP) > unencryptedLeaderBytes {
 			utils.DecryptCBCSInPlace(block, naluEBSP[unencryptedLeaderBytes:], iv, 1, 9)
 		}
-		changedNaluData := make([]byte, naluPayloadOffset+len(naluEBSP))
-		copy(changedNaluData, naluData[:naluPayloadOffset])
-		copy(changedNaluData[naluPayloadOffset:], naluEBSP)
-		nalu.buffer = changedNaluData
+		nalu.buffer = naluData[:naluPayloadOffset+len(naluEBSP)]
 	}
 }
