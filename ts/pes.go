@@ -1,7 +1,6 @@
 package ts
 
 import (
-	"bytes"
 	"crypto/cipher"
 	"fmt"
 )
@@ -28,7 +27,7 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	// 老的PES 结束
 	var newPES *PES = nil
 	if len(p.tsPayload) > 0 && (ts == nil || (p.tsPayload[0].Start && ts.Start)) {
-		nalus := splitNalu(p.payload)
+		nalus := splitNaluStrict(p.payload)
 		// 计算总长度，一次性分配
 		totalLen := 0
 		for _, nalu := range nalus {
@@ -152,55 +151,6 @@ func (pes *PES) SplitToTS(pid int, rawTsList []*TSPacket) {
 	}
 
 	pes.tsPayload = tsPackets
-}
-
-// findNextNALUStart 查找 NALU 起始码 (优先匹配 4 字节)
-// 返回起始位置和起始码长度 (3 或 4)，找不到则返回 -1, 0
-func findNextNALUStart(data []byte, start int) (int, int) {
-	if start >= len(data) {
-		return -1, 0
-	}
-
-	// 优先查找 4 字节 00 00 00 01
-	if idx := bytes.Index(data[start:], []byte{0x00, 0x00, 0x00, 0x01}); idx != -1 {
-		return start + idx, 4
-	}
-
-	// 再查找 3 字节 00 00 01
-	if idx := bytes.Index(data[start:], []byte{0x00, 0x00, 0x01}); idx != -1 {
-		return start + idx, 3
-	}
-
-	return -1, 0
-}
-
-func splitNalu(pesData []byte) []*NALU {
-	var nalus []*NALU
-	pos := 0
-	for {
-		startPos, startCodeLen := findNextNALUStart(pesData, pos)
-		if startPos == -1 {
-			break
-		}
-
-		// 找下一个 start code
-		nextStart, _ := findNextNALUStart(pesData, startPos+startCodeLen)
-
-		if nextStart == -1 {
-			nalus = append(nalus, &NALU{
-				startCodeLen: startCodeLen,
-				buffer:       pesData[startPos:],
-			})
-			break
-		} else {
-			nalus = append(nalus, &NALU{
-				startCodeLen: startCodeLen,
-				buffer:       pesData[startPos:nextStart],
-			})
-		}
-		pos = nextStart
-	}
-	return nalus
 }
 
 func UpdatePESLength(pesHeader []byte, payloadLength int) error {

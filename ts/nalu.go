@@ -41,7 +41,6 @@ func DeEmulationInPlace(ebsp []byte, strict bool) []byte {
 	return ebsp[:w]
 }
 
-
 func (nalu *NALU) Decrypt(block cipher.Block, iv []byte) {
 	naluType := nalu.buffer[nalu.startCodeLen] & 0x1F
 	naluData := nalu.buffer
@@ -56,4 +55,59 @@ func (nalu *NALU) Decrypt(block cipher.Block, iv []byte) {
 		}
 		nalu.buffer = naluData[:naluPayloadOffset+len(naluEBSP)]
 	}
+}
+
+func splitNaluStrict(pesData []byte) []*NALU {
+	var nalus []*NALU
+	if len(pesData) == 0 {
+		return nalus
+	}
+
+	preNaluStartPos := -1
+	preNaluStartCodeLen := -1
+	pos := 0
+	zeroCount := 0
+
+	for pos < len(pesData) {
+		b := pesData[pos]
+
+		if b == 0x00 {
+			zeroCount++
+		} else if b == 0x01 && zeroCount >= 2 {
+			// 找到 start code
+			startCodeLen := 3
+			if zeroCount >= 3 {
+				startCodeLen = 4
+			}
+
+			startCodeStart := pos - zeroCount
+
+			if preNaluStartPos != -1 {
+				// 上一个 NALU 结束于当前 start code 前
+				nalus = append(nalus, &NALU{
+					startCodeLen: preNaluStartCodeLen, // ✅ 修正为上一个 NALU 的 start code
+					buffer:       pesData[preNaluStartPos:startCodeStart],
+				})
+			}
+
+			// 新 NALU 从当前 start code 开始
+			preNaluStartPos = startCodeStart
+			preNaluStartCodeLen = startCodeLen
+			zeroCount = 0
+		} else {
+			zeroCount = 0
+		}
+
+		pos++
+	}
+
+	// 最后一个 NALU（尾部）
+	if preNaluStartPos != -1 {
+		nalus = append(nalus, &NALU{
+			startCodeLen: preNaluStartCodeLen,
+			buffer:       pesData[preNaluStartPos:],
+		})
+	}
+
+	return nalus
 }
