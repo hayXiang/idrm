@@ -48,12 +48,13 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 			nalu.Decrypt(block, iv)
 			totalLen += len(nalu.buffer)
 		}
-		newPayload := p.buffer[p.headerLength:p.headerLength + totalLen]
+		newPayload := p.buffer[p.headerLength : p.headerLength+totalLen]
 		offset := 0
 		for _, nalu := range nalus {
 			copy(newPayload[offset:offset+len(nalu.buffer)], nalu.buffer)
 			offset += len(nalu.buffer)
 		}
+
 		newPES = &PES{continuity: p.continuity}
 		newPES.buffer = p.buffer[:p.headerLength+len(newPayload)]
 		UpdatePESLength(newPES.header(), len(newPayload))
