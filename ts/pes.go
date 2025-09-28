@@ -47,7 +47,7 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 		UpdatePESLength(newPES.header, len(newPayload))
 
 		//PES 分包
-		newPES.SplitToTS(p.tsPayload[0].PID, p.tsPayload)
+		newPES.SplitToTS(p.tsPayload[0])
 		p.tsPayload = p.tsPayload[:0]
 		p.payload = p.payload[:0]
 		p.continuity = newPES.continuity
@@ -56,10 +56,11 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	return newPES
 }
 
-func (pes *PES) SplitToTS(pid int, rawTsList []*TSPacket) {
+func (pes *PES) SplitToTS(firstTsPackage *TSPacket) {
 	const tsPacketSize = 188
 	const tsHeaderSize = 4
 
+	pid := firstTsPackage.PID
 	// 拼接 PES 数据
 	data := make([]byte, len(pes.header)+len(pes.payload))
 	copy(data, pes.header)
@@ -87,44 +88,19 @@ func (pes *PES) SplitToTS(pid int, rawTsList []*TSPacket) {
 		offset := tsHeaderSize
 		var adaptField []byte
 		//只在PES开头copy adapField
-		if tsPackageIndex < len(rawTsList) && tsPackageIndex == 0 {
-			rawTs := rawTsList[tsPackageIndex]
-			aFlen := len(rawTs.AdaptationField) - rawTs.suffingLength
-			adaptField = rawTs.AdaptationField[:aFlen:aFlen]
+		if tsPackageIndex == 0 {
+			aFlen := len(firstTsPackage.AdaptationField) - firstTsPackage.suffingLength
+			adaptField = firstTsPackage.AdaptationField[:aFlen:aFlen]
 		}
 
-		stuffingSize := tsPacketSize - tsHeaderSize - len(adaptField) - len(data)
-		if stuffingSize < 0 {
-			stuffingSize = 0
-		}
-		if len(adaptField) > 0 {
+		if len(adaptField) > 0 || tsPacketSize-tsHeaderSize > len(data) {
 			tsBuffer[3] = (tsBuffer[3] & 0xCF) | (0x30)
-			if stuffingSize > 0 {
-				tsBuffer[offset] = byte(len(adaptField) + stuffingSize - 1)
-			} else {
-				tsBuffer[offset] = byte(len(adaptField))
-			}
+			stuffingSize := max(0, tsPacketSize-tsHeaderSize-1-len(adaptField)-len(data))
+			tsBuffer[offset] = byte(len(adaptField) + stuffingSize)
 			offset++
-			stuffingSize--
 			// 写入 adaptation_field 内容
 			copy(tsBuffer[offset:], adaptField)
 			offset += len(adaptField)
-
-			for i := 0; i < stuffingSize; i++ {
-				if i == 0 {
-					tsBuffer[offset] = 0x00
-				} else {
-					tsBuffer[offset] = 0xFF
-				}
-				offset++
-			}
-		} else if stuffingSize > 0 {
-			tsBuffer[3] = (tsBuffer[3] & 0xCF) | (0x30)
-			tsBuffer[offset] = byte(stuffingSize - 1)
-
-			stuffingSize--
-			offset++
-
 			for i := 0; i < stuffingSize; i++ {
 				if i == 0 {
 					tsBuffer[offset] = 0x00
