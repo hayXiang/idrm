@@ -48,20 +48,15 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 			nalu.Decrypt(block, iv)
 			totalLen += len(nalu.buffer)
 		}
-		newPayload := p.buffer[p.headerLength:]
+		newPayload := p.buffer[p.headerLength:p.headerLength + totalLen]
 		offset := 0
 		for _, nalu := range nalus {
 			copy(newPayload[offset:offset+len(nalu.buffer)], nalu.buffer)
 			offset += len(nalu.buffer)
 		}
-		// 用 0xFF 填充剩余空间
-		for i := offset; i < len(newPayload); i++ {
-			newPayload[i] = 0xFF
-		}
-
 		newPES = &PES{continuity: p.continuity}
 		newPES.buffer = p.buffer[:p.headerLength+len(newPayload)]
-		//UpdatePESLength(newPES.header(), len(newPayload))
+		UpdatePESLength(newPES.header(), len(newPayload))
 		newPES.SplitToTS(p.tsPayload[0])
 		p.tsPayload = p.tsPayload[:0]
 		p.buffer = p.buffer[:0]
