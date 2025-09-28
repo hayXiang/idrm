@@ -7,6 +7,8 @@ import (
 	"os"
 )
 
+const PTM_CHANGE_ONLY = false
+
 const tsPacketSize = 188
 
 // PID → StreamType 映射
@@ -91,6 +93,11 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 			continue
 		}
 
+		if PTM_CHANGE_ONLY {
+			allTS = append(allTS, &ts)
+			continue
+		}
+
 		// 视频流按 NALU 解密
 		if streamType == STREAM_TYPE_VIDEO_H265 || streamType == STREAM_TYPE_VIDEO_H264 || isLastPacket {
 			if streamType == STREAM_TYPE_VIDEO_H265 || streamType == STREAM_TYPE_VIDEO_H264 {
@@ -163,14 +170,14 @@ func hexToBytes(s string) []byte {
 }
 
 func Test() {
-	data, err := os.ReadFile("D://drm/raw-v4_101_d7975751.ts")
+	data, err := os.ReadFile("D://drm/raw.ts")
 	//data, err := os.ReadFile("D://drm/012_mute_60s.ts")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	key := hexToBytes("ca960e1c8e8294a31ab1d28e6848fcc5") // 示例 AES key
-	iv := hexToBytes("3E75EE53CB87366AD4EF3A2CBA2E0636")
+	key := hexToBytes("8bcdab76c02b341fb3658d912b0def9c") // 示例 AES key
+	iv := hexToBytes("A2CC00BBA65B2DB60728B7168F5F4B9A")
 	body := DecryptTS(data, key, iv)
 
 	os.WriteFile("D://drm/de.ts", body, 0644)
