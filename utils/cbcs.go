@@ -2,7 +2,7 @@ package utils
 
 import "crypto/cipher"
 
-func DecryptCBCSInPlace(block cipher.Block, data []byte, iv []byte, cryptByteBlock, skipByteBlock int) {
+func DecryptCBCSInPlace(block cipher.Block, data []byte, iv []byte, cryptByteBlock, skipByteBlock int, includeLastBlock bool) {
 	blockSize := block.BlockSize()
 	size := len(data)
 
@@ -24,7 +24,8 @@ func DecryptCBCSInPlace(block cipher.Block, data []byte, iv []byte, cryptByteBlo
 		// 解密 cryptByteBlock 个 block
 		for i := 0; i < cryptByteBlock && offset < size; i++ {
 			remain := size - offset
-			if remain >= blockSize {
+			// 根据 includeLastBlock 决定是否加密尾部 block
+			if remain > blockSize || (includeLastBlock && remain == blockSize) {
 				// 保存当前密文 block
 				copy(cipherBlock, data[offset:offset+blockSize])
 				// CBC 解密

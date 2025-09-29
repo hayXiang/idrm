@@ -264,7 +264,7 @@ func (audioFrame *AudioFrame) Process(block cipher.Block, ts *TSPacket, iv []byt
 		}
 
 		if len(audioData) > headerLen+16 {
-			utils.DecryptCBCSInPlace(block, audioData[headerLen+16:], iv, 1, 0)
+			utils.DecryptCBCSInPlace(block, audioData[headerLen+16:], iv, 1, 0, true)
 
 			// 回填原始 Payloads
 			offset := 0

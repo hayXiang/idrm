@@ -32,13 +32,13 @@ func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.Senc
 
 	if senc == nil || senc.SubSamples == nil {
 		size := traf.Trun.Samples[i].Size
-		utils.DecryptCBCSInPlace(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock)
+		utils.DecryptCBCSInPlace(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock, true)
 	} else {
 		for _, sub := range senc.SubSamples[i] {
 			offset += uint32(sub.BytesOfClearData)
 			size := uint32(sub.BytesOfProtectedData)
 			if size > 0 {
-				utils.DecryptCBCSInPlace(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock)
+				utils.DecryptCBCSInPlace(block, encrypted[offset:offset+size], iv, cryptByteBlock, skipByteBlock, true)
 				offset += size
 			}
 		}
