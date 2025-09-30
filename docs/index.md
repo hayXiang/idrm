@@ -21,7 +21,7 @@
 
 ---
 
-## ⚙️ 参数说明
+## ⚙️ 命令行简单模式
 
 ```
 -i, --input             m3u订阅 URL
@@ -41,10 +41,15 @@
 --speed-up              预加载分片
 --to-hls                将 DASH 转换成 HLS
 ```
+启动方式：
 
+```bash
+# 启动代理并监听 1234 端口
+./idrm-linux-amd64 -i "https://example.com/playlist.m3u" -l "0.0.0.0:1234" --proxy "socks5://127.0.0.1:1080"
+```
 ---
 
-## 📄 配置文件示例
+## 📄 配置文件模式
 
 使用 `-c config.json` 可以批量配置多个 provider。
 
@@ -92,22 +97,7 @@
 启动方式：
 
 ```bash
-./idrm-linux-amd64 -c config.json
-```
-
----
-
-## 🔧 使用示例
-
-```bash
-# 启动代理并监听 1234 端口
-./idrm-linux-amd64 -i "https://example.com/playlist.m3u" -l "0.0.0.0:1234"
-
-# 使用 SOCKS5 代理
-./idrm-linux-amd64 -i "https://example.com/playlist.m3u" --proxy "socks5://127.0.0.1:1080"
-
-# 使用配置文件
-./idrm-linux-amd64 -c config.json
+./idrm-linux-amd64 -c config.json -l "0.0.0.0:1234" 
 ```
 
 ---
