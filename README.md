@@ -18,7 +18,6 @@
 * 支持仅保留最高码率 (`--best-quality`)。
 * DASH 转换为 HLS (`--to-hls`)。
 * 分片预加载，加快播放启动 (`--speed-up`)。
-* 提供 **pprof 调试接口** (`--pprof-enable`, `--pprof-addr`)。
 
 ---
 
