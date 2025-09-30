@@ -152,16 +152,13 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 		totalSize += len(_ts.buffer)
 	}
 
-	// 预分配切片
-	ret := make([]byte, totalSize)
-
-	// 复制数据到切片
+	//复用原来的数据
 	pos := 0
 	for _, _ts := range allTS {
-		copy(ret[pos:], _ts.buffer)
+		copy(data[pos:], _ts.buffer)
 		pos += len(_ts.buffer)
 	}
-	return ret
+	return data[:totalSize]
 }
 
 func hexToBytes(s string) []byte {

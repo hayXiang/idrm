@@ -56,9 +56,10 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 		}
 
 		newPES = &PES{continuity: p.continuity}
+		newPES.tsPayload = append(newPES.tsPayload, p.tsPayload...)
 		newPES.buffer = p.buffer[:p.headerLength+len(newPayload)]
 		UpdatePESLength(newPES.header(), len(newPayload))
-		newPES.SplitToTS(p.tsPayload[0])
+		newPES.SplitToTS()
 		p.tsPayload = p.tsPayload[:0]
 		p.buffer = p.buffer[:0]
 		p.continuity = newPES.continuity
@@ -68,17 +69,28 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	return newPES
 }
 
-func (pes *PES) SplitToTS(firstTsPackage *TSPacket) {
+func (pes *PES) SplitToTS() {
 	const tsPacketSize = 188
 	const tsHeaderSize = 4
 
-	pid := firstTsPackage.PID
+	firstTsPackage := pes.tsPayload[0]
+	pid := pes.tsPayload[0].PID
 	var tsPackets []*TSPacket
 
 	tsPackageIndex := 0
 	data := pes.buffer
+	//这里可以回填原始的tsPackage,因为解密后的数据只会减少
 	for len(data) > 0 {
-		tsBuffer := make([]byte, tsPacketSize)
+
+		offset := tsHeaderSize
+		var adaptField []byte
+		//只在PES开头copy adapField
+		if tsPackageIndex == 0 {
+			aFlen := len(firstTsPackage.AdaptationField) - firstTsPackage.suffingLength
+			adaptField = firstTsPackage.AdaptationField[:aFlen:aFlen]
+		}
+
+		tsBuffer := pes.tsPayload[tsPackageIndex].buffer
 		tsBuffer[0] = 0x47 // sync byte
 
 		// 第二字节: payload_unit_start_indicator + PID 高5位
@@ -92,15 +104,6 @@ func (pes *PES) SplitToTS(firstTsPackage *TSPacket) {
 		// 第四字节: adaptation_field_control + continuity
 		// 先设为 payload only
 		tsBuffer[3] = 0x10
-
-		offset := tsHeaderSize
-		var adaptField []byte
-		//只在PES开头copy adapField
-		if tsPackageIndex == 0 {
-			aFlen := len(firstTsPackage.AdaptationField) - firstTsPackage.suffingLength
-			adaptField = firstTsPackage.AdaptationField[:aFlen:aFlen]
-		}
-
 		if len(adaptField) > 0 || tsPacketSize-tsHeaderSize > len(data) {
 			tsBuffer[3] = (tsBuffer[3] & 0xCF) | (0x30)
 			stuffingSize := max(0, tsPacketSize-tsHeaderSize-1-len(adaptField)-len(data))
