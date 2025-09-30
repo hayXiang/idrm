@@ -55,6 +55,7 @@
   {
     "name": "astro",
     "url": "https://live.9528.eu.org/xxxx",
+    "proxy": "socks5://127.0.0.1:1080",
     "headers": [
       "User-Agent:Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/8.0 TV Safari/537.36"
     ],
@@ -71,6 +72,7 @@
     "name": "astro",
     "url": "https://live.9528.eu.org/xxxx",
     "headers": ["User-Agent:Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0)"],
+    "proxy": "socks5://127.0.0.1:1080",
     "to-hls": true
   },
   {
@@ -81,7 +83,7 @@
   },
   {
     "name": "espn",
-    "url": "https://example.com/espn.mpd",
+    "url": "https://example.com/espn.m3u",
     "to-hls": true
   }
 ]
