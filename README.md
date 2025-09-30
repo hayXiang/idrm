@@ -102,10 +102,10 @@
 
 ```bash
 # 启动代理并监听 1234 端口
-./idrm-linux-amd64 -i "https://example.com/playlist.m3u8" -l "0.0.0.0:1234"
+./idrm-linux-amd64 -i "https://example.com/playlist.m3u" -l "0.0.0.0:1234"
 
 # 使用 SOCKS5 代理
-./idrm-linux-amd64 -i "https://example.com/playlist.m3u8" --proxy "socks5://127.0.0.1:1080"
+./idrm-linux-amd64 -i "https://example.com/playlist.m3u" --proxy "socks5://127.0.0.1:1080"
 
 # 使用配置文件
 ./idrm-linux-amd64 -c config.json
@@ -115,11 +115,9 @@
 
 ## 📦 下载
 
-请在 [Releases](./releases) 页面获取对应平台的二进制文件：
-
-* Linux: `idrm-linux-amd64`
-* macOS: `idrm-darwin-amd64`
-* Windows: `idrm-windows-amd64.exe`
+* Linux-x86: https://live.9528.eu.org/release/idrm/idrm-linux-arm64
+* Linux-arm: https://live.9528.eu.org/release/idrm/idrm-linux-amd64
+* Windows:   https://live.9528.eu.org/release/idrm/idrm.exe
 
 ---
 
