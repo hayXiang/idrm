@@ -59,7 +59,7 @@ func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, bo
 			}
 			return nil, fmt.Errorf("failed to fetch license: %v", err)
 		}
-		clearKeysMap.Store(tvgID, body)
+		clearKeysMap.Store(tvgID, string(body))
 	}
 
 	// 解析 JWK
