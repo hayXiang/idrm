@@ -7,7 +7,7 @@
 ## ✨ 功能特性
 
 * 支持 **订阅m3u地址** (`-i`, `--input`) 或 **JSON 配置文件** (`-c`)。
-* 支持 **SOCKS5 代理** (`--proxy`, `--m3u-proxy`)。
+* 支持 **SOCKS5,HTTP 代理** (`--proxy`, `--m3u-proxy`)。
 * 可自定义 **User-Agent** 和 **HTTP 请求头**。
 * **缓存机制**：
 
