@@ -37,12 +37,9 @@
 --cache-segment-file    TS/M4S 文件缓存过期时间 (秒)
 --cache-segment-memory  TS/M4S 内存缓存时间 (秒)
 --auto-gc               自动垃圾回收间隔 (秒)
---max-memory            最大内存使用 (MB)
 --best-quality          仅保留最高码率 (默认 true)
 --speed-up              预加载分片
 --to-hls                将 DASH 转换成 HLS
---pprof-enable          开启 pprof HTTP server
---pprof-addr            pprof 地址 (默认 localhost:7070)
 ```
 
 ---
