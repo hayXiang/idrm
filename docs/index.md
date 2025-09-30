@@ -53,7 +53,7 @@
 
 使用 `-c config.json` 可以批量配置多个 provider。
 
-### 单个流
+### 单个provider
 
 ```json
 [
@@ -69,7 +69,7 @@
 ]
 ```
 
-### 多个流
+### 多个provider
 
 ```json
 [
