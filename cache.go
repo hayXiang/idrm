@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"idrm/utils"
 	"os"
 	"path/filepath"
 	"strings"
@@ -343,17 +344,17 @@ func generateTvgIdReport(fc *MyCache, cacheItems []*cache.Item, fileSizeByTvgId 
 	return CacheReportItem{
 		Memory: CacheSummary{
 			Count:          memCount,
-			TotalSize:      formatSize(memSize),
+			TotalSize:      utils.FormatSize(memSize),
 			TotalSizeBytes: memSize,
 		},
 		File: CacheSummary{
 			Count:          fileCount,
-			TotalSize:      formatSize(fileSize),
+			TotalSize:      utils.FormatSize(fileSize),
 			TotalSizeBytes: fileSize,
 		},
 		Total: CacheSummary{
 			Count:          totalCount,
-			TotalSize:      formatSize(totalSize),
+			TotalSize:      utils.FormatSize(totalSize),
 			TotalSizeBytes: totalSize,
 		},
 	}
@@ -379,22 +380,22 @@ func mergeReportItems(items ...CacheReportItem) CacheReportItem {
 	return CacheReportItem{
 		Manifest: CacheSummary{
 			Count:          manifestCount,
-			TotalSize:      formatSize(manifestSize),
+			TotalSize:      utils.FormatSize(manifestSize),
 			TotalSizeBytes: manifestSize,
 		},
 		Memory: CacheSummary{
 			Count:          memCount,
-			TotalSize:      formatSize(memSize),
+			TotalSize:      utils.FormatSize(memSize),
 			TotalSizeBytes: memSize,
 		},
 		File: CacheSummary{
 			Count:          fileCount,
-			TotalSize:      formatSize(fileSize),
+			TotalSize:      utils.FormatSize(fileSize),
 			TotalSizeBytes: fileSize,
 		},
 		Total: CacheSummary{
 			Count:          totalCount,
-			TotalSize:      formatSize(totalSize),
+			TotalSize:      utils.FormatSize(totalSize),
 			TotalSizeBytes: totalSize,
 		},
 	}

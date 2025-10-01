@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"idrm/utils"
 	"log"
 	"math"
 	"net/http"
@@ -350,12 +351,30 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 					peridoDurationTotal -= float64(duration)
 				}
 			}
+
+			// --------------------
+			// 直播，保留最多 10 个分片
+			// --------------------
+			firstSeq := startNumber
+			if !is_static {
+				segments := strings.Split(strings.TrimSpace(segmentBuilder.String()), "\n")
+				segCount := len(segments) / 2 // 总分片数
+				keep := segCount
+				if keep > 10 {
+					keep = 10
+					segments = segments[len(segments)-(keep*2):]
+				}
+				firstSeq = startNumber + (segCount - keep)
+				segmentBuilder.Reset()
+				segmentBuilder.WriteString(strings.Join(segments, "\n"))
+			}
+
 			if is_static {
 				segmentBuilder.WriteString("#EXT-X-ENDLIST")
 			}
 
 			initURI := strings.ReplaceAll(segTemp.SelectAttrValue("initialization", ""), "$RepresentationID$", repID)
-			mediaBuilder.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", startNumber))
+			mediaBuilder.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", firstSeq))
 			mediaBuilder.WriteString(fmt.Sprintf(`#EXT-X-MAP:URI="%s"`+"\n", initURI))
 			mediaBuilder.WriteString(segmentBuilder.String())
 			hlsMap[playlistName] = mediaBuilder.String()
@@ -434,7 +453,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				log.Printf("下载开始(预加载）：%s, %s，%s", "preloader", tvgID, url)
 				start := time.Now()
 				_, body, err, contentType, _ := HttpGet(client, url, config.Headers)
-				log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, formatDuration(time.Since(start)))
+				log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 				if err != nil {
 					return
 				}

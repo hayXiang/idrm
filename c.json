@@ -1,10 +1,7 @@
 [{
 	"name":"mytv",
-	"url":"https://live.9528.eu.org/s/GRHK-D8q.m3u",
-	"proxy":"socks5://127.0.0.1:1234",
-    "user-agent":"666",
-    "m3u-proxy":"socks5://127.0.0.:6789",
-    "m3u-user-agent":"777"
+	"url":"https://live.9528.eu.org/s/Dl1Jfxda",
+  "to-hls":true
 },
 {
     "name": "astro",
