@@ -14,7 +14,11 @@ import (
 
 	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/beevik/etree"
+	"github.com/patrickmn/go-cache"
 )
+
+// 全局缓存器（默认保留 30 分钟）
+var hlsManager = NewHLSSeqManager()
 
 type HLSUpdater struct {
 	provider    string
@@ -301,7 +305,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 			if segTemp == nil {
 				continue
 			}
-			startNumber, _ := strconv.Atoi(segTemp.SelectAttrValue("startNumber", "1"))
+			startNumber, _ := strconv.Atoi(segTemp.SelectAttrValue("startNumber", "-1"))
 			timescale, _ := strconv.Atoi(segTemp.SelectAttrValue("timescale", "1"))
 			mediaTemplate := strings.ReplaceAll(segTemp.SelectAttrValue("media", ""), "$RepresentationID$", repID)
 
@@ -309,6 +313,11 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 			timeline := segTemp.FindElement("SegmentTimeline")
 			seq := startNumber
 			if timeline != nil {
+				if seq == -1 {
+					newSegTimes := parseTimeline(timeline)
+					seq = hlsManager.UpdateTimelineSegments(tvgId+"_"+playlistName, newSegTimes)
+					startNumber = seq
+				}
 				lastT := 0
 				for _, s := range timeline.FindElements("S") {
 					d, _ := strconv.Atoi(s.SelectAttrValue("d", "0"))
@@ -572,4 +581,121 @@ func ParseFloatOrZero(s string) float64 {
 	}
 	f, _ := strconv.ParseFloat(s, 64)
 	return f
+}
+
+// SegmentSeqTracker 记录单一路径的时间戳与 sequence 对应关系
+type SegmentSeqTracker struct {
+	mu       sync.Mutex
+	seqMap   map[int64]int // timeline -> sequence
+	maxCount int
+}
+
+// HLSSeqManager 管理多个 MPD 的分片序列
+type HLSSeqManager struct {
+	cache *cache.Cache
+}
+
+// 创建管理器
+func NewHLSSeqManager() *HLSSeqManager {
+	return &HLSSeqManager{
+		cache: cache.New(10*time.Minute, 20*time.Minute),
+	}
+}
+
+// 获取或创建 tracker
+func (m *HLSSeqManager) getTracker(mpdURL string) *SegmentSeqTracker {
+	if v, ok := m.cache.Get(mpdURL); ok {
+		return v.(*SegmentSeqTracker)
+	}
+	t := &SegmentSeqTracker{
+		seqMap:   make(map[int64]int),
+		maxCount: 100,
+	}
+	m.cache.Set(mpdURL, t, cache.DefaultExpiration)
+	return t
+}
+
+// 更新时间线分片，返回 newSegs[0] 对应的 sequence
+func (m *HLSSeqManager) UpdateTimelineSegments(key string, newSegs []int64) int {
+	tracker := m.getTracker(key)
+	return tracker.Update(newSegs)
+}
+
+// Update 根据缓存和新的时间线推导 sequence
+func (t *SegmentSeqTracker) Update(newSegs []int64) int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if len(newSegs) == 0 {
+		return 1
+	}
+
+	startSeq := 1
+	reset := true
+
+	// 倒序查找新分片中是否有命中缓存的
+	for i := len(newSegs) - 1; i >= 0; i-- {
+		segT := newSegs[i]
+		if oldSeq, ok := t.seqMap[segT]; ok {
+			// 推导出 newSegs[0] 的序号
+			offset := i
+			startSeq = oldSeq - offset
+			if startSeq < 1 {
+				startSeq = 1
+			}
+			reset = false
+			break
+		}
+	}
+
+	// 没找到就从 1 开始
+	if reset {
+		startSeq = 1
+	}
+
+	// 更新缓存映射
+	seq := startSeq
+	for _, segT := range newSegs {
+		t.seqMap[segT] = seq
+		seq++
+	}
+
+	t.trimCache()
+	return startSeq
+}
+
+// 保留最近 N 个分片
+func (t *SegmentSeqTracker) trimCache() {
+	if len(t.seqMap) <= t.maxCount {
+		return
+	}
+	toRemove := len(t.seqMap) - t.maxCount
+	for k := range t.seqMap {
+		delete(t.seqMap, k)
+		toRemove--
+		if toRemove <= 0 {
+			break
+		}
+	}
+}
+
+// 解析 SegmentTimeline 为时间戳列表
+func parseTimeline(timeline *etree.Element) []int64 {
+	var times []int64
+	lastT := int64(0)
+	for _, s := range timeline.FindElements("S") {
+		d, _ := strconv.ParseInt(s.SelectAttrValue("d", "0"), 10, 64)
+		r, _ := strconv.ParseInt(s.SelectAttrValue("r", "0"), 10, 64)
+		tStr := s.SelectAttrValue("t", "")
+		t := lastT
+		if tStr != "" {
+			t, _ = strconv.ParseInt(tStr, 10, 64)
+		}
+		for i := int64(0); i <= r; i++ {
+			times = append(times, t)
+			t += d
+		}
+		lastT = t
+	}
+	return times
 }
