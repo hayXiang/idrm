@@ -714,6 +714,7 @@ func filterHighestAV(body string) string {
 					case "AUDIO":
 						audioGroup = val
 					case "CLOSED-CAPTIONS":
+					case "SUBTITLES":
 						ccGroup = val
 					}
 				}
@@ -771,7 +772,7 @@ func filterHighestAV(body string) string {
 	if bestCCGroup != "" && bestCCGroup != "NONE" {
 		for _, line := range lines {
 			if strings.HasPrefix(line, "#EXT-X-MEDIA:") &&
-				strings.Contains(line, "TYPE=CLOSED-CAPTIONS") &&
+				(strings.Contains(line, "TYPE=CLOSED-CAPTIONS") || strings.Contains(line, "TYPE=SUBTITLES")) &&
 				strings.Contains(line, fmt.Sprintf("GROUP-ID=\"%s\"", bestCCGroup)) {
 				ccLines = append(ccLines, line)
 			}
@@ -1190,7 +1191,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			return
 		}
 		if *config.ToFmp4OverHls {
-			_, hls_list, _ := DashToHLS(finalURI, body, tvgID)
+			_, hls_list, _ := DashToHLS(finalURI, body, tvgID, *config.BestQuality)
 			HLS_BY_TVG_ID.Store(tvgID, hls_list)
 			body = []byte(hls_list["master.m3u8"])
 			contentType = "application/vnd.apple.mpegurl"

@@ -1,31 +1,8 @@
 [{
 	"name":"mytv",
 	"url":"https://live.9528.eu.org/s/Dl1Jfxda",
-  "to-hls":true
-},
-{
-    "name": "astro",
-    "url": "https://live.9528.eu.org/s/3vOAZaOs",
-    "headers": ["User-Agent:Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/8.0 TV Safari/537.36"],
-    "to-hls": true
-},
-{
-    "name": "ben",
-    "url": "https://live.9528.eu.org/s/zn16IzSJ.m3u",
-    "headers": [],
-    "drm-type": "fairplay"
-},
-  {
-    "name": "stan-mini",
-    "url": "https://live.9528.eu.org/stan/mini/index.m3u?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-    "headers": [],
-    "to-hls":true
-  },
-  {
-    "name": "my-test",
-    "url": "https://live.9528.eu.org/s/lR7XUle0.m3u",
-    "proxy": "http://127.0.0.1:7897",
-    "headers": ["User-Agent: MovistarApp-iOS/9.6.1/iPhone/iPhone15,2/18.3.2"],
-    "cache-manifest": 6
-  }
+  "proxy": "http://127.0.0.1:7897",
+  "to-hls":true,
+  "speed-up":true
+}
 ]

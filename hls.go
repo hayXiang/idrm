@@ -85,7 +85,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 					log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
 				}
-				mediaType, hlsMap, err = DashToHLS(finalURI, body, u.tvgID)
+				mediaType, hlsMap, err = DashToHLS(finalURI, body, u.tvgID, *u.config.BestQuality)
 				if err != nil {
 					log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
@@ -218,7 +218,7 @@ func GetMaxSegmentDurationInt(adp *etree.Element) int {
 }
 
 // 返回 HLS playlists 内容，key = filename, value = m3u8 内容
-func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]string, error) {
+func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool) (string, map[string]string, error) {
 	doc := etree.NewDocument()
 	hlsMap := make(map[string]string)
 
@@ -390,7 +390,11 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string) (string, map[string]str
 		}
 	}
 
-	hlsMap["master.m3u8"] = masterBuilder.String()
+	if bestQuality {
+		hlsMap["master.m3u8"] = filterHighestAV(masterBuilder.String())
+	} else {
+		hlsMap["master.m3u8"] = masterBuilder.String()
+	}
 	return media_type, hlsMap, nil
 }
 
