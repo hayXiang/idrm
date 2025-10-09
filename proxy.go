@@ -1154,7 +1154,12 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 					resposneBody(ctx, data, dataType)
 				},
 				//ON TIMEOUT
-				nil,
+				func() {
+					ctx.SetStatusCode(302)
+					ctx.Response.Header.Set("Location", path)
+					ctx.SetBodyString("资源正在下载中，请过一会再试")
+					log.Printf("[ERROR]资源正在下载中：%s,%s", getClientIP(ctx), proxy_url)
+				},
 			)
 			return
 		}
@@ -1306,10 +1311,6 @@ func WaitOrRedirect(
 			log.Printf("[ERROR] 资源请求失败：%s,%s", getClientIP(ctx), key)
 			return
 		case <-timeout:
-			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
-			ctx.Response.Header.Set("Retry-After", "2")
-			ctx.SetBodyString("资源正在下载中，请过一会再试")
-			log.Printf("[ERROR]资源正在下载中：%s,%s", getClientIP(ctx), key)
 			if onTimeout != nil {
 				onTimeout()
 			}
