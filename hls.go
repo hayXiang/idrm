@@ -466,9 +466,11 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				log.Printf("下载开始(预加载）：%s, %s，%s", "preloader", tvgID, url)
 				start := time.Now()
 				_, body, err, contentType, _ := HttpGet(client, url, config.Headers)
-				log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 				if err != nil {
+					log.Printf("下载错误：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 					return
+				} else {
+					log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 				}
 				<-initReaderChan
 				var sinfBox *mp4.SinfBox
