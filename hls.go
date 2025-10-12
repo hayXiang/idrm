@@ -289,7 +289,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool) (stri
 					groupID, lang, lang, tvgId, playlistName))
 			default:
 				line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio"`,
-					bandwidth, resolution, strings.ReplaceAll("hev1", "hvc1", codecs))
+					bandwidth, resolution, codecs)
 				if subtitleExists {
 					line += `,SUBTITLES="subs"`
 				}
