@@ -417,9 +417,12 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 			close(initReaderChan)
 		} else {
 			go func() {
+				start := time.Now()
 				defer func() {
 					close(initReaderChan)
+					log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 				}()
+				log.Printf("下载错误：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 				_, responseBody, err, contentType, _ := HttpGet(client, url, config.Headers)
 				if err != nil {
 					log.Printf("init.m4s 下载失败: %v", err)
@@ -480,8 +483,10 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				}
 				body, err = fetchAndDecrypt(client, config, tvgID, body, nil, sinfBox, proxy_type)
 				if err != nil {
+					log.Printf("解密错误：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 					return
 				}
+				log.Printf("解密结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 				if cache != nil {
 					cache.Set(url, body, MyMetadata{contentType, tvgID, 0})
 				}

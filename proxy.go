@@ -85,7 +85,7 @@ var (
 	CACHE_302_REDIRECT_URL     = cache.New(60*time.Second, 30*time.Second)
 )
 
-var version = "1.0.0.24"
+var version = "1.0.0.25"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -880,15 +880,16 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 		// 跳过 KEY（你这里是直接忽略的）
 		if strings.HasPrefix(line, "#EXT-X-KEY:METHOD=") {
 			if _, exists := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); !exists {
-				sinBox := new(mp4.SinfBox)
-				sinBox.Schm = new(mp4.SchmBox)
-				sinBox.Schi = new(mp4.SchiBox)
-				sinBox.Schi.Tenc = new(mp4.TencBox)
-				if iv, err := parseIV(line); err == nil {
+				if iv, err := parseIV(line); err == nil && len(iv) > 0 {
+					sinBox := new(mp4.SinfBox)
+					sinBox.Schm = new(mp4.SchmBox)
+					sinBox.Schi = new(mp4.SchiBox)
+					sinBox.Schi.Tenc = new(mp4.TencBox)
+
+					sinBox.Schm.SchemeType = "cbcs"
+					SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinBox)
 					sinBox.Schi.Tenc.DefaultConstantIV = iv
 				}
-				sinBox.Schm.SchemeType = "cbcs"
-				SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinBox)
 			}
 			continue
 		}

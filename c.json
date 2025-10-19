@@ -4,5 +4,13 @@
   "proxy": "http://127.0.0.1:7897",
   "to-hls":true,
   "speed-up":true
-}
+},
+  {
+    "name": "nba",
+    "url": "https://live.9528.eu.org/subscribe/npl/mpd?token=yueyue2014",
+    "proxy": "",
+    "headers": [],
+    "best-quality": true,
+    "speed-up": true
+   }
 ]
