@@ -20,6 +20,11 @@
     "headers": [],
     "best-quality": true,
     "speed-up": true
-   }
-   
+   },
+   {
+	"name":"test",
+	"url":"https://live.9528.eu.org/s/r1IBc2Ar.m3u",
+  "to-hls":true,
+  "speed-up":false
+}
 ]
