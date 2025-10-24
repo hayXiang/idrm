@@ -83,6 +83,7 @@ var (
 	HLS_TYPE_BY_TVG_ID         = sync.Map{}
 	SINF_BOX_BY_STREAM_ID      = sync.Map{}
 	CACHE_302_REDIRECT_URL     = cache.New(60*time.Second, 30*time.Second)
+	VISIT_TRACKER              = NewVisitTracker()
 )
 
 var version = "1.0.0.25"
@@ -1120,6 +1121,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 
 	cache := MANIFEST_CACHE_BY_PROVIDER[provider.(string)]
 	if proxy_type == "m4s" || proxy_type == "ts" {
+		VISIT_TRACKER.RecordVisit(tvgID, getClientIP(ctx), proxy_url, stream_uuid)
 		cache = SEGMENT_CACHE_BY_PROVIDER[provider.(string)]
 	}
 

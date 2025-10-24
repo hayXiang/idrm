@@ -12,5 +12,14 @@
     "headers": [],
     "best-quality": true,
     "speed-up": true
+   },
+   {
+    "name": "stan-mini",
+    "url": "https://live.9528.eu.org/stan/live/index.m3u?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+    "proxy": "",
+    "headers": [],
+    "best-quality": true,
+    "speed-up": true
    }
+   
 ]

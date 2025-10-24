@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -35,11 +36,6 @@ type HLSUpdater struct {
 var updaters sync.Map
 
 func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Client, config *StreamConfig, interval time.Duration) {
-
-	if mediaType, ok := HLS_TYPE_BY_TVG_ID.Load(tvgID); ok && mediaType == "static" {
-		return
-	}
-
 	cachedUpd, exists := updaters.Load(tvgID)
 	if exists {
 		cachedUpd.(*HLSUpdater).lastAccess = time.Now()
@@ -114,7 +110,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 						hlsMapLock.Lock()
 						m3u8Content := string(modifyBody)
 						hlsMap[_key+".m3u8"] = m3u8Content
-						if strings.Contains(m3u8Content, "#ENDLIST") {
+						if strings.Contains(m3u8Content, "#EXT-X-ENDLIST") {
 							HLS_TYPE_BY_TVG_ID.Store(u.tvgID, "static")
 						}
 						if manifestCache != nil {
@@ -126,20 +122,10 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 				wg.Wait()
 			}
 			log.Println("Updated HLS for", u.tvgID)
-
-			if mediaType, ok := HLS_TYPE_BY_TVG_ID.Load(tvgID); ok && mediaType == "static" {
-				log.Printf("VOD资源，停止预加载 %s，%s", u.tvgID, u.mainfestUrl)
-				u.stopOnce.Do(func() {
-					close(u.stopCh)
-					updaters.Delete(u.tvgID)
-				})
-				return
-			}
-
 			if !*config.SpeedUp {
 				return
 			}
-			// 预加载最后三个分片
+			// 预加载三个分片,直播流是最后三个，点播流是最近一分钟用户访问的文件的后三个。
 			for name, playlist := range hlsMap {
 				if name == "master.m3u8" || !strings.HasSuffix(name, ".m3u8") {
 					continue
@@ -160,11 +146,46 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 					segmentList = append(segmentList, line)
 				}
 
-				lastSegments := segmentList
-				if len(segmentList) > 3 {
-					lastSegments = segmentList[len(segmentList)-3:]
+				if mediaType, ok := HLS_TYPE_BY_TVG_ID.Load(tvgID); ok && mediaType == "static" {
+					recent := VISIT_TRACKER.GetRecentURLs(tvgID)
+					if len(recent) == 0 {
+						lastSegments := segmentList[0:min(3, len(segmentList))]
+						preloadSegments(u.provider, u.tvgID, lastSegments, initM4sUrl)
+					} else {
+						for _, record := range recent {
+							//根据url找出后面的segment,按照文件名
+							//log.Printf("[最近访问] tvgID=%s IP=%s URL=%s", tvgID, ip, record.URL)
+							// 根据 URL 提取文件名
+							filename := path.Base(record.URL)
+
+							// 找出该文件在 segmentList 中的位置
+							startIdx := -1
+							for i, seg := range segmentList {
+								if strings.Contains(seg, filename) {
+									startIdx = i
+									break
+								}
+							}
+
+							// 如果找到了对应的分片，取后续的 3 个
+							if startIdx != -1 {
+								nextStart := startIdx + 1
+								if nextStart < len(segmentList) {
+									end := min(nextStart+3, len(segmentList))
+									nextSegments := segmentList[nextStart:end]
+									//log.Printf("[预加载] IP=%s 起始=%s 下3片=%v", ip, filename, nextSegments)
+									preloadSegments(u.provider, u.tvgID, nextSegments, initM4sUrl)
+								}
+							}
+						}
+					}
+				} else {
+					lastSegments := segmentList
+					if len(segmentList) > 3 {
+						lastSegments = segmentList[len(segmentList)-3:]
+					}
+					preloadSegments(u.provider, u.tvgID, lastSegments, initM4sUrl)
 				}
-				preloadSegments(u.provider, u.tvgID, lastSegments, initM4sUrl)
 			}
 		}
 		update()
