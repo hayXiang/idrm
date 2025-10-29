@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -90,33 +91,24 @@ func NewMyCache(dir string, memTTL int, fileTTL int) *MyCache {
 	return fc
 }
 
+var MYTV_SUPER_REG = regexp.MustCompile(`^https?://[^/]+/session/[^/]+`)
+
 // 生成文件名：<原始文件名>_<md5(key)>
 func fileNameFromKey(key string) string {
-	u, err := url.Parse(key)
-	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
-		// ---- HTTP(S) 情况：主域名 + 路径后两级 ----
-		hostParts := strings.Split(u.Hostname(), ".")
-		domain := u.Hostname()
-		if len(hostParts) >= 2 {
-			domain = strings.Join(hostParts[len(hostParts)-2:], ".")
-		}
-
-		pathParts := strings.Split(strings.Trim(u.Path, "/"), "/")
-		var pathKey string
-		if len(pathParts) >= 2 {
-			pathKey = strings.Join(pathParts[len(pathParts)-2:], "/")
-		} else if len(pathParts) == 1 {
-			pathKey = pathParts[0]
-		}
-
-		h := md5.Sum([]byte(domain + "/" + pathKey))
-		md5Str := hex.EncodeToString(h[:])
-
-		base := filepath.Base(u.Path)
-		return base + "_" + md5Str
-	}
 	base := filepath.Base(key)
 	base = strings.Split(base, "?")[0]
+
+	u, err := url.Parse(key)
+	if err == nil && (u.Scheme == "http" || u.Scheme == "https") {
+		// ---- HTTP(S) 情况：去掉协议、域名、session/ID ----
+		fixedPath := MYTV_SUPER_REG.ReplaceAllString(key, "")
+
+		h := md5.Sum([]byte(fixedPath))
+		md5Str := hex.EncodeToString(h[:])
+		return base + "_" + md5Str
+	}
+
+	// 非 HTTP URL 或解析失败
 	h := md5.Sum([]byte(key))
 	md5Str := hex.EncodeToString(h[:])
 	return base + "_" + md5Str
