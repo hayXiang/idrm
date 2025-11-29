@@ -422,7 +422,7 @@ func main() {
 }
 
 func requestHandler(ctx *fasthttp.RequestCtx) {
-	path := string(ctx.Path())
+	path := string(ctx.URI().PathOriginal())
 
 	switch {
 	case strings.HasPrefix(path, "/drm/proxy/"):
@@ -636,7 +636,11 @@ var M3U8_INIT_REGEXP = regexp.MustCompile(`URI="([^"]+)"`)
 var M3U8_IV_REGEXP = regexp.MustCompile(`IV=0x([0-9A-Fa-f]+)`)
 
 func convert_to_proxy_url(proxy_type string, tvgID string, targetUrl string, baseUrl string, stream_uuid string) string {
-	return fmt.Sprintf("/drm/proxy/%s/%s/%s/%s", proxy_type, tvgID, stream_uuid, strings.Replace(resolveURL(targetUrl, baseUrl), "://", "/", 1))
+	if stream_uuid != "" {
+		stream_uuid = "/" + stream_uuid
+	}
+	url := resolveURL(targetUrl, baseUrl)
+	return fmt.Sprintf("/drm/proxy/%s/%s%s/%s", proxy_type, tvgID, stream_uuid, strings.Replace(url, "://", "/", 1))
 }
 
 func collectBaseURLs(elem *etree.Element) []string {
@@ -869,6 +873,7 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 	lines := strings.Split(strBody, "\n")
 	var newLines []string
 	var lastLineWasExtInf bool
+	var lastLineWasExtStremInf bool
 
 	hash := md5.Sum([]byte(url))
 	stream_uuid := hex.EncodeToString(hash[:])
@@ -918,6 +923,24 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 			lastLineWasExtInf = true
 		}
 
+		if strings.HasPrefix(line, "#EXT-X-STREAM-INF") {
+			lastLineWasExtStremInf = true
+		}
+
+		// 替换 #EXT-X-MEDIA
+		if strings.HasPrefix(line, "#EXT-X-MEDIA:") {
+			matches := M3U8_INIT_REGEXP.FindStringSubmatch(line)
+			if len(matches) == 2 {
+				newURI := convert_to_proxy_url("m3u8", tvgID, matches[1], url, "")
+				line = M3U8_INIT_REGEXP.ReplaceAllString(line, `URI="`+newURI+`"`)
+			}
+		}
+
+		//替换m3u8
+		if lastLineWasExtStremInf && !strings.HasPrefix(line, "http") && !strings.HasPrefix(line, "#") && strings.Contains(line, ".m3u8") {
+			line = convert_to_proxy_url("m3u8", tvgID, line, url, "")
+			lastLineWasExtStremInf = false
+		}
 		newLines = append(newLines, line)
 	}
 
