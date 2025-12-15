@@ -123,25 +123,22 @@ func decryptFromBody(proxy_type string, data []byte, key []byte, sinfBox *mp4.Si
 type DecryptCallback func(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32) error
 
 func decrypt(sinfBox *mp4.SinfBox, mp4File *mp4.File, key []byte, doDecryptFuc DecryptCallback) error {
-	var traf *mp4.TrafBox = nil
-	var frag *mp4.Fragment = nil
-
-	//找到fragment
 	for i := len(mp4File.Segments) - 1; i >= 0; i-- {
 		seg := mp4File.Segments[i]
 		if len(seg.Fragments) > 0 {
-			// 取最后一个 fragment
-			frag = seg.Fragments[len(seg.Fragments)-1]
-			if frag.Moof != nil && len(frag.Moof.Trafs) > 0 {
-				traf = frag.Moof.Trafs[0]
-				break
+			for j := 0; j < len(seg.Fragments); j++ {
+				frag := seg.Fragments[j]
+				if frag.Moof != nil && len(frag.Moof.Trafs) > 0 {
+					traf := frag.Moof.Trafs[0]
+					decryptFragment(sinfBox, key, doDecryptFuc, frag, traf)
+				}
 			}
 		}
 	}
+	return nil
+}
 
-	if traf == nil {
-		return fmt.Errorf("未找到 traf")
-	}
+func decryptFragment(sinfBox *mp4.SinfBox, key []byte, doDecryptFuc DecryptCallback, frag *mp4.Fragment, traf *mp4.TrafBox) error {
 
 	// 查找 SENC box,并删除
 	var senc *mp4.SencBox
