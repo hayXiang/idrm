@@ -86,7 +86,7 @@ var (
 	VISIT_TRACKER              = NewVisitTracker()
 )
 
-var version = "1.0.0.27"
+var version = "1.0.0.28"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
