@@ -883,6 +883,10 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 			continue
 		}
 
+		if strings.HasPrefix(line, "#EXT-X-DATERANGE") {
+			continue
+		}
+
 		// 跳过 KEY（你这里是直接忽略的）
 		if strings.HasPrefix(line, "#EXT-X-KEY:METHOD=") {
 			if _, exists := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); !exists {
