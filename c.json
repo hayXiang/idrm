@@ -26,5 +26,21 @@
 	"url":"https://live.9528.eu.org/s/r1IBc2Ar.m3u",
   "to-hls":true,
   "speed-up":false
-}
+},
+ {
+    "name": "disney",
+    "url": "http://107.173.241.244:36888/disney/vod/index.m3u?token=f9f10a11ec1fc75aaccb8fdebff74f70",
+    "proxy": "http://LUpZbgTCZk:ED8c8oqB2H@129.151.124.214:59171",
+    "headers": [],
+    "best-quality": true,
+    "speed-up": false
+   },
+    {
+    "name": "test2",
+    "url": "https://live.9528.eu.org/s/N34MLSE8.m3u",
+    "proxy": "http://LUpZbgTCZk:ED8c8oqB2H@129.151.124.214:59171",
+    "headers": [],
+    "best-quality": true,
+    "speed-up": false
+   }
 ]
