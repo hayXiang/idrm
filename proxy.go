@@ -86,7 +86,7 @@ var (
 	VISIT_TRACKER              = NewVisitTracker()
 )
 
-var version = "1.0.0.28"
+var version = "1.0.0.29"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -525,7 +525,7 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 	if ctx != nil {
 		schema = GetForwardHeader(ctx, "X-Forwarded-Proto", string(ctx.URI().Scheme()))
 		port = GetForwardHeader(ctx, "X-Forwarded-Port", _port)
-		serverName = GetForwardHeader(ctx, "X-Forwarded-Host", "")
+		serverName = strings.Split(GetForwardHeader(ctx, "X-Forwarded-Host", ""), ":")[0]
 		if serverName == "" {
 			serverName = GetForwardHeader(ctx, "X-Forwarded-Server-Name", _host)
 		}
