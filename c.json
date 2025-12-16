@@ -29,7 +29,7 @@
 },
  {
     "name": "disney",
-    "url": "http://107.173.241.244:36888/disney/vod/index.m3u?token=f9f10a11ec1fc75aaccb8fdebff74f70",
+    "url": "http://107.173.241.244:36888/disney/live/index.m3u?token=f9f10a11ec1fc75aaccb8fdebff74f70",
     "proxy": "http://LUpZbgTCZk:ED8c8oqB2H@129.151.124.214:59171",
     "headers": [],
     "best-quality": true,

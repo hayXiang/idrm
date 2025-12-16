@@ -39,7 +39,9 @@ func isSameFileName(url1, url2 string) bool {
 
 func HttpGet(client *http.Client, startURL string, headers []string) (statusCode int, body []byte, err error, contentType string, url_302 string) {
 	currentURL := startURL
+	is_cached_302_url := false
 	if v, ok := CACHE_302_REDIRECT_URL.Get(startURL); ok {
+		is_cached_302_url = true
 		currentURL = v.(string)
 		log.Printf("使用缓存的302地址：%s", currentURL)
 	}
@@ -66,7 +68,7 @@ func HttpGet(client *http.Client, startURL string, headers []string) (statusCode
 		return resp.StatusCode, nil, errors.New("http get failed," + resp.Status), "", startURL
 	}
 	currentURL = resp.Request.URL.String()
-	if startURL != currentURL && !strings.Contains(currentURL, "https://live.9528.eu.org/error/") {
+	if !is_cached_302_url && startURL != currentURL && !strings.Contains(currentURL, "https://live.9528.eu.org/error/") {
 		if isSameFileName(startURL, currentURL) {
 			CACHE_302_REDIRECT_URL.Add(startURL, currentURL, 1*time.Hour)
 		} else {
