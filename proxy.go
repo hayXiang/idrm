@@ -86,7 +86,7 @@ var (
 	VISIT_TRACKER              = NewVisitTracker()
 )
 
-var version = "1.0.0.29"
+var version = "1.0.0.30"
 
 func loadConfigFile(path string) ([]StreamConfig, error) {
 	f, err := os.ReadFile(path)
@@ -533,7 +533,13 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#EXTM3U") {
+		if line == "" || line == "#EXTM3U" {
+			continue
+		}
+
+		//兼容台标或者其他标签
+		if strings.HasPrefix(line, "#EXTM3U") {
+			newLines = append(newLines, line)
 			continue
 		}
 

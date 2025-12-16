@@ -66,8 +66,12 @@ func HttpGet(client *http.Client, startURL string, headers []string) (statusCode
 		return resp.StatusCode, nil, errors.New("http get failed," + resp.Status), "", startURL
 	}
 	currentURL = resp.Request.URL.String()
-	if startURL != currentURL && isSameFileName(startURL, currentURL) {
-		CACHE_302_REDIRECT_URL.Add(startURL, currentURL, 1*time.Hour)
+	if startURL != currentURL && !strings.Contains(currentURL, "https://live.9528.eu.org/error/") {
+		if isSameFileName(startURL, currentURL) {
+			CACHE_302_REDIRECT_URL.Add(startURL, currentURL, 1*time.Hour)
+		} else {
+			CACHE_302_REDIRECT_URL.Add(startURL, currentURL, 1*time.Minute)
+		}
 	}
 	_body, _ := io.ReadAll(resp.Body)
 	contentType = resp.Header.Get("Content-Type")
