@@ -1,9 +1,9 @@
 [{
-	"name":"mytv",
-	"url":"https://live.9528.eu.org/s/Dl1Jfxda",
-  "proxy": "http://127.0.0.1:7897",
-  "to-hls":true,
-  "speed-up":true
+	"name":"peacock",
+	"url":"https://live.9528.eu.org/peacock/live/index.m3u?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+  "proxy": "http://ZxKVvyxwVP:SNHhUhwzK6@143.14.221.168:40018",
+  "to-hls":false,
+  "speed-up":false
 },
   {
     "name": "nba",

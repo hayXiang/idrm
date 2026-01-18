@@ -957,11 +957,36 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 	return []byte(strings.Join(newLines, "\n"))
 }
 
+// parseISO8601ToSeconds 将 PT1H2M3S 格式转换为秒数
+func parseISO8601ToSeconds(duration string) float64 {
+	re := regexp.MustCompile(`PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?`)
+	matches := re.FindStringSubmatch(duration)
+	if matches == nil {
+		return 0
+	}
+
+	var total float64
+	if matches[1] != "" { // 小时
+		val, _ := strconv.ParseFloat(matches[1], 64)
+		total += val * 3600
+	}
+	if matches[2] != "" { // 分钟
+		val, _ := strconv.ParseFloat(matches[2], 64)
+		total += val * 60
+	}
+	if matches[3] != "" { // 秒
+		val, _ := strconv.ParseFloat(matches[3], 64)
+		total += val
+	}
+	return total
+}
+
 func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, error) {
 	doc := etree.NewDocument()
 	doc.ReadFromBytes(body)
 
-	if mpd := doc.FindElement("//MPD"); mpd != nil {
+	mpd := doc.FindElement("//MPD")
+	if mpd != nil {
 		// 删除 DRM 命名空间
 		mpd.RemoveAttr("xmlns:cenc")
 		mpd.RemoveAttr("xmlns:mspr")
@@ -969,13 +994,33 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 		// 比如 xmlns, xmlns:xsi, xmlns:scte35
 	}
 
-	//只保留最后一个
+	// 2. 获取所有的 Period
 	periods := doc.FindElements("//Period")
 	if len(periods) > 1 {
-		for i := 0; i < len(periods)-1; i++ {
-			parent := periods[i].Parent()
-			if parent != nil {
-				parent.RemoveChild(periods[i])
+		var keepIndex int
+		isStatic := mpd.SelectAttrValue("type", "static") == "static"
+		if isStatic {
+			// VOD 逻辑：选取 duration 最长的那个
+			maxSecs := -1.0
+			for i, p := range periods {
+				dStr := p.SelectAttrValue("duration", "PT0S")
+				secs := parseISO8601ToSeconds(dStr) // 调用下方解析函数
+				if secs > maxSecs {
+					maxSecs = secs
+					keepIndex = i
+				}
+			}
+		} else {
+			// 非 static 逻辑（Live）：保留最后一个
+			keepIndex = len(periods) - 1
+		}
+
+		// 4. 执行删除操作
+		for i, p := range periods {
+			if i != keepIndex {
+				if parent := p.Parent(); parent != nil {
+					parent.RemoveChild(p)
+				}
 			}
 		}
 	}
