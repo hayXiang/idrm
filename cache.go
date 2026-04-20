@@ -431,13 +431,22 @@ func generateFullCacheReport(filterProvider string, filterTvgId string) CacheRep
 	}
 
 	if filterTvgId != "" {
-		if _, ok := CONFIGS_BY_PROVIDER[filterProvider]; !ok {
+		configsMu.RLock()
+		_, ok := CONFIGS_BY_PROVIDER[filterProvider]
+		configsMu.RUnlock()
+		if !ok {
 			return report
 		}
 	}
 
 	// 遍历所有 provider
+	configsMu.RLock()
+	providersCopy := make([]string, 0)
 	for provider := range CONFIGS_BY_PROVIDER {
+		providersCopy = append(providersCopy, provider)
+	}
+	configsMu.RUnlock()
+	for _, provider := range providersCopy {
 		if filterProvider != "" && filterProvider != provider {
 			continue
 		}

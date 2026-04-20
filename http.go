@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -38,6 +39,48 @@ func isSameFileName(url1, url2 string) bool {
 }
 
 func HttpGet(client *http.Client, startURL string, headers []string) (statusCode int, body []byte, err error, contentType string, url_302 string) {
+	const maxRetries = 3
+	var lastErr error
+	var contentLength int64
+	
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			log.Printf("[HttpGet重试] URL=%s, 第%d次重试", startURL, attempt)
+			time.Sleep(time.Duration(attempt) * 500 * time.Millisecond) // 递增延迟
+		}
+		
+		statusCode, body, contentLength, err, contentType, url_302 = httpGetOnce(client, startURL, headers)
+		if err != nil {
+			lastErr = err
+			continue // 出错则重试
+		}
+		
+		// 检查内容大小是否与 Content-Length 一致
+		// 如果 Content-Length = 0 但 body 不为空，直接返回（可能是 chunked 传输）
+		if contentLength == 0 && len(body) > 0 {
+			log.Printf("[HttpGet] URL=%s, Content-Length=0, 实际大小=%d, 直接返回", startURL, len(body))
+			return statusCode, body, nil, contentType, url_302
+		}
+		if contentLength > 0 && int64(len(body)) != contentLength {
+			log.Printf("[HttpGet大小不一致] URL=%s, Content-Length=%d, 实际大小=%d", startURL, contentLength, len(body))
+			lastErr = fmt.Errorf("内容大小不一致: 期望%d, 实际%d", contentLength, len(body))
+			continue // 大小不一致则重试
+		}
+		
+		// 成功返回
+		if attempt > 0 {
+			log.Printf("[HttpGet重试成功] URL=%s, 第%d次重试成功", startURL, attempt)
+		}
+		return statusCode, body, nil, contentType, url_302
+	}
+	
+	// 所有重试都失败
+	log.Printf("[HttpGet失败] URL=%s, 重试%d次后仍然失败: %v", startURL, maxRetries, lastErr)
+	return statusCode, body, lastErr, contentType, url_302
+}
+
+// httpGetOnce 执行单次 HTTP GET 请求，返回内容长度用于校验
+func httpGetOnce(client *http.Client, startURL string, headers []string) (statusCode int, body []byte, contentLength int64, err error, contentType string, url_302 string) {
 	currentURL := startURL
 	is_cached_302_url := false
 	if v, ok := CACHE_302_REDIRECT_URL.Get(startURL); ok {
@@ -47,7 +90,7 @@ func HttpGet(client *http.Client, startURL string, headers []string) (statusCode
 	}
 	req, err := http.NewRequest("GET", currentURL, nil)
 	if err != nil {
-		return 503, nil, err, "", startURL
+		return 503, nil, 0, err, "", startURL
 	}
 
 	for _, head := range headers {
@@ -60,12 +103,12 @@ func HttpGet(client *http.Client, startURL string, headers []string) (statusCode
 	resp, err := client.Do(req)
 	if err != nil {
 		CACHE_302_REDIRECT_URL.Delete(startURL)
-		return 503, nil, err, "", startURL
+		return 503, nil, 0, err, "", startURL
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		CACHE_302_REDIRECT_URL.Delete(startURL)
-		return resp.StatusCode, nil, errors.New("http get failed," + resp.Status), "", startURL
+		return resp.StatusCode, nil, 0, errors.New("http get failed," + resp.Status), "", startURL
 	}
 	currentURL = resp.Request.URL.String()
 	if !is_cached_302_url && startURL != currentURL && !strings.Contains(currentURL, "https://live.9528.eu.org/error/") {
@@ -77,7 +120,7 @@ func HttpGet(client *http.Client, startURL string, headers []string) (statusCode
 	}
 	_body, _ := io.ReadAll(resp.Body)
 	contentType = resp.Header.Get("Content-Type")
-	return resp.StatusCode, _body, err, contentType, currentURL
+	return resp.StatusCode, _body, resp.ContentLength, nil, contentType, currentURL
 }
 
 func GetForwardHeader(ctx *fasthttp.RequestCtx, header, fallback string) string {

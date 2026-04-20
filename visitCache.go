@@ -14,6 +14,7 @@ type VisitTracker struct {
 
 type VisitRecord struct {
 	IP        string
+	Token     string
 	URL       string
 	StreamID  string
 	Timestamp time.Time
@@ -26,7 +27,7 @@ func NewVisitTracker() *VisitTracker {
 }
 
 // 记录访问
-func (v *VisitTracker) RecordVisit(tvgID, ip, url, streamID string) {
+func (v *VisitTracker) RecordVisit(tvgID, ip, token, url, streamID string) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 
@@ -39,6 +40,7 @@ func (v *VisitTracker) RecordVisit(tvgID, ip, url, streamID string) {
 
 	records = append(records, VisitRecord{
 		IP:        ip,
+		Token:     token,
 		URL:       url,
 		StreamID:  streamID,
 		Timestamp: time.Now(),
@@ -64,4 +66,47 @@ func (v *VisitTracker) GetRecentURLs(tvgID string) map[string]VisitRecord {
 		}
 	}
 	return result
+}
+
+// OnlineUser 在线用户信息
+type OnlineUser struct {
+	IP        string    `json:"ip"`
+	Token     string    `json:"token"`
+	TvgID     string    `json:"tvgId"`
+	URL       string    `json:"url"`
+	StreamID  string    `json:"streamId"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// GetAllOnlineUsers 获取所有在线用户
+func (v *VisitTracker) GetAllOnlineUsers() []OnlineUser {
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+
+	var onlineUsers []OnlineUser
+	now := time.Now()
+
+	for key, x := range v.cache.Items() {
+		if records, ok := x.Object.([]VisitRecord); ok {
+			// 从 key 中提取 tvgID
+			tvgID := ""
+			if len(key) > 4 && key[:4] == "tvg:" {
+				tvgID = key[4:]
+			}
+			for _, r := range records {
+				// 只返回30秒内的记录
+				if now.Sub(r.Timestamp) <= 30*time.Second {
+					onlineUsers = append(onlineUsers, OnlineUser{
+						IP:        r.IP,
+						Token:     r.Token,
+						TvgID:     tvgID,
+						URL:       r.URL,
+						StreamID:  r.StreamID,
+						Timestamp: r.Timestamp,
+					})
+				}
+			}
+		}
+	}
+	return onlineUsers
 }

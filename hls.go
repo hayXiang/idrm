@@ -35,6 +35,27 @@ type HLSUpdater struct {
 
 var updaters sync.Map
 
+// stopUpdatersByProvider 停止指定 Provider 的所有 Updater
+func stopUpdatersByProvider(providerName string) {
+	log.Printf("正在停止 Provider %s 的所有 Updater", providerName)
+	count := 0
+	updaters.Range(func(key, value interface{}) bool {
+		upd := value.(*HLSUpdater)
+		if upd.provider == providerName {
+			upd.stopOnce.Do(func() {
+				close(upd.stopCh)
+				updaters.Delete(key)
+				log.Printf("Updater 已停止: %s (tvgID: %s)", providerName, key)
+			})
+			count++
+		}
+		return true
+	})
+	if count > 0 {
+		log.Printf("Provider %s 的 %d 个 Updater 已全部停止", providerName, count)
+	}
+}
+
 func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Client, config *StreamConfig, interval time.Duration) {
 	cachedUpd, exists := updaters.Load(tvgID)
 	if exists {
@@ -68,20 +89,20 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 			}
 
 			_, body, err, contentType, finalURI := HttpGet(u.client, u.mainfestUrl, u.config.Headers)
-			if err != nil {
-				log.Printf("[ERROR] 更新manifest失败 %s，%s, %v", u.tvgID, u.mainfestUrl, err)
+			if err != nil || strings.Contains(finalURI, "/error/") {
+				log.Printf("[ERROR] 更新manifest失败 %s，%s, %v, %s, ", u.tvgID, u.mainfestUrl, err, finalURI)
 				return
 			}
 			var hlsMap = make(map[string]string)
 			var hlsMapLock sync.Mutex
 			var mediaType = "dynamic"
 			if strings.Contains(u.mainfestUrl, ".mpd") || contentType == "application/dash+xml" {
-				body, err = modifyMpd(u.provider, u.tvgID, finalURI, body)
+				body, err = modifyMpd(u.provider, u.tvgID, finalURI, body, "__idrm_user_token__")
 				if err != nil {
 					log.Printf("[ERROR]  重写mpd错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
 				}
-				mediaType, hlsMap, err = DashToHLS(finalURI, body, u.tvgID, *u.config.BestQuality)
+				mediaType, hlsMap, err = DashToHLS(finalURI, body, u.tvgID, *u.config.BestQuality, "")
 				if err != nil {
 					log.Printf("[ERROR]  Dash TO HLS错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
 					return
@@ -89,7 +110,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 				HLS_BY_TVG_ID.Store(u.tvgID, hlsMap)
 				HLS_TYPE_BY_TVG_ID.Store(u.tvgID, mediaType)
 			} else {
-				body = modifyHLS(body, u.tvgID, finalURI, *u.config.BestQuality)
+				body = modifyHLS(body, u.tvgID, finalURI, *u.config.BestQuality, "__idrm_user_token__", false)
 				urls, err := HLSParse(body, finalURI)
 				if err != nil {
 					log.Printf("[ERROR] HLS解析错误 %s，%s, %s", u.tvgID, u.mainfestUrl, err)
@@ -106,7 +127,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 							fmt.Println("请求失败:", _url, err)
 							return
 						}
-						modifyBody := modifyHLS(body, u.tvgID, finalURI, *u.config.BestQuality)
+						modifyBody := modifyHLS(body, u.tvgID, finalURI, *u.config.BestQuality, "__idrm_user_token__")
 						hlsMapLock.Lock()
 						m3u8Content := string(modifyBody)
 						hlsMap[_key+".m3u8"] = m3u8Content
@@ -239,7 +260,7 @@ func GetMaxSegmentDurationInt(adp *etree.Element) int {
 }
 
 // 返回 HLS playlists 内容，key = filename, value = m3u8 内容
-func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool) (string, map[string]string, error) {
+func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userToken string) (string, map[string]string, error) {
 	doc := etree.NewDocument()
 	hlsMap := make(map[string]string)
 
@@ -301,13 +322,13 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool) (stri
 			case "text", "subtitle":
 				lang := adap.SelectAttrValue("lang", "und")
 				masterBuilder.WriteString(fmt.Sprintf(
-					`#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=NO,FORCED=NO,URI="/drm/proxy/hls/%s/%s"`+"\n",
-					lang, lang, tvgId, playlistName))
+					`#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=NO,FORCED=NO,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
+					lang, lang, tvgId, userToken, playlistName))
 			case "audio":
 				lang := adap.SelectAttrValue("lang", "und")
 				masterBuilder.WriteString(fmt.Sprintf(
-					`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s"`+"\n",
-					groupID, lang, lang, tvgId, playlistName))
+					`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
+					groupID, lang, lang, tvgId, userToken, playlistName))
 			default:
 				line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio"`,
 					bandwidth, resolution, codecs)
@@ -315,7 +336,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool) (stri
 					line += `,SUBTITLES="subs"`
 				}
 				masterBuilder.WriteString(line + "\n")
-				masterBuilder.WriteString(fmt.Sprintf("/drm/proxy/hls/%s/%s\n", tvgId, playlistName))
+				masterBuilder.WriteString(fmt.Sprintf("/drm/proxy/hls/%s/%s/%s\n", tvgId, userToken, playlistName))
 			}
 
 			// 生成 media playlist
@@ -422,18 +443,22 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool) (stri
 func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4sUrl string) {
 	cache := SEGMENT_CACHE_BY_PROVIDER[provider]
 	client := CLIENTS_BY_PROVIDER[provider]
+	configsMu.RLock()
 	config := CONFIGS_BY_PROVIDER[provider]
+	configsMu.RUnlock()
 	//需要先下载initM4s，才能获取到解密需要的信息。
 	// 先确保 init.m4s 已下载并解析
 	initReaderChan := make(chan struct{})
+	var initStreamUUID, initURL string
 	if initM4sUrl != "" {
-		// 替换成真实 URL
-		url := strings.Replace(initM4sUrl, "/drm/proxy/init-m4s/"+tvgID, "", 1)
-		stream_uuid := strings.Split(url, "/")[1]
-		url = strings.Replace(url, "/"+stream_uuid, "", 1)
-		url = strings.Replace(url, "/http/", "http://", 1)
-		url = strings.Replace(url, "/https/", "https://", 1)
-		_, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid)
+		// 解析代理URL: /drm/proxy/init-m4s/{tvgID}/{userToken}/{stream_uuid}/http/...
+		parts := strings.SplitN(initM4sUrl, "/", 8)
+		if len(parts) >= 8 {
+			initStreamUUID = parts[6]
+			initURL = strings.Replace(parts[7], "http/", "http://", 1)
+			initURL = strings.Replace(initURL, "https/", "https://", 1)
+		}
+		_, ok := SINF_BOX_BY_STREAM_ID.Load(initStreamUUID)
 		if ok {
 			close(initReaderChan)
 		} else {
@@ -441,10 +466,10 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				start := time.Now()
 				defer func() {
 					close(initReaderChan)
-					log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
+					log.Printf("下载结束：%s, %s，%s, 耗时：%s", "preloader", tvgID, initURL, utils.FormatDuration(time.Since(start)))
 				}()
-				log.Printf("下载错误：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
-				_, responseBody, err, contentType, _ := HttpGet(client, url, config.Headers)
+				log.Printf("下载错误：%s, %s，%s, 耗时：%s", "preloader", tvgID, initURL, utils.FormatDuration(time.Since(start)))
+				_, responseBody, err, contentType, _ := HttpGet(client, initURL, config.Headers)
 				if err != nil {
 					log.Printf("init.m4s 下载失败: %v", err)
 					return
@@ -454,9 +479,9 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				if err != nil {
 					return
 				}
-				SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinfBox)
+				SINF_BOX_BY_STREAM_ID.Store(initStreamUUID, sinfBox)
 				if cache != nil {
-					cache.Set(url, body, MyMetadata{contentType, tvgID, 0})
+					cache.Set(initURL, body, MyMetadata{contentType, tvgID, 0})
 				}
 			}()
 		}
@@ -469,11 +494,14 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 		if strings.HasPrefix(segURL, "/drm/proxy/ts") {
 			proxy_type = "ts"
 		}
-		segURL = strings.Replace(segURL, "/drm/proxy/"+proxy_type+"/"+tvgID, "", 1)
-		stream_uuid := strings.Split(segURL, "/")[1]
-		segURL = strings.Replace(segURL, "/"+stream_uuid, "", 1)
-		segURL = strings.Replace(segURL, "/http/", "http://", 1)
-		segURL = strings.Replace(segURL, "/https/", "https://", 1)
+		// 解析代理URL: /drm/proxy/{type}/{tvgID}/{userToken}/{stream_uuid}/http/...
+		parts := strings.SplitN(segURL, "/", 8)
+		var streamUUID string
+		if len(parts) >= 8 {
+			streamUUID = parts[6]
+			segURL = strings.Replace(parts[7], "http/", "http://", 1)
+			segURL = strings.Replace(segURL, "https/", "https://", 1)
+		}
 
 		// 先看缓存
 		if data, _, _, _ := cache.Get(segURL); data != nil {
@@ -482,7 +510,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 		}
 
 		if canRequest, _ := rm.TryRequest(segURL); canRequest {
-			go func(url string) {
+			go func(url string, segStreamUUID string) {
 				defer func() {
 					rm.DoneRequest(url)
 					log.Printf("预加载结束：%s, %s，%s", "preloader", tvgID, url)
@@ -498,7 +526,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				}
 				<-initReaderChan
 				var sinfBox *mp4.SinfBox
-				v, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid)
+				v, ok := SINF_BOX_BY_STREAM_ID.Load(segStreamUUID)
 				if ok {
 					sinfBox = v.(*mp4.SinfBox)
 				}
@@ -511,7 +539,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				if cache != nil {
 					cache.Set(url, body, MyMetadata{contentType, tvgID, 0})
 				}
-			}(segURL)
+			}(segURL, streamUUID)
 		}
 	}
 }

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"embed"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -17,6 +17,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"net/url"
+	"os"
 	"path"
 	"regexp"
 	"runtime"
@@ -27,8 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"os"
-
 	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/beevik/etree"
 	"github.com/patrickmn/go-cache"
@@ -36,26 +35,10 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-// ---------- 数据结构 ----------
-type StreamConfig struct {
-	Name                     string   `json:"name"`
-	URL                      string   `json:"url"`
-	Headers                  []string `json:"headers"`
-	UserAgent                *string  `json:"user-agent"`
-	LicenseUrlHeaders        []string `json:"license-url-headers"`
-	Proxy                    string   `json:"proxy"`
-	M3uProxy                 string   `json:"m3u-proxy"`
-	M3uUserAgent             *string  `json:"m3u-user-agent"`
-	BestQuality              *bool    `json:"best-quality"`
-	ToFmp4OverHls            *bool    `json:"to-hls"`
-	SpeedUp                  *bool    `json:"speed-up"`
-	HttpTimeout              *int     `json:"http-timeout"`
-	ManifestCacheExpire      *int     `json:"cache-manifest"`
-	SegmentMemoryCacheExpire *int     `json:"cache-segment-memory"`
-	SegmentFileCacheExpire   *int     `json:"cache-segment-file"`
-	CacheDir                 *string  `json:"cache-dir"`
-	DrmType                  *string  `json:"drm-type"`
-}
+//go:embed dist
+var distFS embed.FS
+
+// 注意: StreamConfig 已移至 config.go
 
 // ---------- 支持多次传参的 flag ----------
 type multiFlag []string
@@ -72,8 +55,10 @@ func (m *multiFlag) Set(value string) error {
 var (
 	PUBLISH_ADDRESS            string
 	BIND_ADDRESS               string
+	CACHE_DIR                  string       // 缓存目录，由命令行参数设置
 	PROVIDER_BY_TVG_ID         = sync.Map{} // map[tvgID]providerName
 	CONFIGS_BY_PROVIDER        = make(map[string]*StreamConfig)
+	configsMu                  sync.RWMutex // 保护 CONFIGS_BY_PROVIDER 的读写锁
 	CLIENTS_BY_PROVIDER        = make(map[string]*http.Client)
 	M3U_CLIENT_BY_PROVIDER     = make(map[string]*http.Client)
 	MANIFEST_CACHE_BY_PROVIDER = make(map[string]*MyCache)
@@ -86,19 +71,7 @@ var (
 	VISIT_TRACKER              = NewVisitTracker()
 )
 
-var version = "1.0.0.31"
-
-func loadConfigFile(path string) ([]StreamConfig, error) {
-	f, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var cfg []StreamConfig
-	if err := json.Unmarshal(f, &cfg); err != nil {
-		return nil, err
-	}
-	return cfg, nil
-}
+var version = "1.0.0.32"
 
 // newHTTPClient 创建支持 SOCKS5 或 HTTP 代理的 net/http Client
 func newHTTPClient(proxyURL string, timeout int) *http.Client {
@@ -185,84 +158,23 @@ func validateHeaderLine(line string) error {
 
 func main() {
 	var (
-		configFile               string
-		name                     string
-		singleInput              string
-		headers                  multiFlag
-		proxyURL                 string
-		userAgent                string
-		m3uProxy                 string
-		m3uUserAgent             string
-		bestQuality              bool
-		toFmp4OverHls            bool
-		speedUp                  bool
-		maxMemory                int64
-		gcInterval               int
-		httpTimeout              int
-		manifestCacheExpire      int
-		segmentMemoryCacheExpire int
-		segmentFileCacheExpire   int
-		cacheDir                 string
+		cacheDir    string
+		enablePprof bool
+		pprofAddr   string
 	)
 
 	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
 
-	flag.StringVar(&configFile, "c", "", "配置文件 (JSON)。使用这种模式，下面的--name, --input, --header, --proxy --user-agent 将无效")
+	// 只保留 -l 参数设置监听地址，其他 Provider 相关参数均忽略
 	flag.StringVar(&BIND_ADDRESS, "listen", "127.0.0.1:1234", "代理服务器监听端口")
 	flag.StringVar(&BIND_ADDRESS, "l", "127.0.0.1:1234", "代理服务器监听端口 (简写)")
-	flag.StringVar(&name, "name", "default", "provider 的名称")
-	flag.StringVar(&singleInput, "input", "", "m3u订阅地址")
-	flag.StringVar(&singleInput, "i", "", "m3u订阅地址（简写）")
-	flag.Var(&headers, "header", "HTTP 请求头，可多次指定")
-	flag.StringVar(&userAgent, "user-agent", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header")
-	flag.StringVar(&userAgent, "A", "okhttp/4.12.0", "自定义 User-Agent, 优先级高于 header (简写)")
-	flag.StringVar(&proxyURL, "proxy", "", "MPD或者M3U8代理设置 (SOCKS5)")
-	flag.StringVar(&PUBLISH_ADDRESS, "publish", "", "发布地址的前缀(公网可以访问的地址）,例如:https://live.9999.eu.org:443")
-	flag.StringVar(&m3uProxy, "m3u-proxy", "", "M3U 请求的代理设置 (SOCKS5)")
-	flag.StringVar(&m3uUserAgent, "m3u-user-agent", "okhttp/4.12.0", "M3U 请求的 User-Agent")
-	flag.BoolVar(&bestQuality, "best-quality", true, "仅保留最高码率的音视频")
-	flag.BoolVar(&toFmp4OverHls, "to-hls", false, "将dash转成fmp4 over hls")
-	flag.BoolVar(&speedUp, "speed-up", false, "预加载分片")
-	flag.Int64Var(&maxMemory, "max-memory", 0, "最大内存使用，单位MB，0表示不限制, 最小值100MB")
-	flag.IntVar(&gcInterval, "auto-gc", 30, "自动垃圾回收间隔，单位秒，0表示不启用, 最小值5秒")
-	flag.IntVar(&httpTimeout, "http-timeout", 15, "默认http请求超时")
 	flag.StringVar(&cacheDir, "cache-dir", "./", "cache 文件的保存路径，默认当前路径")
-	flag.IntVar(&manifestCacheExpire, "cache-manifest", -1, "mpd或者m3u8缓存过期时间，单位秒,-1 表示不开启")
-	flag.IntVar(&segmentMemoryCacheExpire, "cache-segment-memory", -1, "ts或者m4s缓存短期过期时间，单位秒, -1 表示不开启")
-	flag.IntVar(&segmentFileCacheExpire, "cache-segment-file", -1, "ts或者m4s缓存文件最大存活时间，单位秒,-1 表示不开启")
-
-	var enablePprof bool
-	var pprofAddr string
-
 	flag.BoolVar(&enablePprof, "pprof-enable", false, "Enable pprof HTTP server")
 	flag.StringVar(&pprofAddr, "pprof-addr", "localhost:7070", "pprof listen address")
 
 	flag.Parse()
 
-	if gcInterval > 0 {
-		if gcInterval < 5 {
-			gcInterval = 5
-		}
-		startAutoGC(time.Duration(gcInterval) * time.Second)
-	}
-
-	if maxMemory > 0 {
-		if maxMemory < 100 {
-			maxMemory = 100
-		}
-		debug.SetMemoryLimit(maxMemory << 20)
-	}
-	userSet := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "user-agent" || f.Name == "A" {
-			userSet = true
-		}
-	})
-
-	name = strings.TrimSpace(name)
-	proxyURL = strings.TrimSpace(proxyURL)
 	BIND_ADDRESS = strings.TrimSpace(BIND_ADDRESS)
-	PUBLISH_ADDRESS = strings.TrimSpace(PUBLISH_ADDRESS)
 
 	// 处理监听地址
 	if !strings.Contains(BIND_ADDRESS, ":") {
@@ -271,141 +183,17 @@ func main() {
 		BIND_ADDRESS = "127.0.0.1" + BIND_ADDRESS
 	}
 
-	var configs []StreamConfig
-	var err error
-	if configFile != "" {
-		configs, err = loadConfigFile(configFile)
-		if err != nil {
-			log.Fatalf("配置文件加载失败: %v", err)
-		}
-		var ua string = "okhttp/4.12.0"
-		for i := range configs {
-			if configs[i].M3uUserAgent == nil {
-				configs[i].M3uUserAgent = &ua
-			}
-
-			if configs[i].BestQuality == nil {
-				configs[i].BestQuality = &bestQuality
-			}
-
-			if configs[i].ToFmp4OverHls == nil {
-				configs[i].ToFmp4OverHls = &toFmp4OverHls
-			}
-
-			if configs[i].HttpTimeout == nil {
-				configs[i].HttpTimeout = &httpTimeout
-			}
-
-			if configs[i].ManifestCacheExpire == nil {
-				configs[i].ManifestCacheExpire = &manifestCacheExpire
-			}
-
-			if configs[i].SegmentFileCacheExpire == nil {
-				configs[i].SegmentFileCacheExpire = &segmentFileCacheExpire
-			}
-
-			if configs[i].SegmentMemoryCacheExpire == nil {
-				configs[i].SegmentMemoryCacheExpire = &segmentMemoryCacheExpire
-			}
-
-			if configs[i].SpeedUp == nil {
-				configs[i].SpeedUp = &speedUp
-			}
-		}
-	} else if singleInput != "" {
-		var us *string = nil
-		if userSet {
-			us = &userAgent
-		}
-		configs = []StreamConfig{
-			{
-				Name:                     name,
-				URL:                      singleInput,
-				Headers:                  headers,
-				UserAgent:                us,
-				Proxy:                    proxyURL,
-				M3uProxy:                 m3uProxy,
-				M3uUserAgent:             &m3uUserAgent,
-				BestQuality:              &bestQuality,
-				ToFmp4OverHls:            &toFmp4OverHls,
-				HttpTimeout:              &httpTimeout,
-				SegmentMemoryCacheExpire: &segmentMemoryCacheExpire,
-				SegmentFileCacheExpire:   &segmentFileCacheExpire,
-				ManifestCacheExpire:      &manifestCacheExpire,
-				SpeedUp:                  &speedUp,
-			},
-		}
-	} else {
-		flag.Usage()
-		os.Exit(1)
-	}
-
-	// 处理 User-Agent 优先级
-	for i := range configs {
-		var user_agent_index = -1
-		for j, h := range configs[i].Headers {
-			parts := strings.SplitN(h, ":", 2)
-			if len(parts) != 2 {
-				continue // 非法 Header 跳过
-			}
-			key := strings.TrimSpace(strings.ToLower(parts[0]))
-			value := strings.TrimSpace(parts[1])
-			if key == "user-agent" {
-				user_agent_index = j
-				if configs[i].UserAgent == nil {
-					configs[i].UserAgent = &value
-				}
-				break
-			}
-		}
-		ua := "okhttp/4.12.0"
-		if configs[i].UserAgent == nil {
-			configs[i].UserAgent = &ua
-		}
-		if user_agent_index != -1 {
-			// 覆盖已有的 User-Agent
-			configs[i].Headers[user_agent_index] = "User-Agent: " + *configs[i].UserAgent
-		} else {
-			// 添加新的 User-Agent
-			configs[i].Headers = append(configs[i].Headers, "User-Agent: "+*configs[i].UserAgent)
-		}
-	}
-
-	for _, config := range configs {
-		if config.Headers != nil {
-			for _, line := range config.Headers {
-				if err := validateHeaderLine(line); err != nil {
-					log.Fatalf("无效的 header 格式: %s, 错误: %v.", line, err)
-				}
-			}
-		}
-	}
-
+	// 处理缓存目录
 	if !strings.HasSuffix(cacheDir, "/") {
 		cacheDir += "/"
 	}
-	for _, config := range configs {
-		CONFIGS_BY_PROVIDER[config.Name] = &config
-		CLIENTS_BY_PROVIDER[config.Name] = newHTTPClient(config.Proxy, *config.HttpTimeout)
-		M3U_CLIENT_BY_PROVIDER[config.Name] = newHTTPClient(config.M3uProxy, 30)
-		if *config.ManifestCacheExpire >= 0 {
-			MANIFEST_CACHE_BY_PROVIDER[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name+"/manifest", *config.ManifestCacheExpire, -1)
-		}
+	// 设置全局缓存目录（供后续 API 创建的 Provider 使用）
+	CACHE_DIR = cacheDir
 
-		if *config.SegmentFileCacheExpire >= 0 || *config.SegmentMemoryCacheExpire >= 0 || *config.SpeedUp {
-			if *config.SegmentMemoryCacheExpire < 10 {
-				*config.SegmentMemoryCacheExpire = 10
-			}
-			SEGMENT_CACHE_BY_PROVIDER[config.Name] = NewMyCache(cacheDir+"idrm-cache/"+config.Name, *config.SegmentMemoryCacheExpire, *config.SegmentFileCacheExpire)
-		}
-	}
+	// 初始化 API
+	initAPI()
 
-	for _, config := range configs {
-		go func() {
-			loadM3u(nil, config.Name)
-		}()
-	}
-
+	// 启动 pprof 服务（如果启用）
 	if enablePprof {
 		go func() {
 			log.Printf("Starting pprof server on %s", pprofAddr)
@@ -425,16 +213,94 @@ func requestHandler(ctx *fasthttp.RequestCtx) {
 	path := string(ctx.URI().PathOriginal())
 
 	switch {
+	case strings.HasPrefix(path, "/api/"):
+		APIHandler(ctx)
 	case strings.HasPrefix(path, "/drm/proxy/"):
 		proxyStreamURL(ctx, path)
 	case strings.HasSuffix(path, ".m3u"):
-		loadM3u(ctx, "")
+		// 验证用户 token 并获取用户
+		userToken := string(ctx.QueryArgs().Peek("token"))
+		if userToken == "" {
+			ctx.SetStatusCode(fasthttp.StatusForbidden)
+			ctx.SetBodyString("Missing token")
+			return
+		}
+		user := getUserByToken(userToken)
+		if user == nil {
+			ctx.SetStatusCode(fasthttp.StatusForbidden)
+			ctx.SetBodyString("Invalid token")
+			return
+		}
+		loadM3u(ctx, "", userToken)
 	case strings.HasPrefix(path, "/stats/cache"):
 		CacheStatsHandler(ctx)
 	default:
-		ctx.SetStatusCode(fasthttp.StatusNotFound)
-		ctx.SetBodyString("Not Found")
+		// 尝试提供静态文件服务
+		serveStaticFiles(ctx, path)
 	}
+}
+
+// serveStaticFiles 提供嵌入的静态文件服务
+func serveStaticFiles(ctx *fasthttp.RequestCtx, path string) {
+	// 如果路径是根目录，返回 index.html
+	if path == "/" || path == "" {
+		path = "/index.html"
+	}
+
+	// 构建文件路径
+	filePath := "dist" + path
+
+	// 尝试读取文件
+	content, err := distFS.ReadFile(filePath)
+	if err != nil {
+		// 文件不存在，返回 index.html（支持前端路由）
+		content, err = distFS.ReadFile("dist/index.html")
+		if err != nil {
+			ctx.SetStatusCode(fasthttp.StatusNotFound)
+			ctx.SetBodyString("Not Found")
+			return
+		}
+		// 返回 index.html
+		ctx.SetContentType("text/html; charset=utf-8")
+		ctx.SetStatusCode(fasthttp.StatusOK)
+		ctx.SetBody(content)
+		return
+	}
+
+	// 设置 Content-Type
+	contentType := "application/octet-stream"
+	switch {
+	case strings.HasSuffix(path, ".html"):
+		contentType = "text/html; charset=utf-8"
+	case strings.HasSuffix(path, ".js"):
+		contentType = "application/javascript; charset=utf-8"
+	case strings.HasSuffix(path, ".css"):
+		contentType = "text/css; charset=utf-8"
+	case strings.HasSuffix(path, ".json"):
+		contentType = "application/json; charset=utf-8"
+	case strings.HasSuffix(path, ".png"):
+		contentType = "image/png"
+	case strings.HasSuffix(path, ".jpg"), strings.HasSuffix(path, ".jpeg"):
+		contentType = "image/jpeg"
+	case strings.HasSuffix(path, ".gif"):
+		contentType = "image/gif"
+	case strings.HasSuffix(path, ".svg"):
+		contentType = "image/svg+xml"
+	case strings.HasSuffix(path, ".ico"):
+		contentType = "image/x-icon"
+	case strings.HasSuffix(path, ".woff"):
+		contentType = "font/woff"
+	case strings.HasSuffix(path, ".woff2"):
+		contentType = "font/woff2"
+	case strings.HasSuffix(path, ".ttf"):
+		contentType = "font/ttf"
+	case strings.HasSuffix(path, ".eot"):
+		contentType = "application/vnd.ms-fontobject"
+	}
+
+	ctx.SetContentType(contentType)
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(content)
 }
 
 var reTvg = regexp.MustCompile(`tvg-id="([^"]+)"`)
@@ -444,12 +310,164 @@ var reBW = regexp.MustCompile(`BANDWIDTH=(\d+)`)
 var reLang = regexp.MustCompile(`LANGUAGE="([^"]+)"`)
 var clearKeysMap = sync.Map{} // map[tvgID]clearkey
 
+// handleCustomProviderM3U 处理 custom 类型 Provider 的 M3U 生成
+func handleCustomProviderM3U(ctx *fasthttp.RequestCtx, name string, providerID string, userToken string) {
+	channelsMu.RLock()
+	channels := apiChannels[providerID]
+	channelsMu.RUnlock()
+
+	var lines []string
+	lines = append(lines, "#EXTM3U")
+
+	// 获取 schema, serverName, port
+	var schema = "http"
+	var port = "1234"
+	var serverName = "127.0.0.1"
+
+	if ctx != nil {
+		if h, p, err := net.SplitHostPort(string(ctx.Host())); err == nil {
+			port = p
+			serverName = h
+		} else {
+			if string(ctx.URI().Scheme()) == "https" {
+				port = "443"
+			} else {
+				port = "80"
+			}
+		}
+		schema = GetForwardHeader(ctx, "X-Forwarded-Proto", string(ctx.URI().Scheme()))
+		port = GetForwardHeader(ctx, "X-Forwarded-Port", port)
+		serverName = strings.Split(GetForwardHeader(ctx, "X-Forwarded-Host", ""), ":")[0]
+		if serverName == "" {
+			serverName = GetForwardHeader(ctx, "X-Forwarded-Server-Name", serverName)
+		}
+	} else {
+		if PUBLISH_ADDRESS != "" {
+			if u, err := url.Parse(PUBLISH_ADDRESS); err == nil {
+				schema = u.Scheme
+				serverName = u.Hostname()
+				port = u.Port()
+				if port == "" {
+					if schema == "https" {
+						port = "443"
+					} else {
+						port = "80"
+					}
+				}
+			}
+		} else if BIND_ADDRESS != "" {
+			if h, p, err := net.SplitHostPort(BIND_ADDRESS); err == nil {
+				serverName = h
+				port = p
+			}
+		}
+	}
+
+	prefixAddress := fmt.Sprintf("%s://%s:%s", schema, serverName, port)
+	if PUBLISH_ADDRESS != "" {
+		prefixAddress = PUBLISH_ADDRESS
+	}
+
+	for _, channel := range channels {
+		if !channel.Enabled {
+			continue
+		}
+
+		// 构建 EXTINF 行
+		extInf := fmt.Sprintf(`#EXTINF:-1 tvg-id="%s"`, channel.TvgID)
+		if channel.GroupTitle != "" {
+			extInf += fmt.Sprintf(` group-title="%s"`, channel.GroupTitle)
+		}
+		if channel.Logo != "" {
+			extInf += fmt.Sprintf(` tvg-logo="%s"`, channel.Logo)
+		}
+		extInf += "," + channel.Name
+		lines = append(lines, extInf)
+
+		// 添加 Kodi DRM 配置（如果有）
+		if channel.DRM != nil && channel.DRM.Type == "clearkey" {
+			drmLine := fmt.Sprintf(`#KODIPROP:inputstream.adaptive.drm_legacy=org.w3.clearkey|%s:%s`,
+				channel.DRM.KeyID, channel.DRM.Key)
+			lines = append(lines, drmLine)
+		}
+
+		// 构建代理 URL
+		contentType := "m3u8"
+		if strings.Contains(channel.URL, ".mpd") {
+			contentType = "mpd"
+		}
+
+		var proxyPath string
+		configsMu.RLock()
+		config := CONFIGS_BY_PROVIDER[name]
+		configsMu.RUnlock()
+		if config != nil && *(config.ToFmp4OverHls) && contentType == "mpd" {
+			proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/%s/index.m3u8", prefixAddress, contentType, channel.TvgID, userToken)
+		} else {
+			proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/%s/%s", prefixAddress, contentType, channel.TvgID, userToken,
+				strings.Replace(channel.URL, "://", "/", 1))
+		}
+		lines = append(lines, proxyPath)
+	}
+
+	result := strings.Join(lines, "\n")
+	if ctx != nil {
+		ctx.SetContentType("application/vnd.apple.mpegurl")
+		ctx.SetBodyString(result)
+	}
+
+	log.Printf("Custom Provider %s M3U 已生成，共 %d 个频道", name, len(lines)/2)
+}
+
 // 使用示例
-func loadM3u(ctx *fasthttp.RequestCtx, name string) {
+// updateProviderStatus 更新 Provider 状态
+func updateProviderStatus(providerID string, status string, message string) {
+	providersMu.Lock()
+	defer providersMu.Unlock()
+	if provider, exists := apiProviders[providerID]; exists {
+		provider.Status = status
+		provider.StatusMessage = message
+	}
+}
+
+func loadM3u(ctx *fasthttp.RequestCtx, name string, userToken string) {
 	if ctx != nil {
 		name = getAliasFromPath(string(ctx.URI().Path()))
 	}
+	// 如果 userToken 为空，尝试从 query 参数获取（用于后台加载）
+	if userToken == "" && ctx != nil {
+		userToken = string(ctx.QueryArgs().Peek("token"))
+	}
+	// 验证用户 token（后台加载时 userToken 为空，跳过验证）
+	if userToken != "" && ctx != nil {
+		user := getUserByToken(userToken)
+		if user == nil {
+			ctx.SetStatusCode(fasthttp.StatusForbidden)
+			ctx.SetBodyString("Invalid token")
+			return
+		}
+		// 非管理员用户检查是否有权限访问该 Provider
+		if user.Role != "admin" {
+			// 获取 Provider ID
+			pid := getProviderIDByName(name)
+			// 检查用户是否有权限访问该 Provider
+			hasPermission := false
+			for _, allowedID := range user.AllowedProviders {
+				if allowedID == pid {
+					hasPermission = true
+					break
+				}
+			}
+			if !hasPermission {
+				ctx.SetStatusCode(fasthttp.StatusForbidden)
+				ctx.SetBodyString("No permission to access this provider")
+				return
+			}
+		}
+	}
+	configsMu.RLock()
 	config, ok := CONFIGS_BY_PROVIDER[name]
+	configsMu.RUnlock()
 	if !ok {
 		if ctx != nil {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
@@ -457,21 +475,51 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 		}
 		return
 	}
+
+	// 获取 Provider ID 和类型
+	providerID := getProviderIDByName(name)
+	providerType := ""
+	providersMu.RLock()
+	if provider, exists := apiProviders[providerID]; exists {
+		providerType = provider.Type
+	}
+	providersMu.RUnlock()
+
+	// 如果是 custom 类型，直接从 apiChannels 生成 M3U
+	if providerType == "custom" {
+		handleCustomProviderM3U(ctx, name, providerID, userToken)
+		return
+	}
+
 	log.Printf("开始加载M3u: %s, %s, User-Agent:%s", name, config.URL, *config.UserAgent)
 	var count = 0
 	var body []byte
+
+	// 清空旧频道数据
+	if providerID != "" {
+		channelsMu.Lock()
+		delete(apiChannels, providerID)
+		apiChannels[providerID] = make(map[string]*Channel)
+		channelsMu.Unlock()
+	}
+
 	if strings.HasPrefix(config.URL, "http") {
-		_, resonseBody, err, _, _ := HttpGet(M3U_CLIENT_BY_PROVIDER[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent})
+		statusCode, resonseBody, err, _, _ := HttpGet(M3U_CLIENT_BY_PROVIDER[name], config.URL, []string{"user-agent: " + *config.M3uUserAgent})
 		if err != nil {
 			if ctx != nil {
 				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 				ctx.SetBodyString("无法获取 M3U")
 			}
-			log.Printf("[ERROR]无法获取 M3U: %s, %s, %v", name, config.URL, err)
+			errorMsg := fmt.Sprintf("无法获取 M3U: %v", err)
+			if statusCode > 0 {
+				errorMsg = fmt.Sprintf("无法获取 M3U: HTTP %d", statusCode)
+			}
+			log.Printf("[ERROR]%s: %s, %s", errorMsg, name, config.URL)
+			updateProviderStatus(providerID, "error", errorMsg)
 			return
 		}
 		body = resonseBody
-	} else {
+	} else if config.URL != "" {
 		// 本地文件
 		f, err := os.ReadFile(config.URL)
 		if err != nil {
@@ -479,10 +527,19 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 				ctx.SetStatusCode(fasthttp.StatusBadGateway)
 				ctx.SetBodyString("无法读取本地 M3U")
 			}
-			log.Printf("[ERROR]无法读取本地 M3U: %s, %s", name, config.URL)
+			errorMsg := fmt.Sprintf("无法读取本地 M3U: %v", err)
+			log.Printf("[ERROR]%s: %s, %s", errorMsg, name, config.URL)
+			updateProviderStatus(providerID, "error", errorMsg)
 			return
 		}
 		body = f
+	} else {
+		// 空 URL，返回空 M3U
+		if ctx != nil {
+			ctx.SetContentType("application/vnd.apple.mpegurl")
+			ctx.SetBodyString("#EXTM3U\n")
+		}
+		return
 	}
 	lines := strings.Split(string(body), "\n")
 	if len(lines) > 0 && !strings.HasPrefix(lines[0], "#EXT") {
@@ -490,17 +547,20 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 			ctx.SetStatusCode(fasthttp.StatusBadGateway)
 			ctx.SetBodyString("非法的M3U内容")
 		}
-		log.Printf("[ERROR]非法的M3U内容: %s, %s", name, config.URL)
+		errorMsg := "非法的M3U内容"
+		log.Printf("[ERROR]%s: %s, %s", errorMsg, name, config.URL)
 		if len(body) > 500 {
 			log.Printf("[ERROR] 非法M3U内容过长: %s, 前500字符: %s", name, string(body[:500]))
 		} else {
 			log.Printf("[ERROR] 非法M3U内容: %s, %s", name, string(body))
 		}
+		updateProviderStatus(providerID, "error", errorMsg)
 		return
 	}
 	base, _ := url.Parse(config.URL)
 
 	var tvgID, clearkey string
+	var channelName, groupTitle, logo string
 	var newLines []string
 	newLines = append(newLines, "#EXTM3U")
 
@@ -519,15 +579,38 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 			}
 		}
 	}
-	var schema = ""
-	var port = ""
-	var serverName = ""
+	var schema = "http"
+	var port = "1234"
+	var serverName = "127.0.0.1"
 	if ctx != nil {
 		schema = GetForwardHeader(ctx, "X-Forwarded-Proto", string(ctx.URI().Scheme()))
 		port = GetForwardHeader(ctx, "X-Forwarded-Port", _port)
 		serverName = strings.Split(GetForwardHeader(ctx, "X-Forwarded-Host", ""), ":")[0]
 		if serverName == "" {
 			serverName = GetForwardHeader(ctx, "X-Forwarded-Server-Name", _host)
+		}
+	} else {
+		// 后台加载时使用 PUBLISH_ADDRESS 或 BIND_ADDRESS
+		if PUBLISH_ADDRESS != "" {
+			// 解析 PUBLISH_ADDRESS
+			if u, err := url.Parse(PUBLISH_ADDRESS); err == nil {
+				schema = u.Scheme
+				serverName = u.Hostname()
+				port = u.Port()
+				if port == "" {
+					if schema == "https" {
+						port = "443"
+					} else {
+						port = "80"
+					}
+				}
+			}
+		} else if BIND_ADDRESS != "" {
+			// 解析 BIND_ADDRESS
+			if h, p, err := net.SplitHostPort(BIND_ADDRESS); err == nil {
+				serverName = h
+				port = p
+			}
 		}
 	}
 
@@ -544,12 +627,24 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 		}
 
 		// 解析 EXTINF 行
-		if strings.HasPrefix(line, "#EXTINF") && (strings.Contains(line, "tvg-logo") || strings.Contains(line, "group-title") || strings.Contains(line, "tvg-id")) {
+		if strings.HasPrefix(line, "#EXTINF") {
 			matches := reTvg.FindStringSubmatch(line)
 			if len(matches) == 2 {
 				tvgID = matches[1]
 			} else {
 				tvgID = "unknown"
+			}
+			// 提取频道名称（逗号后面）
+			if idx := strings.LastIndex(line, ","); idx != -1 {
+				channelName = strings.TrimSpace(line[idx+1:])
+			}
+			// 提取 group-title
+			if matches := regexp.MustCompile(`group-title="([^"]+)"`).FindStringSubmatch(line); len(matches) == 2 {
+				groupTitle = matches[1]
+			}
+			// 提取 tvg-logo
+			if matches := regexp.MustCompile(`tvg-logo="([^"]+)"`).FindStringSubmatch(line); len(matches) == 2 {
+				logo = matches[1]
 			}
 			newLines = append(newLines, line)
 			continue
@@ -597,7 +692,10 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 				prefixAddress = PUBLISH_ADDRESS
 			}
 			var proxyPath = ""
-			if *(CONFIGS_BY_PROVIDER[name].ToFmp4OverHls) && content_type == "mpd" {
+			configsMu.RLock()
+			toFmp4OverHls := *CONFIGS_BY_PROVIDER[name].ToFmp4OverHls
+			configsMu.RUnlock()
+			if toFmp4OverHls && content_type == "mpd" {
 				var suffix = ""
 				if strings.Contains(suffix, ".m3u8") {
 					suffix = ".m3u8"
@@ -605,25 +703,64 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 				if strings.Contains(suffix, ".mpd") {
 					suffix = ".mpd"
 				}
-				if *CONFIGS_BY_PROVIDER[name].ToFmp4OverHls {
+				if toFmp4OverHls {
 					suffix = ".m3u8"
 				}
-				proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/index%s",
+				proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/%s/index%s",
 					prefixAddress,
 					content_type,
 					tvgID,
+					userToken,
 					suffix,
 				)
 			} else {
-				proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/%s",
+				proxyPath = fmt.Sprintf("%s/drm/proxy/%s/%s/%s/%s",
 					prefixAddress,
 					content_type,
 					tvgID,
+					userToken,
 					strings.Replace(u.String(), "://", "/", 1))
 			}
 			RAW_URL_BY_TVG_ID.Store(tvgID, u.String())
 			newLines = append(newLines, proxyPath)
 			count = count + 1
+
+			// 将频道信息存储到 apiChannels
+			if providerID != "" {
+				channel := &Channel{
+					ID:         generateID(),
+					Name:       channelName,
+					TvgID:      tvgID,
+					GroupTitle: groupTitle,
+					Logo:       logo,
+					URL:        u.String(), // 保存原始 URL，不是代理 URL
+					Enabled:    true,
+				}
+				// 如果有 DRM 信息，解析并保存
+				if clearkey != "" {
+					parts := strings.SplitN(clearkey, ":", 2)
+					if len(parts) == 2 {
+						channel.DRM = &DRMInfo{
+							Type:  "clearkey",
+							KeyID: parts[0],
+							Key:   parts[1],
+						}
+					}
+				}
+				channelsMu.Lock()
+				if apiChannels[providerID] == nil {
+					apiChannels[providerID] = make(map[string]*Channel)
+				}
+				apiChannels[providerID][channel.ID] = channel
+				channelsMu.Unlock()
+			}
+
+			// 重置频道相关变量，准备处理下一个频道
+			tvgID = "unknown"
+			clearkey = ""
+			channelName = ""
+			groupTitle = ""
+			logo = ""
 		}
 	}
 	var extra = ""
@@ -631,6 +768,17 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 		extra += fmt.Sprintf(", 发布地址: %s/%s.m3u", PUBLISH_ADDRESS, name)
 	}
 	log.Printf("结束加载M3u: %s, 一共%d个频道, 访问地址: http://%s/%s.m3u%s", name, count, BIND_ADDRESS, name, extra)
+
+	// 更新 Provider 的频道数量
+	updateProviderChannelCount(name, count)
+
+	// 清除 Provider 的错误状态
+	updateProviderStatus(providerID, "ok", "")
+
+	// 保存频道数据到文件
+	if providerID != "" {
+		saveChannels()
+	}
 
 	if ctx != nil {
 		ctx.SetStatusCode(fasthttp.StatusOK)
@@ -641,12 +789,16 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string) {
 var M3U8_INIT_REGEXP = regexp.MustCompile(`URI="([^"]+)"`)
 var M3U8_IV_REGEXP = regexp.MustCompile(`IV=0x([0-9A-Fa-f]+)`)
 
-func convert_to_proxy_url(proxy_type string, tvgID string, targetUrl string, baseUrl string, stream_uuid string) string {
-	if stream_uuid != "" {
-		stream_uuid = "/" + stream_uuid
-	}
+func convert_to_proxy_url(proxy_type string, tvgID string, targetUrl string, baseUrl string, stream_uuid string, userToken string) string {
 	url := resolveURL(targetUrl, baseUrl)
-	return fmt.Sprintf("/drm/proxy/%s/%s%s/%s", proxy_type, tvgID, stream_uuid, strings.Replace(url, "://", "/", 1))
+	// 如果 userToken 为空，使用 "__idrm_user_token__" 作为占位符，避免 URL 中出现双斜杠
+	if userToken == "" {
+		userToken = "x__idrm_user_token__x"
+	}
+	if stream_uuid != "" {
+		return fmt.Sprintf("/drm/proxy/%s/%s/%s/%s/%s", proxy_type, tvgID, userToken, stream_uuid, strings.Replace(url, "://", "/", 1))
+	}
+	return fmt.Sprintf("/drm/proxy/%s/%s/%s/%s", proxy_type, tvgID, userToken, strings.Replace(url, "://", "/", 1))
 }
 
 func collectBaseURLs(elem *etree.Element) []string {
@@ -868,7 +1020,12 @@ func parseIV(line string) ([]byte, error) {
 	return iv, nil
 }
 
-func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
+func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken string, convertToProxy ...bool) []byte {
+	// 默认转换为代理地址
+	doConvert := true
+	if len(convertToProxy) > 0 {
+		doConvert = convertToProxy[0]
+	}
 	strBody := string(body)
 
 	// 如果启用最高画质过滤
@@ -914,18 +1071,27 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 		if strings.HasPrefix(line, "#EXT-X-MAP:") {
 			matches := M3U8_INIT_REGEXP.FindStringSubmatch(line)
 			if len(matches) == 2 {
-				newURI := convert_to_proxy_url("init-m4s", tvgID, matches[1], url, stream_uuid)
+				var newURI string
+				if doConvert {
+					newURI = convert_to_proxy_url("init-m4s", tvgID, matches[1], url, stream_uuid, userToken)
+				} else {
+					newURI = resolveURL(matches[1], url)
+				}
 				line = M3U8_INIT_REGEXP.ReplaceAllString(line, `URI="`+newURI+`"`)
 			}
 		}
 
 		// 如果上一行是 EXTINF → 当前行是分片地址
 		if lastLineWasExtInf && !strings.HasPrefix(line, "#") {
-			media_type := "m4s"
-			if strings.Contains(line, ".ts") {
-				media_type = "ts"
+			if doConvert {
+				media_type := "m4s"
+				if strings.Contains(line, ".ts") {
+					media_type = "ts"
+				}
+				line = convert_to_proxy_url(media_type, tvgID, line, url, stream_uuid, userToken)
+			} else {
+				line = resolveURL(line, url)
 			}
-			line = convert_to_proxy_url(media_type, tvgID, line, url, stream_uuid)
 			lastLineWasExtInf = false
 		}
 
@@ -941,14 +1107,23 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool) []byte {
 		if strings.HasPrefix(line, "#EXT-X-MEDIA:") {
 			matches := M3U8_INIT_REGEXP.FindStringSubmatch(line)
 			if len(matches) == 2 {
-				newURI := convert_to_proxy_url("m3u8", tvgID, matches[1], url, "")
+				var newURI string
+				if doConvert {
+					newURI = convert_to_proxy_url("m3u8", tvgID, matches[1], url, "", userToken)
+				} else {
+					newURI = resolveURL(matches[1], url)
+				}
 				line = M3U8_INIT_REGEXP.ReplaceAllString(line, `URI="`+newURI+`"`)
 			}
 		}
 
 		//替换m3u8
 		if lastLineWasExtStremInf && !strings.HasPrefix(line, "http") && !strings.HasPrefix(line, "#") && strings.Contains(line, ".m3u8") {
-			line = convert_to_proxy_url("m3u8", tvgID, line, url, "")
+			if doConvert {
+				line = convert_to_proxy_url("m3u8", tvgID, line, url, "", userToken)
+			} else {
+				line = resolveURL(line, url)
+			}
 			lastLineWasExtStremInf = false
 		}
 		newLines = append(newLines, line)
@@ -981,7 +1156,7 @@ func parseISO8601ToSeconds(duration string) float64 {
 	return total
 }
 
-func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, error) {
+func modifyMpd(provider string, tvgId string, url string, body []byte, userToken string) ([]byte, error) {
 	doc := etree.NewDocument()
 	doc.ReadFromBytes(body)
 
@@ -1054,14 +1229,14 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 				media_type = "jpg"
 			}
 			st.RemoveAttr("media")
-			st.CreateAttr("media", convert_to_proxy_url(media_type, tvgId, media, url, strconv.Itoa(stream_index)))
+			st.CreateAttr("media", convert_to_proxy_url(media_type, tvgId, media, url, strconv.Itoa(stream_index), userToken))
 		}
 
 		init := st.SelectAttrValue("initialization", "")
 		if init != "" {
 			init = joinBaseAndMedia(collectBaseURLs(st), init)
 			st.RemoveAttr("initialization")
-			st.CreateAttr("initialization", convert_to_proxy_url("init-m4s", tvgId, init, url, strconv.Itoa(stream_index)))
+			st.CreateAttr("initialization", convert_to_proxy_url("init-m4s", tvgId, init, url, strconv.Itoa(stream_index), userToken))
 		}
 		stream_index++
 	}
@@ -1075,7 +1250,10 @@ func modifyMpd(provider string, tvgId string, url string, body []byte) ([]byte, 
 		}
 	}
 
-	if *(CONFIGS_BY_PROVIDER[provider].BestQuality) {
+	configsMu.RLock()
+	bestQuality := *CONFIGS_BY_PROVIDER[provider].BestQuality
+	configsMu.RUnlock()
+	if bestQuality {
 		// --- 保留最高码率 Representation ---
 		for _, period := range doc.FindElements("//Period") {
 			for _, aset := range period.FindElements("AdaptationSet") {
@@ -1112,11 +1290,57 @@ func resposneBody(ctx *fasthttp.RequestCtx, data []byte, contentType string) err
 
 var rm = NewRequestManager()
 
+// 全局 token 密钥（实际生产环境应该从配置或环境变量读取）
+var PROXY_TOKEN_SECRET = "idrm-secret-key-change-in-production"
+
+// generateProxyToken 生成代理 URL 的 token
+func generateProxyToken(tvgID string) string {
+	// 简单的 token 生成：tvgID + secret 的 MD5
+	h := md5.New()
+	io.WriteString(h, tvgID+PROXY_TOKEN_SECRET)
+	return hex.EncodeToString(h.Sum(nil))[:16] // 取前16位
+}
+
+// verifyProxyToken 验证代理 URL 的 token
+func verifyProxyToken(tvgID string, token string) bool {
+	expectedToken := generateProxyToken(tvgID)
+	return token == expectedToken
+}
+
+// verifyUserToken 验证用户 token
+func verifyUserToken(ctx *fasthttp.RequestCtx) bool {
+	token := string(ctx.QueryArgs().Peek("token"))
+	if token == "" {
+		return false
+	}
+	// 查找具有该 token 的用户
+	usersMu.RLock()
+	defer usersMu.RUnlock()
+	for _, user := range apiUsers {
+		if user.Token == token {
+			return true
+		}
+	}
+	return false
+}
+
+// getUserByToken 根据 token 获取用户
+func getUserByToken(token string) *User {
+	usersMu.RLock()
+	defer usersMu.RUnlock()
+	for _, user := range apiUsers {
+		if user.Token == token {
+			return user
+		}
+	}
+	return nil
+}
+
 // 代理流 URL
 func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	ctx.Response.Header.Set("Access-Control-Allow-Origin", "*")
-	parts := strings.SplitN(strings.TrimPrefix(path, "/drm/proxy/"), "/", 3)
-	if len(parts) < 3 {
+	parts := strings.SplitN(strings.TrimPrefix(path, "/drm/proxy/"), "/", 4)
+	if len(parts) < 4 {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
 		ctx.SetBodyString("Invalid proxy URL")
 		return
@@ -1124,10 +1348,21 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	query := string(ctx.QueryArgs().QueryString())
 	proxy_type := parts[0]
 	tvgID := parts[1]
-	var proxy_url = parts[2]
+	userToken := parts[2]
+	var proxy_url = parts[3]
+
+	// 验证用户 token（空 token 只允许后台预加载场景使用）
+	if userToken != "" {
+		user := getUserByToken(userToken)
+		if user == nil {
+			ctx.SetStatusCode(fasthttp.StatusForbidden)
+			ctx.SetBodyString("Invalid token")
+			return
+		}
+	}
 	var stream_uuid string = "default"
 	if proxy_type == "m3u8" || proxy_type == "mpd" {
-		if strings.HasPrefix(parts[2], "index.") {
+		if strings.HasPrefix(proxy_url, "index.") {
 			raw_url, ok := RAW_URL_BY_TVG_ID.Load(tvgID)
 			if !ok {
 				ctx.SetStatusCode(fasthttp.StatusBadRequest)
@@ -1168,7 +1403,9 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		return
 	}
 
+	configsMu.RLock()
 	config := CONFIGS_BY_PROVIDER[provider.(string)]
+	configsMu.RUnlock()
 	raw_url, ok := RAW_URL_BY_TVG_ID.Load(tvgID)
 	if !ok {
 		ctx.SetStatusCode(fasthttp.StatusBadRequest)
@@ -1185,6 +1422,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		hls_list, ok := HLS_BY_TVG_ID.Load(tvgID)
 		if ok {
 			body := []byte(hls_list.(map[string]string)[proxy_url])
+			body = []byte(strings.ReplaceAll(string(body), "__idrm_user_token__", userToken))
 			contentType := "application/vnd.apple.mpegurl"
 			ctx.Response.Header.Set("Cache-Control", "no-cache")
 			ctx.SetStatusCode(fasthttp.StatusOK)
@@ -1197,10 +1435,12 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		return
 	}
 
+	is_mainfest_cache := true
 	cache := MANIFEST_CACHE_BY_PROVIDER[provider.(string)]
 	if proxy_type == "m4s" || proxy_type == "ts" {
-		VISIT_TRACKER.RecordVisit(tvgID, getClientIP(ctx), proxy_url, stream_uuid)
+		VISIT_TRACKER.RecordVisit(tvgID, getClientIP(ctx), userToken, proxy_url, stream_uuid)
 		cache = SEGMENT_CACHE_BY_PROVIDER[provider.(string)]
+		is_mainfest_cache = false
 	}
 
 	if cache != nil {
@@ -1209,6 +1449,9 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			log.Printf("资源hit：%s, %s，%s", getClientIP(ctx), tvgID, proxy_url)
 			ctx.SetStatusCode(fasthttp.StatusOK)
 			ctx.Response.Header.Set("IDRM-CACHE", "HIT")
+			if is_mainfest_cache {
+				data = []byte(strings.ReplaceAll(string(data), "__idrm_user_token__", userToken))
+			}
 			resposneBody(ctx, data, dataType)
 			return
 		}
@@ -1269,7 +1512,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 	}
 	body := responseBody
 	if proxy_type == "mpd" || contentType == "application/dash+xml" {
-		body, err = modifyMpd(provider.(string), tvgID, finalURI, body)
+		body, err = modifyMpd(provider.(string), tvgID, finalURI, body, userToken)
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("xml 重写错误")
@@ -1277,7 +1520,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			return
 		}
 		if *config.ToFmp4OverHls {
-			_, hls_list, _ := DashToHLS(finalURI, body, tvgID, *config.BestQuality)
+			_, hls_list, _ := DashToHLS(finalURI, body, tvgID, *config.BestQuality, userToken)
 			HLS_BY_TVG_ID.Store(tvgID, hls_list)
 			body = []byte(hls_list["master.m3u8"])
 			contentType = "application/vnd.apple.mpegurl"
@@ -1290,7 +1533,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "m3u8" {
-		body = modifyHLS(body, tvgID, finalURI, *config.BestQuality)
+		body = modifyHLS(body, tvgID, finalURI, *config.BestQuality, userToken)
 		if strings.Contains(query, "debug") {
 			contentType = "text/plain; charset=utf-8"
 		}
@@ -1315,8 +1558,12 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		if t, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); ok {
 			sinfBox = t.(*mp4.SinfBox)
 		}
-		body, err = fetchAndDecrypt(client, CONFIGS_BY_PROVIDER[provider.(string)], tvgID, body, ctx, sinfBox, proxy_type)
+		configsMu.RLock()
+		config := CONFIGS_BY_PROVIDER[provider.(string)]
+		configsMu.RUnlock()
+		body, err = fetchAndDecrypt(client, config, tvgID, body, ctx, sinfBox, proxy_type)
 		if err != nil {
+			log.Printf("解密m4s错误: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, utils.FormatDuration(time.Since(start)), utils.FormatSize(int64(len(body))))
 			return
 		}
 		if cache != nil {
@@ -1327,8 +1574,12 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		if t, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); ok {
 			sinfBox = t.(*mp4.SinfBox)
 		}
-		body, err = fetchAndDecrypt(client, CONFIGS_BY_PROVIDER[provider.(string)], tvgID, body, ctx, sinfBox, proxy_type)
+		configsMu.RLock()
+		config := CONFIGS_BY_PROVIDER[provider.(string)]
+		configsMu.RUnlock()
+		body, err = fetchAndDecrypt(client, config, tvgID, body, ctx, sinfBox, proxy_type)
 		if err != nil {
+			log.Printf("解密ts错误: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, utils.FormatDuration(time.Since(start)), utils.FormatSize(int64(len(body))))
 			return
 		}
 		if cache != nil {
