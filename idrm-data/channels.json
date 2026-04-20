@@ -1,59 +1,7 @@
 {
   "410d0e6ba61425f2": {
-    "03909a585726eea5": {
-      "id": "03909a585726eea5",
-      "name": "04/19 06:35 Qualifying: Grand Prix of Long Beach - Indycar 2026",
-      "tvgId": "6232937",
-      "groupTitle": "Indycar",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0cjhsT0VnY0xvZXFlcGQuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dDJGU096NVZVb2VidmZWLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9OGE5NjljXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRQWkx3WHl6WDlybEZwSS5wbmdcdTAwMjZkZXNjPUluZHljYXIrJUUyJTgwJUEyK1I1XHUwMDI2aDE9TG9uZytCZWFjaFx1MDAyNmgyPVF1YWxpZnlpbmdcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NTUxNzI1MDAwXHUwMDI2cGljPU1vdG9yc3BvcnRcdTAwMjZ0ZW1wbGF0ZT1iYXNpYy1sYW5kc2NhcGUifQ.kv6eFTOQ_Trrhq-ekeAAfTvVL-fYlXFJads8uEuCEwE",
-      "url": "https://live.9528.eu.org:443/stan/url/6232937.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6232937?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "04e52395d7ff6466": {
-      "id": "04e52395d7ff6466",
-      "name": "04/19 05:30 PL Saturday Wrap: Matchweek 33 - Apr 19",
-      "tvgId": "6350651",
-      "groupTitle": "PL Midweek Wrap",
-      "logo": "https://streamcoimg-a.akamaihd.net/000/635/0651/6350651-Banner-L2-84064b5d2841a8899139e4bd82d49c9a.jpg~liveStartDate=1776547811000~liveEndDate=0~badge=live",
-      "url": "https://live.9528.eu.org:443/stan/url/6350651.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6350651?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "3664ff05b500eb0c": {
-      "id": "3664ff05b500eb0c",
-      "name": "04/19 02:50 Chelsea vs Manchester United",
-      "tvgId": "6329639",
-      "groupTitle": "Premier League",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0NHE5ckZrM1hjS1JkcTYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFlVOWZLeVEwbElhQU9uLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDVGMEZGXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjYlMkZhdHQ3b3pqckc0WVlvN3JGTy5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlKyVFMiU4MCVBMitNVyszM1x1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9UHJlbWllcitMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NTM4MjE0MDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjYlMkZhdHRTWFI2VzFPZHJ4S0E5Ni5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI1JTJGNiUyRmF0dHM1ZFd1Njh5YWljT1BTLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnF1YWxpdHk9dWhkXHUwMDI2dGVhbTE9Q2hlbHNlYVx1MDAyNnRlYW0yPU1hbitVbml0ZWRcdTAwMjZ0ZW1wbGF0ZT10ZWFtdnRlYW0tbGFuZHNjYXBlIn0.k7w-iH8RIusS5aukSvCSwIspT2_fv_tmFpc0-_JYyPE",
-      "url": "https://fastlylive01.stan.video/out/v1/bf728201685d4e63952e83062b4e4bf7/index.mpd?availabilityStart=1776535169\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon%2Cfastly\u0026clearaudio=true\u0026end=1776546314\u0026live=true\u0026maxQuality=hd\u0026start=1776538214",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "0fab8f22ed434b029b67285e66b45349:a5a8a662615e0a6909306f594965dd17"
-      }
-    },
-    "3f10078349314ac5": {
-      "id": "3f10078349314ac5",
-      "name": "04/19 23:20 Manchester City vs Arsenal",
-      "tvgId": "6329638",
-      "groupTitle": "Premier League",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0NHE5ckZrM1hjS1JkcTYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFlVOWZLeVEwbElhQU9uLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDVGMEZGXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjYlMkZhdHQ3b3pqckc0WVlvN3JGTy5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlKyVFMiU4MCVBMitNVyszM1x1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9UHJlbWllcitMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjEyMDE1MDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjYlMkZhdHRQS0h2Qk5sd0YxajV6Yy5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI1JTJGNiUyRmF0dGEyeDNXSXExcm9qWmlQLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnF1YWxpdHk9dWhkXHUwMDI2dGVhbTE9TWFuK0NpdHlcdTAwMjZ0ZWFtMj1BcnNlbmFsXHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9.A-j3nzxuAABMNOAxcfRCxfb1fen7T7MxVocyMoHnziE",
-      "url": "https://fastlylive02.stan.video/out/v1/d7545864733d4be18420b1154504395d/index.mpd?availabilityStart=1776608917\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon%2Cfastly\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776612015",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "e0f6eea0f9c64289919c6ec1c17ceed4:ec8ef91711e89ab5967504980a422918"
-      }
-    },
-    "48666cfb33968bb6": {
-      "id": "48666cfb33968bb6",
+    "0450518aa49ed291": {
+      "id": "0450518aa49ed291",
       "name": "04/19 09:55 Hong Kong Day 3: Session 1 - World Rugby Sevens Series 2025/26",
       "tvgId": "5661283",
       "groupTitle": "World Sevens Series",
@@ -65,138 +13,8 @@
         "value": "db42be5f5af74961ae7b0227746bdb04:e4698b8d107872825a5854da10e1a207"
       }
     },
-    "4e21b63a20d82659": {
-      "id": "4e21b63a20d82659",
-      "name": "04/19 15:23 Pohang Steelers vs FC Anyang",
-      "tvgId": "6234891",
-      "groupTitle": "K League",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkY3JTJGYXR0REk4bmtzMDVHZXF1ZW8uanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGNyUyRmF0dERGYzhuQnBud3BrU2tSLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9NjM2MzYzXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjclMkZhdHRGZWJoUHhQSDNxQjJ5aC5wbmdcdTAwMjZkZXNjPUsrTGVhZ3VlKyVFMiU4MCVBMitNVys4XHUwMDI2aDE9Rm9vdGJhbGxcdTAwMjZoMj1LK0xlYWd1ZVx1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY1ODM0MjIwMDBcdTAwMjZsb2dvMT0lMkZjbXMlMkYyMDI1JTJGNyUyRmF0dEFJd1Z4cDM1d042MVo2LnBuZ1x1MDAyNmxvZ28yPSUyRmNtcyUyRjIwMjUlMkY3JTJGYXR0ajFoMWZQeXdQTTBqOG8ucG5nXHUwMDI2cGljPUZvb3RiYWxsXHUwMDI2dGVhbTE9UG9oYW5nXHUwMDI2dGVhbTI9QW55YW5nXHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9._OUHD8LTIsgbF-cKDzzMPECl46FdkrYYVidqHAyHYyg",
-      "url": "https://live.9528.eu.org:443/stan/url/6234891.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6234891?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "5186e930c049b521": {
-      "id": "5186e930c049b521",
-      "name": "04/19 00:31 Ireland vs Italy",
-      "tvgId": "5695610",
-      "groupTitle": "Women's Six Nations",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjQlMkYxMiUyRmF0dGdqYWlRTlJhM1Q4MzFpLmpwZ1x1MDAyNmJhY2tncm91bmRJbWdQb3N0ZXI9JTJGY21zJTJGMjAyNCUyRjEyJTJGYXR0UlpFYzlmdkdRMnV0eHYuanBnXHUwMDI2YmFkZ2U9bGl2ZVx1MDAyNmNvbXBDb2xvcj0wYTA0MDZcdTAwMjZjb21wTG9nbz0lMkZjbXMlMkYyMDI0JTJGMTIlMkZhdHQ0b3ZTMjBEeVhvVzY1NC5wbmdcdTAwMjZkZXNjPVc2TislRTIlODAlQTIrUjJcdTAwMjZoMT1SdWdieVx1MDAyNmgyPVdvbWVuJTI3cytTaXgrTmF0aW9uc1x1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY1Mjk4NzAwMDBcdTAwMjZsb2dvMT0lMkZjbXMlMkYyMDI1JTJGMSUyRmF0dHE3Z1FrMnNja0FXVWV3LnBuZ1x1MDAyNmxvZ28yPSUyRmNtcyUyRjIwMjUlMkYxJTJGYXR0YU5paVdmZ2pSV3NRSTUucG5nXHUwMDI2cGljPVJ1Z2J5XHUwMDI2dGVhbTE9SXJlbGFuZFx1MDAyNnRlYW0yPUl0YWx5XHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9.46O6lLQ8KIo35gAnwKir4BXPrvInhjzDfaKnnD2vIQg",
-      "url": "https://live.9528.eu.org:443/stan/url/5695610.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/5695610?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "7cf38a16029772c0": {
-      "id": "7cf38a16029772c0",
-      "name": "04/20 05:30 Race: Grand Prix of Long Beach - Indycar 2026",
-      "tvgId": "6232952",
-      "groupTitle": "Indycar",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0cjhsT0VnY0xvZXFlcGQuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dDJGU096NVZVb2VidmZWLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9OGE5NjljXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRQWkx3WHl6WDlybEZwSS5wbmdcdTAwMjZkZXNjPUluZHljYXIrJUUyJTgwJUEyK1I1XHUwMDI2aDE9TG9uZytCZWFjaFx1MDAyNmgyPVJhY2VcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjM0MjAzMDAwXHUwMDI2cGljPU1vdG9yc3BvcnRcdTAwMjZ0ZW1wbGF0ZT1iYXNpYy1sYW5kc2NhcGUifQ.WoYaC7DQ6tOkurlSExdm2917tnljYQqcxPZvjyGZsX8",
-      "url": "https://fastlylive02.stan.video/out/v1/eba5b2bf48104768bb9cfb5a607026b4/index.mpd?availabilityStart=1776631161\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon\u0026clearaudio=true\u0026end=1776643102\u0026live=true\u0026maxQuality=hd\u0026start=1776634203",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "48cbfe508f5b4d8eb58139a6b93196e8:2db1e5b4b014b6781ef8701c987ec5c7"
-      }
-    },
-    "8003bd3edbcf5c6c": {
-      "id": "8003bd3edbcf5c6c",
-      "name": "04/20 02:00 PL Weekend Wrap: Matchweek 33 - Apr 20",
-      "tvgId": "6350658",
-      "groupTitle": "PL Weekend Wrap",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0ZDZybDJlUUwwVG1GaVguanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFZUOFV6MERzVHBlRnNULmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9NWE4OGZmXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjglMkZhdHQ2b21EZkhsWGUwV1NJZC5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlXHUwMDI2aDE9V2Vla2VuZCtXcmFwXHUwMDI2aDI9TWF0Y2h3ZWVrKzMzXHUwMDI2bGl2ZUVuZERhdGU9MFx1MDAyNmxpdmVTdGFydERhdGU9MTc3NjYyMTYxMjAwMFx1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnRlbXBsYXRlPWJhc2ljLWxhbmRzY2FwZSJ9.ttDntUqknED9EuNy6GoD6SLvHxmKp_S9cAH3JlBHzqo",
-      "url": "https://fastlylive02.stan.video/out/v1/e382123e3dc74061abcb3924715539a7/index.mpd?availabilityStart=1776618718\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=akamai\u0026clearaudio=true\u0026end=1776625084\u0026live=true\u0026maxQuality=hd\u0026start=1776621612",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "c25287feedb04f82a9b748211c87acdd:0fc290549f56c927616f2065a96e2aeb"
-      }
-    },
-    "89a93b1f0c38c10d": {
-      "id": "89a93b1f0c38c10d",
-      "name": "04/19 18:30 Race: 6 Hours of Imola - WEC 2026",
-      "tvgId": "6332131",
-      "groupTitle": "WEC",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0Nm1OWDdXSlRlYjkwNzQuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dFFocXN6cVNQcndxMmRqLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDBhZWVmXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNCUyRjglMkZhdHRMY2RNQlFSUHlvRUFUNS5wbmdcdTAwMjZkZXNjPVdFQyslRTIlODAlQTIrUjFcdTAwMjZoMT02K0hvdXJzK29mK0ltb2xhXHUwMDI2aDI9UmFjZVx1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY1OTQ2MTQwMDBcdTAwMjZwaWM9TW90b3JzcG9ydFx1MDAyNnRlbXBsYXRlPWJhc2ljLWxhbmRzY2FwZSJ9.zwr5C-mMufcquUWK--IzmyRYnCCcODw-v6yNcOf9lr0",
-      "url": "https://live.9528.eu.org:443/stan/url/6332131.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6332131?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "8bd2805b046ca6af": {
-      "id": "8bd2805b046ca6af",
-      "name": "04/19 19:00 Race Day Part 1: Trentino - MXGP 2026",
-      "tvgId": "6302173",
-      "groupTitle": "MXGP",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0OEczZjFmZmtQU1RmczYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dGxaaUg5b3Y4c3lmM0JnLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9YTZhNmE2XHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRlZ3ZVTkk3YW9vOTlWQS5wbmdcdTAwMjZkZXNjPU1YR1ArJUUyJTgwJUEyK1I1XHUwMDI2aDE9VHJlbnRpbm9cdTAwMjZoMj1SYWNlK0RheSsxXHUwMDI2bGl2ZUVuZERhdGU9MFx1MDAyNmxpdmVTdGFydERhdGU9MTc3NjU5NjQxNDAwMFx1MDAyNnBpYz1Nb3RvcnNwb3J0XHUwMDI2dGVtcGxhdGU9YmFzaWMtbGFuZHNjYXBlIn0.DZuP8YWOtoJsefHsVIrj3n71GIUpky8Q4QfV4P10zZo",
-      "url": "https://live.9528.eu.org:443/stan/url/6302173.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6302173?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "9884e4058f8926c9": {
-      "id": "9884e4058f8926c9",
-      "name": "04/19 21:55 Sale vs Saracens",
-      "tvgId": "5619790",
-      "groupTitle": "Premiership Rugby",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkY5JTJGYXR0T1RXSG9RNzJZOG9KRUUuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGOSUyRmF0dGVVMnF1Sm44UjRuSFI5LmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9ZmY1MDAxXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjklMkZhdHRUeDNISWlmdFJwNnQ4Vi5wbmdcdTAwMjZkZXNjPVBSRU0rUnVnYnkrJUUyJTgwJUEyK1IxM1x1MDAyNmgxPVJ1Z2J5XHUwMDI2aDI9UHJlbWllcnNoaXArUnVnYnlcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjA2OTIxMDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNCUyRjklMkZhdHQza25LUjZmSTJVZ1JSeC5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI0JTJGOSUyRmF0dEZsSFVjclZmZ1E2dDJqLnBuZ1x1MDAyNnBpYz1SdWdieVx1MDAyNnRlYW0xPVNhbGVcdTAwMjZ0ZWFtMj1TYXJhY2Vuc1x1MDAyNnRlbXBsYXRlPXRlYW12dGVhbS1sYW5kc2NhcGUifQ.Mx1GAcsH-L48Q2jRAXSDrCLoxXzWNIaI-sktJNVBNQE",
-      "url": "https://live.9528.eu.org:443/stan/url/5619790.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/5619790?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "a38563649a228e60": {
-      "id": "a38563649a228e60",
-      "name": "04/19 23:23 Manchester City vs Arsenal",
-      "tvgId": "5487537",
-      "groupTitle": "Premier League",
-      "logo": "https://streamcoimg-a.akamaihd.net/000/548/7537/5487537-Banner-L2-05aa3cf5270179a18a6cd95f076c39ae.jpg~liveStartDate=1776612207000~liveEndDate=0~badge=live",
-      "url": "https://fastlylive02.stan.video/out/v1/6ea080d60433465980bd47fbddbe4283/index.mpd?availabilityStart=1776609029\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon%2Cfastly\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776612209",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "8e28064c5b514281b9c8ed73b753f51f:38f95b5eac10bdcb8b60362796ce84b3"
-      }
-    },
-    "a5a2d006c3e2e849": {
-      "id": "a5a2d006c3e2e849",
-      "name": "04/19 22:00 Race Day Part 2: Trentino - MXGP 2026",
-      "tvgId": "6302156",
-      "groupTitle": "MXGP",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0OEczZjFmZmtQU1RmczYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dGxaaUg5b3Y4c3lmM0JnLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9YTZhNmE2XHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRlZ3ZVTkk3YW9vOTlWQS5wbmdcdTAwMjZkZXNjPU1YR1ArJUUyJTgwJUEyK1I1XHUwMDI2aDE9VHJlbnRpbm9cdTAwMjZoMj1SYWNlK0RheSsyXHUwMDI2bGl2ZUVuZERhdGU9MFx1MDAyNmxpdmVTdGFydERhdGU9MTc3NjYwNzIxNTAwMFx1MDAyNnBpYz1Nb3RvcnNwb3J0XHUwMDI2dGVtcGxhdGU9YmFzaWMtbGFuZHNjYXBlIn0.rEUEyVWA31sP9IcHs_hyCNlI8bJxS4PNh-o3GN20v4o",
-      "url": "https://live.9528.eu.org:443/stan/url/6302156.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6302156?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "adc536c2ea4d40ed": {
-      "id": "adc536c2ea4d40ed",
-      "name": "04/19 18:57 Stuttgart: Day 7 - WTA 500",
-      "tvgId": "6332055",
-      "groupTitle": "WTA 500",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYzJTJGYXR0bU1rYmxRNTlBR04xdzUuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMyUyRmF0dDQ2Z1RPMjA3RmZ4cmZoLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9NjQ4ZThjXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNiUyRjMlMkZhdHRnQUlaOWtSMXg0eml3aS5wbmdcdTAwMjZkZXNjPVdUQSs1MDBcdTAwMjZoMT1TdHV0dGdhcnRcdTAwMjZoMj1EYXkrN1x1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY1OTYyNTAwMDBcdTAwMjZwaWM9VGVubmlzXHUwMDI2dGVtcGxhdGU9YmFzaWMtbGFuZHNjYXBlIn0.GrmaHLtUE5rb71pLrhQS5-E5mCWOD_jE8jXt57QMtyE",
-      "url": "https://live.9528.eu.org:443/stan/url/6332055.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6332055?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "c19692c554978ba8": {
-      "id": "c19692c554978ba8",
+    "06945e0d8adee79d": {
+      "id": "06945e0d8adee79d",
       "name": "04/19 11:00 Canberra - Australian Motocross Championship 2026",
       "tvgId": "6316527",
       "groupTitle": "Australian Motocross Championship",
@@ -208,34 +26,8 @@
         "value": "https://live.9528.eu.org:443/stan/key/6316527?token=c36f10fd0ff59c3bcce088d7a7a6c410"
       }
     },
-    "cedadc5bdd8a9b66": {
-      "id": "cedadc5bdd8a9b66",
-      "name": "04/21 00:40 Club Brugge U19 vs Real Madrid U19",
-      "tvgId": "6494466",
-      "groupTitle": "UEFA Youth League",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjQlMkY5JTJGYXR0UEVxRXZVNmZ0MHhaVmIuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI0JTJGOSUyRmF0dEhlSVZrbE9IUUNybE1aLmpwZ1x1MDAyNmJhZGdlPWZ1bGxEYXRlXHUwMDI2Y29tcENvbG9yPWZmMDI0Y1x1MDAyNmNvbXBMb2dvPSUyRmNtcyUyRjIwMjQlMkY5JTJGYXR0c3ExMDZPSE5TR0EzR24ucG5nXHUwMDI2ZGVzYz1VWUwrJUUyJTgwJUEyK0ZpbmFsXHUwMDI2aDE9Rm9vdGJhbGxcdTAwMjZoMj1VRUZBK1lvdXRoK0xlYWd1ZVx1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY3MDMyMDAwMDBcdTAwMjZsb2dvMT0lMkZjbXMlMkYyMDI0JTJGOSUyRmF0dExPam8xZGloTXlmeFJKLnBuZ1x1MDAyNmxvZ28yPSUyRmNtcyUyRjIwMjQlMkY5JTJGYXR0OUUyNkw3RHZXaGd6RjcucG5nXHUwMDI2cGljPUZvb3RiYWxsXHUwMDI2dGVhbTE9Q2x1YitCcnVnZ2UrVTE5XHUwMDI2dGVhbTI9UmVhbCtNYWRyaWQrVTE5XHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9.mL2XgvSnapendOnKngivl4aITzm7c3-dtokRbAgfW9s",
-      "url": "https://live.9528.eu.org:443/stan/url/6494466.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6494466?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "d4198e68273c62bb": {
-      "id": "d4198e68273c62bb",
-      "name": "04/19 01:29 Practice 2: Grand Prix of Long Beach - Indycar 2026",
-      "tvgId": "6232948",
-      "groupTitle": "Indycar",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0cjhsT0VnY0xvZXFlcGQuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dDJGU096NVZVb2VidmZWLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9OGE5NjljXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRQWkx3WHl6WDlybEZwSS5wbmdcdTAwMjZkZXNjPUluZHljYXIrJUUyJTgwJUEyK1I1XHUwMDI2aDE9TG9uZytCZWFjaFx1MDAyNmgyPVByYWN0aWNlKzJcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NTMzMzk5MDAwXHUwMDI2cGljPU1vdG9yc3BvcnRcdTAwMjZ0ZW1wbGF0ZT1iYXNpYy1sYW5kc2NhcGUifQ.50y6uxw5BGk_dAHuFvDzK5L0zS47t__vNfoyoh1W95k",
-      "url": "https://live.9528.eu.org:443/stan/url/6232948.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6232948?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "dd0f0f9efe942907": {
-      "id": "dd0f0f9efe942907",
+    "0856a8a39862d35b": {
+      "id": "0856a8a39862d35b",
       "name": "04/19 20:00 Everton vs Liverpool",
       "tvgId": "6329640",
       "groupTitle": "Premier League",
@@ -247,47 +39,8 @@
         "value": "18f7eca3e13b48729feba4f0dbacca9e:d980f7ae376b2322de9d60f3eeb4204e"
       }
     },
-    "de845b533e6f1010": {
-      "id": "de845b533e6f1010",
-      "name": "04/19 20:50 Nottingham Forest vs Burnley",
-      "tvgId": "5487619",
-      "groupTitle": "Premier League",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0NHE5ckZrM1hjS1JkcTYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFlVOWZLeVEwbElhQU9uLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDVGMEZGXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjYlMkZhdHQ3b3pqckc0WVlvN3JGTy5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlKyVFMiU4MCVBMitNVyszM1x1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9UHJlbWllcitMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjAzMDE0MDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjYlMkZhdHRDYUNYcDE1VUpKQ1pEVy5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI1JTJGNiUyRmF0dGFQTjN4eHhRaUg4VndVLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnRlYW0xPU5vdHQlMjdtK0ZvcmVzdFx1MDAyNnRlYW0yPUJ1cm5sZXlcdTAwMjZ0ZW1wbGF0ZT10ZWFtdnRlYW0tbGFuZHNjYXBlIn0.YBIG_gTKdnCChhWavN9hDBjhl9tSxLEuwWn_kYDJY14",
-      "url": "https://fastlylive01.stan.video/out/v1/494b5fbfdfd340d88e6248c926900246/index.mpd?availabilityStart=1776599873\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon%2Cakamai\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776603014",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "ba36cca8a2c349e9bbf9b408e6b7004c:73dcc6a21af0f44d67abac704259dff6"
-      }
-    },
-    "e0c7f2e22e6b0cef": {
-      "id": "e0c7f2e22e6b0cef",
-      "name": "04/19 21:29 Rouen: Day 7 - WTA 250",
-      "tvgId": "6332074",
-      "groupTitle": "WTA 250",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYzJTJGYXR0Qm16TERKUjhQWlRQcFAuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMyUyRmF0dGl2RkJmUGRYMGVBdkkxLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9N2U1NmJhXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNiUyRjMlMkZhdHRIOEJqMnNtTkVRY2NSby5wbmdcdTAwMjZkZXNjPVdUQSsyNTBcdTAwMjZoMT1Sb3Vlblx1MDAyNmgyPURheSs3XHUwMDI2bGl2ZUVuZERhdGU9MFx1MDAyNmxpdmVTdGFydERhdGU9MTc3NjYwNTM2NTAwMFx1MDAyNnBpYz1UZW5uaXNcdTAwMjZ0ZW1wbGF0ZT1iYXNpYy1sYW5kc2NhcGUifQ.4bi0_SOmvM9VAj9Y6IFnzJFqo-nF6rU8eUVgADqyUxc",
-      "url": "https://live.9528.eu.org:443/stan/url/6332074.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6332074?token=c36f10fd0ff59c3bcce088d7a7a6c410"
-      }
-    },
-    "e42829f6bedac182": {
-      "id": "e42829f6bedac182",
-      "name": "04/19 20:50 Aston Villa vs Sunderland",
-      "tvgId": "5487771",
-      "groupTitle": "Premier League",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0NHE5ckZrM1hjS1JkcTYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFlVOWZLeVEwbElhQU9uLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDVGMEZGXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjYlMkZhdHQ3b3pqckc0WVlvN3JGTy5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlKyVFMiU4MCVBMitNVyszM1x1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9UHJlbWllcitMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjAzMDExMDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjYlMkZhdHRYUzI1NEx5QUdaV2RNby5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI1JTJGNiUyRmF0dEVBVkxCZnJEZUxMYjhzLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnRlYW0xPUFzdG9uK1ZpbGxhXHUwMDI2dGVhbTI9U3VuZGVybGFuZFx1MDAyNnRlbXBsYXRlPXRlYW12dGVhbS1sYW5kc2NhcGUifQ.OckLiNXAnmUWPfbTZ_ti11sSRGLl93e5CkAfi3otDfI",
-      "url": "https://fastlylive02.stan.video/out/v1/ec2c19265c9b4fd6acb8d1304cc49540/index.mpd?availabilityStart=1776599883\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=akamai%2Cfastly\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776603011",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "value": "e4a8ee37b84443a88984a5119c63004c:7600d4a5099bf60f7bb4bfcb6eadf557"
-      }
-    },
-    "e49f5dda363618fc": {
-      "id": "e49f5dda363618fc",
+    "1c07972a93c1b9e4": {
+      "id": "1c07972a93c1b9e4",
       "name": "04/19 17:30 Hong Kong Day 3: Session 2 - World Rugby Sevens Series 2025/26",
       "tvgId": "5661284",
       "groupTitle": "World Sevens Series",
@@ -299,8 +52,125 @@
         "value": "https://live.9528.eu.org:443/stan/key/5661284?token=c36f10fd0ff59c3bcce088d7a7a6c410"
       }
     },
-    "e55fbc5d333f6101": {
-      "id": "e55fbc5d333f6101",
+    "2afc978cd319b27e": {
+      "id": "2afc978cd319b27e",
+      "name": "04/19 00:15 Tottenham Hotspur vs Brighton \u0026 Hove Albion",
+      "tvgId": "5487521",
+      "groupTitle": "Premier League",
+      "logo": "https://streamcoimg-a.akamaihd.net/000/548/7521/5487521-Banner-L2-925d514037b953ef0e76a78e5bf80bcc.jpg~liveStartDate=1776528940000~liveEndDate=0~badge=live",
+      "url": "https://fastlylive02.stan.video/out/v1/659e96c90275450fad622acf8c8605c0/index.mpd?availabilityStart=1776526183\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=akamai%2Cfastly\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776528940",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "16ef21ac60e24eebb7ef4673cdfb8571:607d1de6874f30526d1d671563206578"
+      }
+    },
+    "4923a06990a079b3": {
+      "id": "4923a06990a079b3",
+      "name": "04/19 18:30 Race: 6 Hours of Imola - WEC 2026",
+      "tvgId": "6332131",
+      "groupTitle": "WEC",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0Nm1OWDdXSlRlYjkwNzQuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dFFocXN6cVNQcndxMmRqLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDBhZWVmXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNCUyRjglMkZhdHRMY2RNQlFSUHlvRUFUNS5wbmdcdTAwMjZkZXNjPVdFQyslRTIlODAlQTIrUjFcdTAwMjZoMT02K0hvdXJzK29mK0ltb2xhXHUwMDI2aDI9UmFjZVx1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY1OTQ2MTQwMDBcdTAwMjZwaWM9TW90b3JzcG9ydFx1MDAyNnRlbXBsYXRlPWJhc2ljLWxhbmRzY2FwZSJ9.zwr5C-mMufcquUWK--IzmyRYnCCcODw-v6yNcOf9lr0",
+      "url": "https://live.9528.eu.org:443/stan/url/6332131.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/6332131?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "5453c6ff4380778b": {
+      "id": "5453c6ff4380778b",
+      "name": "04/19 19:00 Race Day Part 1: Trentino - MXGP 2026",
+      "tvgId": "6302173",
+      "groupTitle": "MXGP",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0OEczZjFmZmtQU1RmczYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dGxaaUg5b3Y4c3lmM0JnLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9YTZhNmE2XHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRlZ3ZVTkk3YW9vOTlWQS5wbmdcdTAwMjZkZXNjPU1YR1ArJUUyJTgwJUEyK1I1XHUwMDI2aDE9VHJlbnRpbm9cdTAwMjZoMj1SYWNlK0RheSsxXHUwMDI2bGl2ZUVuZERhdGU9MFx1MDAyNmxpdmVTdGFydERhdGU9MTc3NjU5NjQxNDAwMFx1MDAyNnBpYz1Nb3RvcnNwb3J0XHUwMDI2dGVtcGxhdGU9YmFzaWMtbGFuZHNjYXBlIn0.DZuP8YWOtoJsefHsVIrj3n71GIUpky8Q4QfV4P10zZo",
+      "url": "https://live.9528.eu.org:443/stan/url/6302173.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/6302173?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "59ec0ab6ec5d8d24": {
+      "id": "59ec0ab6ec5d8d24",
+      "name": "04/19 20:50 Nottingham Forest vs Burnley",
+      "tvgId": "5487619",
+      "groupTitle": "Premier League",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0NHE5ckZrM1hjS1JkcTYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFlVOWZLeVEwbElhQU9uLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDVGMEZGXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjYlMkZhdHQ3b3pqckc0WVlvN3JGTy5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlKyVFMiU4MCVBMitNVyszM1x1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9UHJlbWllcitMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjAzMDE0MDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjYlMkZhdHRDYUNYcDE1VUpKQ1pEVy5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI1JTJGNiUyRmF0dGFQTjN4eHhRaUg4VndVLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnRlYW0xPU5vdHQlMjdtK0ZvcmVzdFx1MDAyNnRlYW0yPUJ1cm5sZXlcdTAwMjZ0ZW1wbGF0ZT10ZWFtdnRlYW0tbGFuZHNjYXBlIn0.YBIG_gTKdnCChhWavN9hDBjhl9tSxLEuwWn_kYDJY14",
+      "url": "https://fastlylive01.stan.video/out/v1/494b5fbfdfd340d88e6248c926900246/index.mpd?availabilityStart=1776599873\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon%2Cakamai\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776603014",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "ba36cca8a2c349e9bbf9b408e6b7004c:73dcc6a21af0f44d67abac704259dff6"
+      }
+    },
+    "5dc43f8cbce8bbac": {
+      "id": "5dc43f8cbce8bbac",
+      "name": "04/19 20:50 Aston Villa vs Sunderland",
+      "tvgId": "5487771",
+      "groupTitle": "Premier League",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0NHE5ckZrM1hjS1JkcTYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFlVOWZLeVEwbElhQU9uLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDVGMEZGXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjYlMkZhdHQ3b3pqckc0WVlvN3JGTy5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlKyVFMiU4MCVBMitNVyszM1x1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9UHJlbWllcitMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjAzMDExMDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjYlMkZhdHRYUzI1NEx5QUdaV2RNby5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI1JTJGNiUyRmF0dEVBVkxCZnJEZUxMYjhzLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnRlYW0xPUFzdG9uK1ZpbGxhXHUwMDI2dGVhbTI9U3VuZGVybGFuZFx1MDAyNnRlbXBsYXRlPXRlYW12dGVhbS1sYW5kc2NhcGUifQ.OckLiNXAnmUWPfbTZ_ti11sSRGLl93e5CkAfi3otDfI",
+      "url": "https://fastlylive02.stan.video/out/v1/ec2c19265c9b4fd6acb8d1304cc49540/index.mpd?availabilityStart=1776599883\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=akamai%2Cfastly\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776603011",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "e4a8ee37b84443a88984a5119c63004c:7600d4a5099bf60f7bb4bfcb6eadf557"
+      }
+    },
+    "67d3be8db3afb77f": {
+      "id": "67d3be8db3afb77f",
+      "name": "04/20 02:00 PL Weekend Wrap: Matchweek 33 - Apr 20",
+      "tvgId": "6350658",
+      "groupTitle": "PL Weekend Wrap",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0ZDZybDJlUUwwVG1GaVguanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFZUOFV6MERzVHBlRnNULmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9NWE4OGZmXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjglMkZhdHQ2b21EZkhsWGUwV1NJZC5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlXHUwMDI2aDE9V2Vla2VuZCtXcmFwXHUwMDI2aDI9TWF0Y2h3ZWVrKzMzXHUwMDI2bGl2ZUVuZERhdGU9MFx1MDAyNmxpdmVTdGFydERhdGU9MTc3NjYyMTYxMjAwMFx1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnRlbXBsYXRlPWJhc2ljLWxhbmRzY2FwZSJ9.ttDntUqknED9EuNy6GoD6SLvHxmKp_S9cAH3JlBHzqo",
+      "url": "https://fastlylive02.stan.video/out/v1/e382123e3dc74061abcb3924715539a7/index.mpd?availabilityStart=1776618718\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=akamai\u0026clearaudio=true\u0026end=1776625084\u0026live=true\u0026maxQuality=hd\u0026start=1776621612",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "c25287feedb04f82a9b748211c87acdd:0fc290549f56c927616f2065a96e2aeb"
+      }
+    },
+    "79bfb63ff09c68e3": {
+      "id": "79bfb63ff09c68e3",
+      "name": "04/19 23:20 Manchester City vs Arsenal",
+      "tvgId": "6329638",
+      "groupTitle": "Premier League",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0NHE5ckZrM1hjS1JkcTYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFlVOWZLeVEwbElhQU9uLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDVGMEZGXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjYlMkZhdHQ3b3pqckc0WVlvN3JGTy5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlKyVFMiU4MCVBMitNVyszM1x1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9UHJlbWllcitMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjEyMDE1MDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjYlMkZhdHRQS0h2Qk5sd0YxajV6Yy5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI1JTJGNiUyRmF0dGEyeDNXSXExcm9qWmlQLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnF1YWxpdHk9dWhkXHUwMDI2dGVhbTE9TWFuK0NpdHlcdTAwMjZ0ZWFtMj1BcnNlbmFsXHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9.A-j3nzxuAABMNOAxcfRCxfb1fen7T7MxVocyMoHnziE",
+      "url": "https://fastlylive02.stan.video/out/v1/d7545864733d4be18420b1154504395d/index.mpd?availabilityStart=1776608917\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon%2Cfastly\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776612015",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "e0f6eea0f9c64289919c6ec1c17ceed4:ec8ef91711e89ab5967504980a422918"
+      }
+    },
+    "806f8899bc6b1021": {
+      "id": "806f8899bc6b1021",
+      "name": "04/19 06:35 Qualifying: Grand Prix of Long Beach - Indycar 2026",
+      "tvgId": "6232937",
+      "groupTitle": "Indycar",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0cjhsT0VnY0xvZXFlcGQuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dDJGU096NVZVb2VidmZWLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9OGE5NjljXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRQWkx3WHl6WDlybEZwSS5wbmdcdTAwMjZkZXNjPUluZHljYXIrJUUyJTgwJUEyK1I1XHUwMDI2aDE9TG9uZytCZWFjaFx1MDAyNmgyPVF1YWxpZnlpbmdcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NTUxNzI1MDAwXHUwMDI2cGljPU1vdG9yc3BvcnRcdTAwMjZ0ZW1wbGF0ZT1iYXNpYy1sYW5kc2NhcGUifQ.kv6eFTOQ_Trrhq-ekeAAfTvVL-fYlXFJads8uEuCEwE",
+      "url": "https://live.9528.eu.org:443/stan/url/6232937.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/6232937?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "85cd1e164c0e339b": {
+      "id": "85cd1e164c0e339b",
+      "name": "04/19 18:57 Stuttgart: Day 7 - WTA 500",
+      "tvgId": "6332055",
+      "groupTitle": "WTA 500",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYzJTJGYXR0bU1rYmxRNTlBR04xdzUuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMyUyRmF0dDQ2Z1RPMjA3RmZ4cmZoLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9NjQ4ZThjXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNiUyRjMlMkZhdHRnQUlaOWtSMXg0eml3aS5wbmdcdTAwMjZkZXNjPVdUQSs1MDBcdTAwMjZoMT1TdHV0dGdhcnRcdTAwMjZoMj1EYXkrN1x1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY1OTYyNTAwMDBcdTAwMjZwaWM9VGVubmlzXHUwMDI2dGVtcGxhdGU9YmFzaWMtbGFuZHNjYXBlIn0.GrmaHLtUE5rb71pLrhQS5-E5mCWOD_jE8jXt57QMtyE",
+      "url": "https://live.9528.eu.org:443/stan/url/6332055.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/6332055?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "acc7ba73e13df370": {
+      "id": "acc7ba73e13df370",
       "name": "04/19 02:50 Chelsea vs Manchester United",
       "tvgId": "5487634",
       "groupTitle": "Premier League",
@@ -312,8 +182,34 @@
         "value": "620fc709266f4bf78513d33edb42f80e:dff532da51f25dbb0ac43391b167720a"
       }
     },
-    "e81ca290430df712": {
-      "id": "e81ca290430df712",
+    "acee2940ef0423df": {
+      "id": "acee2940ef0423df",
+      "name": "04/19 01:29 Practice 2: Grand Prix of Long Beach - Indycar 2026",
+      "tvgId": "6232948",
+      "groupTitle": "Indycar",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0cjhsT0VnY0xvZXFlcGQuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dDJGU096NVZVb2VidmZWLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9OGE5NjljXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRQWkx3WHl6WDlybEZwSS5wbmdcdTAwMjZkZXNjPUluZHljYXIrJUUyJTgwJUEyK1I1XHUwMDI2aDE9TG9uZytCZWFjaFx1MDAyNmgyPVByYWN0aWNlKzJcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NTMzMzk5MDAwXHUwMDI2cGljPU1vdG9yc3BvcnRcdTAwMjZ0ZW1wbGF0ZT1iYXNpYy1sYW5kc2NhcGUifQ.50y6uxw5BGk_dAHuFvDzK5L0zS47t__vNfoyoh1W95k",
+      "url": "https://live.9528.eu.org:443/stan/url/6232948.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/6232948?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "adfd1a0b345ea8f4": {
+      "id": "adfd1a0b345ea8f4",
+      "name": "04/19 21:55 Sale vs Saracens",
+      "tvgId": "5619790",
+      "groupTitle": "Premiership Rugby",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkY5JTJGYXR0T1RXSG9RNzJZOG9KRUUuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGOSUyRmF0dGVVMnF1Sm44UjRuSFI5LmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9ZmY1MDAxXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjklMkZhdHRUeDNISWlmdFJwNnQ4Vi5wbmdcdTAwMjZkZXNjPVBSRU0rUnVnYnkrJUUyJTgwJUEyK1IxM1x1MDAyNmgxPVJ1Z2J5XHUwMDI2aDI9UHJlbWllcnNoaXArUnVnYnlcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjA2OTIxMDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNCUyRjklMkZhdHQza25LUjZmSTJVZ1JSeC5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI0JTJGOSUyRmF0dEZsSFVjclZmZ1E2dDJqLnBuZ1x1MDAyNnBpYz1SdWdieVx1MDAyNnRlYW0xPVNhbGVcdTAwMjZ0ZWFtMj1TYXJhY2Vuc1x1MDAyNnRlbXBsYXRlPXRlYW12dGVhbS1sYW5kc2NhcGUifQ.Mx1GAcsH-L48Q2jRAXSDrCLoxXzWNIaI-sktJNVBNQE",
+      "url": "https://live.9528.eu.org:443/stan/url/5619790.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/5619790?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "b300d953c1fae486": {
+      "id": "b300d953c1fae486",
       "name": "04/19 20:50 Everton vs Liverpool",
       "tvgId": "5487704",
       "groupTitle": "Premier League",
@@ -325,34 +221,34 @@
         "value": "9fe565cf4eb34b5c94535e28afd28b4b:f7e6cedb50a0dab2f3f6f84f7adb8e12"
       }
     },
-    "ea797fef1b428aa9": {
-      "id": "ea797fef1b428aa9",
-      "name": "04/21 18:25 Jeonbuk Hyundai Motors vs Incheon",
-      "tvgId": "6234894",
+    "b415a68b72467952": {
+      "id": "b415a68b72467952",
+      "name": "04/19 15:23 Pohang Steelers vs FC Anyang",
+      "tvgId": "6234891",
       "groupTitle": "K League",
-      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkY3JTJGYXR0REk4bmtzMDVHZXF1ZW8uanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGNyUyRmF0dERGYzhuQnBud3BrU2tSLmpwZ1x1MDAyNmJhZGdlPWZ1bGxEYXRlXHUwMDI2Y29tcENvbG9yPTYzNjM2M1x1MDAyNmNvbXBMb2dvPSUyRmNtcyUyRjIwMjUlMkY3JTJGYXR0RmViaFB4UEgzcUIyeWgucG5nXHUwMDI2ZGVzYz1LK0xlYWd1ZSslRTIlODAlQTIrTVcrOVx1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9SytMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NzY3MTAwMDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjclMkZhdHRYeW4wd1g3aTZ2TVNQMC5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI2JTJGMiUyRmF0dGdSWFBNaFJEaENmRFgxLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnRlYW0xPUplb25idWtcdTAwMjZ0ZWFtMj1JbmNoZW9uXHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9.P3vidzk_gY04vc3f8jwcALYkL9VvNESRQ5CGYlXygGI",
-      "url": "https://live.9528.eu.org:443/stan/url/6234894.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkY3JTJGYXR0REk4bmtzMDVHZXF1ZW8uanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGNyUyRmF0dERGYzhuQnBud3BrU2tSLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9NjM2MzYzXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjclMkZhdHRGZWJoUHhQSDNxQjJ5aC5wbmdcdTAwMjZkZXNjPUsrTGVhZ3VlKyVFMiU4MCVBMitNVys4XHUwMDI2aDE9Rm9vdGJhbGxcdTAwMjZoMj1LK0xlYWd1ZVx1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY1ODM0MjIwMDBcdTAwMjZsb2dvMT0lMkZjbXMlMkYyMDI1JTJGNyUyRmF0dEFJd1Z4cDM1d042MVo2LnBuZ1x1MDAyNmxvZ28yPSUyRmNtcyUyRjIwMjUlMkY3JTJGYXR0ajFoMWZQeXdQTTBqOG8ucG5nXHUwMDI2cGljPUZvb3RiYWxsXHUwMDI2dGVhbTE9UG9oYW5nXHUwMDI2dGVhbTI9QW55YW5nXHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9._OUHD8LTIsgbF-cKDzzMPECl46FdkrYYVidqHAyHYyg",
+      "url": "https://live.9528.eu.org:443/stan/url/6234891.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
       "enabled": true,
       "drm": {
         "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/6234894?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+        "value": "https://live.9528.eu.org:443/stan/key/6234891?token=c36f10fd0ff59c3bcce088d7a7a6c410"
       }
     },
-    "ec032fff72650a14": {
-      "id": "ec032fff72650a14",
-      "name": "04/21 02:30 Crystal Palace vs West Ham United",
-      "tvgId": "5487759",
-      "groupTitle": "Premier League",
-      "logo": "https://streamcoimg-a.akamaihd.net/000/548/7759/5487759-Banner-L2-108fc11ccc868578f9853066d048d4aa.jpg~liveStartDate=1776709800000~liveEndDate=0~badge=fullDate",
-      "url": "https://live.9528.eu.org:443/stan/url/5487759.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+    "b937339d2eb74d34": {
+      "id": "b937339d2eb74d34",
+      "name": "04/19 22:00 Race Day Part 2: Trentino - MXGP 2026",
+      "tvgId": "6302156",
+      "groupTitle": "MXGP",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0OEczZjFmZmtQU1RmczYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dGxaaUg5b3Y4c3lmM0JnLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9YTZhNmE2XHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRlZ3ZVTkk3YW9vOTlWQS5wbmdcdTAwMjZkZXNjPU1YR1ArJUUyJTgwJUEyK1I1XHUwMDI2aDE9VHJlbnRpbm9cdTAwMjZoMj1SYWNlK0RheSsyXHUwMDI2bGl2ZUVuZERhdGU9MFx1MDAyNmxpdmVTdGFydERhdGU9MTc3NjYwNzIxNTAwMFx1MDAyNnBpYz1Nb3RvcnNwb3J0XHUwMDI2dGVtcGxhdGU9YmFzaWMtbGFuZHNjYXBlIn0.rEUEyVWA31sP9IcHs_hyCNlI8bJxS4PNh-o3GN20v4o",
+      "url": "https://live.9528.eu.org:443/stan/url/6302156.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
       "enabled": true,
       "drm": {
         "type": "clearkey",
-        "value": "https://live.9528.eu.org:443/stan/key/5487759?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+        "value": "https://live.9528.eu.org:443/stan/key/6302156?token=c36f10fd0ff59c3bcce088d7a7a6c410"
       }
     },
-    "f02ae37830d61ddd": {
-      "id": "f02ae37830d61ddd",
+    "bf63f27ea0d76a4f": {
+      "id": "bf63f27ea0d76a4f",
       "name": "04/19 00:25 Bath vs Harlequins",
       "tvgId": "5619789",
       "groupTitle": "Premiership Rugby",
@@ -364,17 +260,121 @@
         "value": "https://live.9528.eu.org:443/stan/key/5619789?token=c36f10fd0ff59c3bcce088d7a7a6c410"
       }
     },
-    "f4ffede73cd41c93": {
-      "id": "f4ffede73cd41c93",
-      "name": "04/19 00:15 Tottenham Hotspur vs Brighton \u0026 Hove Albion",
-      "tvgId": "5487521",
-      "groupTitle": "Premier League",
-      "logo": "https://streamcoimg-a.akamaihd.net/000/548/7521/5487521-Banner-L2-925d514037b953ef0e76a78e5bf80bcc.jpg~liveStartDate=1776528940000~liveEndDate=0~badge=live",
-      "url": "https://fastlylive02.stan.video/out/v1/659e96c90275450fad622acf8c8605c0/index.mpd?availabilityStart=1776526183\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=akamai%2Cfastly\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776528940",
+    "c682c48b233b8721": {
+      "id": "c682c48b233b8721",
+      "name": "04/21 00:40 Club Brugge U19 vs Real Madrid U19",
+      "tvgId": "6494466",
+      "groupTitle": "UEFA Youth League",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjQlMkY5JTJGYXR0UEVxRXZVNmZ0MHhaVmIuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI0JTJGOSUyRmF0dEhlSVZrbE9IUUNybE1aLmpwZ1x1MDAyNmJhZGdlPWZ1bGxEYXRlXHUwMDI2Y29tcENvbG9yPWZmMDI0Y1x1MDAyNmNvbXBMb2dvPSUyRmNtcyUyRjIwMjQlMkY5JTJGYXR0c3ExMDZPSE5TR0EzR24ucG5nXHUwMDI2ZGVzYz1VWUwrJUUyJTgwJUEyK0ZpbmFsXHUwMDI2aDE9Rm9vdGJhbGxcdTAwMjZoMj1VRUZBK1lvdXRoK0xlYWd1ZVx1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY3MDMyMDAwMDBcdTAwMjZsb2dvMT0lMkZjbXMlMkYyMDI0JTJGOSUyRmF0dExPam8xZGloTXlmeFJKLnBuZ1x1MDAyNmxvZ28yPSUyRmNtcyUyRjIwMjQlMkY5JTJGYXR0OUUyNkw3RHZXaGd6RjcucG5nXHUwMDI2cGljPUZvb3RiYWxsXHUwMDI2dGVhbTE9Q2x1YitCcnVnZ2UrVTE5XHUwMDI2dGVhbTI9UmVhbCtNYWRyaWQrVTE5XHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9.mL2XgvSnapendOnKngivl4aITzm7c3-dtokRbAgfW9s",
+      "url": "https://live.9528.eu.org:443/stan/url/6494466.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
       "enabled": true,
       "drm": {
         "type": "clearkey",
-        "value": "16ef21ac60e24eebb7ef4673cdfb8571:607d1de6874f30526d1d671563206578"
+        "value": "https://live.9528.eu.org:443/stan/key/6494466?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "c991d012871ddf68": {
+      "id": "c991d012871ddf68",
+      "name": "04/21 02:30 Crystal Palace vs West Ham United",
+      "tvgId": "5487759",
+      "groupTitle": "Premier League",
+      "logo": "https://streamcoimg-a.akamaihd.net/000/548/7759/5487759-Banner-L2-108fc11ccc868578f9853066d048d4aa.jpg~liveStartDate=1776709800000~liveEndDate=0~badge=fullDate",
+      "url": "https://live.9528.eu.org:443/stan/url/5487759.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/5487759?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "cc79e0967419b01f": {
+      "id": "cc79e0967419b01f",
+      "name": "04/20 05:30 Race: Grand Prix of Long Beach - Indycar 2026",
+      "tvgId": "6232952",
+      "groupTitle": "Indycar",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkYyJTJGYXR0cjhsT0VnY0xvZXFlcGQuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGMiUyRmF0dDJGU096NVZVb2VidmZWLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9OGE5NjljXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjIlMkZhdHRQWkx3WHl6WDlybEZwSS5wbmdcdTAwMjZkZXNjPUluZHljYXIrJUUyJTgwJUEyK1I1XHUwMDI2aDE9TG9uZytCZWFjaFx1MDAyNmgyPVJhY2VcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NjM0MjAzMDAwXHUwMDI2cGljPU1vdG9yc3BvcnRcdTAwMjZ0ZW1wbGF0ZT1iYXNpYy1sYW5kc2NhcGUifQ.WoYaC7DQ6tOkurlSExdm2917tnljYQqcxPZvjyGZsX8",
+      "url": "https://fastlylive02.stan.video/out/v1/eba5b2bf48104768bb9cfb5a607026b4/index.mpd?availabilityStart=1776631161\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon\u0026clearaudio=true\u0026end=1776643102\u0026live=true\u0026maxQuality=hd\u0026start=1776634203",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "48cbfe508f5b4d8eb58139a6b93196e8:2db1e5b4b014b6781ef8701c987ec5c7"
+      }
+    },
+    "ccd56ae4eadf6d38": {
+      "id": "ccd56ae4eadf6d38",
+      "name": "04/19 02:50 Chelsea vs Manchester United",
+      "tvgId": "6329639",
+      "groupTitle": "Premier League",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYxJTJGYXR0NHE5ckZrM1hjS1JkcTYuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMSUyRmF0dFlVOWZLeVEwbElhQU9uLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9MDVGMEZGXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNSUyRjYlMkZhdHQ3b3pqckc0WVlvN3JGTy5wbmdcdTAwMjZkZXNjPVByZW1pZXIrTGVhZ3VlKyVFMiU4MCVBMitNVyszM1x1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9UHJlbWllcitMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NTM4MjE0MDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjYlMkZhdHRTWFI2VzFPZHJ4S0E5Ni5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI1JTJGNiUyRmF0dHM1ZFd1Njh5YWljT1BTLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnF1YWxpdHk9dWhkXHUwMDI2dGVhbTE9Q2hlbHNlYVx1MDAyNnRlYW0yPU1hbitVbml0ZWRcdTAwMjZ0ZW1wbGF0ZT10ZWFtdnRlYW0tbGFuZHNjYXBlIn0.k7w-iH8RIusS5aukSvCSwIspT2_fv_tmFpc0-_JYyPE",
+      "url": "https://fastlylive01.stan.video/out/v1/bf728201685d4e63952e83062b4e4bf7/index.mpd?availabilityStart=1776535169\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon%2Cfastly\u0026clearaudio=true\u0026end=1776546314\u0026live=true\u0026maxQuality=hd\u0026start=1776538214",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "0fab8f22ed434b029b67285e66b45349:a5a8a662615e0a6909306f594965dd17"
+      }
+    },
+    "d61fb3b6562bfb4a": {
+      "id": "d61fb3b6562bfb4a",
+      "name": "04/19 05:30 PL Saturday Wrap: Matchweek 33 - Apr 19",
+      "tvgId": "6350651",
+      "groupTitle": "PL Midweek Wrap",
+      "logo": "https://streamcoimg-a.akamaihd.net/000/635/0651/6350651-Banner-L2-84064b5d2841a8899139e4bd82d49c9a.jpg~liveStartDate=1776547811000~liveEndDate=0~badge=live",
+      "url": "https://live.9528.eu.org:443/stan/url/6350651.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/6350651?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "de64eaba9fac73e9": {
+      "id": "de64eaba9fac73e9",
+      "name": "04/19 23:23 Manchester City vs Arsenal",
+      "tvgId": "5487537",
+      "groupTitle": "Premier League",
+      "logo": "https://streamcoimg-a.akamaihd.net/000/548/7537/5487537-Banner-L2-05aa3cf5270179a18a6cd95f076c39ae.jpg~liveStartDate=1776612207000~liveEndDate=0~badge=live",
+      "url": "https://fastlylive02.stan.video/out/v1/6ea080d60433465980bd47fbddbe4283/index.mpd?availabilityStart=1776609029\u0026aws.manifestfilter=video_codec%3Ah265\u0026cdns=amazon%2Cfastly\u0026clearaudio=true\u0026live=true\u0026maxQuality=hd\u0026start=1776612209",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "8e28064c5b514281b9c8ed73b753f51f:38f95b5eac10bdcb8b60362796ce84b3"
+      }
+    },
+    "f2c57b72968de53f": {
+      "id": "f2c57b72968de53f",
+      "name": "04/19 00:31 Ireland vs Italy",
+      "tvgId": "5695610",
+      "groupTitle": "Women's Six Nations",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjQlMkYxMiUyRmF0dGdqYWlRTlJhM1Q4MzFpLmpwZ1x1MDAyNmJhY2tncm91bmRJbWdQb3N0ZXI9JTJGY21zJTJGMjAyNCUyRjEyJTJGYXR0UlpFYzlmdkdRMnV0eHYuanBnXHUwMDI2YmFkZ2U9bGl2ZVx1MDAyNmNvbXBDb2xvcj0wYTA0MDZcdTAwMjZjb21wTG9nbz0lMkZjbXMlMkYyMDI0JTJGMTIlMkZhdHQ0b3ZTMjBEeVhvVzY1NC5wbmdcdTAwMjZkZXNjPVc2TislRTIlODAlQTIrUjJcdTAwMjZoMT1SdWdieVx1MDAyNmgyPVdvbWVuJTI3cytTaXgrTmF0aW9uc1x1MDAyNmxpdmVFbmREYXRlPTBcdTAwMjZsaXZlU3RhcnREYXRlPTE3NzY1Mjk4NzAwMDBcdTAwMjZsb2dvMT0lMkZjbXMlMkYyMDI1JTJGMSUyRmF0dHE3Z1FrMnNja0FXVWV3LnBuZ1x1MDAyNmxvZ28yPSUyRmNtcyUyRjIwMjUlMkYxJTJGYXR0YU5paVdmZ2pSV3NRSTUucG5nXHUwMDI2cGljPVJ1Z2J5XHUwMDI2dGVhbTE9SXJlbGFuZFx1MDAyNnRlYW0yPUl0YWx5XHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9.46O6lLQ8KIo35gAnwKir4BXPrvInhjzDfaKnnD2vIQg",
+      "url": "https://live.9528.eu.org:443/stan/url/5695610.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/5695610?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "f46869d643730850": {
+      "id": "f46869d643730850",
+      "name": "04/21 18:25 Jeonbuk Hyundai Motors vs Incheon",
+      "tvgId": "6234894",
+      "groupTitle": "K League",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjUlMkY3JTJGYXR0REk4bmtzMDVHZXF1ZW8uanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI1JTJGNyUyRmF0dERGYzhuQnBud3BrU2tSLmpwZ1x1MDAyNmJhZGdlPWZ1bGxEYXRlXHUwMDI2Y29tcENvbG9yPTYzNjM2M1x1MDAyNmNvbXBMb2dvPSUyRmNtcyUyRjIwMjUlMkY3JTJGYXR0RmViaFB4UEgzcUIyeWgucG5nXHUwMDI2ZGVzYz1LK0xlYWd1ZSslRTIlODAlQTIrTVcrOVx1MDAyNmgxPUZvb3RiYWxsXHUwMDI2aDI9SytMZWFndWVcdTAwMjZsaXZlRW5kRGF0ZT0wXHUwMDI2bGl2ZVN0YXJ0RGF0ZT0xNzc2NzY3MTAwMDAwXHUwMDI2bG9nbzE9JTJGY21zJTJGMjAyNSUyRjclMkZhdHRYeW4wd1g3aTZ2TVNQMC5wbmdcdTAwMjZsb2dvMj0lMkZjbXMlMkYyMDI2JTJGMiUyRmF0dGdSWFBNaFJEaENmRFgxLnBuZ1x1MDAyNnBpYz1Gb290YmFsbFx1MDAyNnRlYW0xPUplb25idWtcdTAwMjZ0ZWFtMj1JbmNoZW9uXHUwMDI2dGVtcGxhdGU9dGVhbXZ0ZWFtLWxhbmRzY2FwZSJ9.P3vidzk_gY04vc3f8jwcALYkL9VvNESRQ5CGYlXygGI",
+      "url": "https://live.9528.eu.org:443/stan/url/6234894.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/6234894?token=c36f10fd0ff59c3bcce088d7a7a6c410"
+      }
+    },
+    "f4e0b1f30955fe8f": {
+      "id": "f4e0b1f30955fe8f",
+      "name": "04/19 21:29 Rouen: Day 7 - WTA 250",
+      "tvgId": "6332074",
+      "groupTitle": "WTA 250",
+      "logo": "https://streamcoimg-a.akamaihd.net/tile/eyJhbGciOiJIUzI1NiIsImtpZCI6InBpa2FjaHUiLCJ0eXAiOiJKV1QifQ.eyJQYXJhbXMiOiJiYWNrZ3JvdW5kSW1nPSUyRmNtcyUyRjIwMjYlMkYzJTJGYXR0Qm16TERKUjhQWlRQcFAuanBnXHUwMDI2YmFja2dyb3VuZEltZ1Bvc3Rlcj0lMkZjbXMlMkYyMDI2JTJGMyUyRmF0dGl2RkJmUGRYMGVBdkkxLmpwZ1x1MDAyNmJhZGdlPWxpdmVcdTAwMjZjb21wQ29sb3I9N2U1NmJhXHUwMDI2Y29tcExvZ289JTJGY21zJTJGMjAyNiUyRjMlMkZhdHRIOEJqMnNtTkVRY2NSby5wbmdcdTAwMjZkZXNjPVdUQSsyNTBcdTAwMjZoMT1Sb3Vlblx1MDAyNmgyPURheSs3XHUwMDI2bGl2ZUVuZERhdGU9MFx1MDAyNmxpdmVTdGFydERhdGU9MTc3NjYwNTM2NTAwMFx1MDAyNnBpYz1UZW5uaXNcdTAwMjZ0ZW1wbGF0ZT1iYXNpYy1sYW5kc2NhcGUifQ.4bi0_SOmvM9VAj9Y6IFnzJFqo-nF6rU8eUVgADqyUxc",
+      "url": "https://live.9528.eu.org:443/stan/url/6332074.mpd?token=c36f10fd0ff59c3bcce088d7a7a6c410",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "value": "https://live.9528.eu.org:443/stan/key/6332074?token=c36f10fd0ff59c3bcce088d7a7a6c410"
       }
     }
   },

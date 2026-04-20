@@ -80,7 +80,7 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 	go func(u *HLSUpdater) {
 		update := func() {
 			// 检查是否超时
-			if time.Since(u.lastAccess) > 30*time.Second {
+			if time.Since(u.lastAccess) > 10 * time.Second {
 				u.stopOnce.Do(func() {
 					close(u.stopCh)
 					updaters.Delete(u.tvgID)
@@ -142,7 +142,10 @@ func startOrResetUpdater(provider, tvgID, mainfestUrl string, client *http.Clien
 				}
 				wg.Wait()
 			}
-			log.Println("Updated HLS for", u.tvgID)
+			log.Printf("[INFO] Updated HLS for %s | LastAccess: %v ago | Time to stop: %v", 
+				u.tvgID, 
+				time.Since(u.lastAccess).Round(time.Second),
+				(10*time.Second - time.Since(u.lastAccess)).Round(time.Second))
 			if !*config.SpeedUp {
 				return
 			}
