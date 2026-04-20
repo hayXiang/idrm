@@ -46,6 +46,9 @@ i<template>
             <el-tooltip v-if="row.status === 'error'" :content="row.statusMessage" placement="top">
               <el-tag type="danger">错误</el-tag>
             </el-tooltip>
+            <el-tag v-else-if="row.status === 'loading'" type="warning">
+              <el-icon class="is-loading"><Loading /></el-icon> 加载中
+            </el-tag>
             <el-tag v-else-if="row.type === 'custom'" type="success">正常</el-tag>
             <el-tag v-else-if="row.status === 'ok' || row.channelCount > 0" type="success">正常</el-tag>
             <el-tag v-else type="info">未加载</el-tag>
@@ -106,6 +109,7 @@ import { useRouter } from 'vue-router'
 import { useProviderStore } from '@/stores/provider'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Plus, List, Refresh, Document, Loading } from '@element-plus/icons-vue'
 import { getSubscribeUrl } from '@/api/auth'
 import ProviderForm from './components/ProviderForm.vue'
 

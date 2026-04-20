@@ -16,10 +16,10 @@
       <!-- 类型选择（仅新增时） -->
       <el-form-item label="类型" prop="type" v-if="!isEdit">
         <el-radio-group v-model="form.type">
-          <el-radio-button label="remote">
+          <el-radio-button value="remote">
             <el-icon><Link /></el-icon> 远程 M3U
           </el-radio-button>
-          <el-radio-button label="custom">
+          <el-radio-button value="custom">
             <el-icon><Edit /></el-icon> 自定义频道
           </el-radio-button>
         </el-radio-group>

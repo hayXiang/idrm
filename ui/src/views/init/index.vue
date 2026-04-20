@@ -118,9 +118,6 @@ const handleInit = async () => {
     localStorage.setItem('token', data.token)
     localStorage.setItem('needChangePassword', 'false')
     
-    // 清除初始化标记
-    localStorage.removeItem('needSystemInit')
-    
     ElMessage.success('初始化成功')
     
     // 直接替换当前路由

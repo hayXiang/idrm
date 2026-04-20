@@ -74,20 +74,13 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
   
-  // 检查系统是否需要初始化（通过 localStorage 标记）
-  const needInit = localStorage.getItem('needSystemInit')
-  if (needInit === 'true' && to.path !== '/init') {
-    next('/init')
-    return
-  }
-  
   // 对于公开页面（登录、初始化、修改密码），直接放行
   if (to.meta.public) {
     next()
     return
   }
   
-  // 如果用户已登录且有 token，跳过系统状态检查，直接进入
+  // 如果用户已登录且有 token，直接进入
   if (userStore.token && userStore.userInfo) {
     // 已登录但还需要修改密码，强制跳转到修改密码页面
     if (userStore.needChangePassword && to.path !== '/change-password') {
@@ -110,9 +103,8 @@ router.beforeEach(async (to, from, next) => {
     const { getSystemStatus } = await import('@/api/auth')
     const { data } = await getSystemStatus()
     
-    // 如果系统未初始化，设置标记并跳转到初始化页面
+    // 如果系统未初始化，直接跳转到初始化页面
     if (!data.initialized) {
-      localStorage.setItem('needSystemInit', 'true')
       next('/init')
       return
     }

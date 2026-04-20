@@ -7,6 +7,15 @@
             <span>所有频道</span>
           </div>
           <div class="header-right">
+            <el-button 
+              v-if="isAdmin"
+              type="primary" 
+              size="small" 
+              @click="handleCreate"
+              style="margin-right: 10px;"
+            >
+              <el-icon><Plus /></el-icon>新增频道
+            </el-button>
             <el-input
               v-model="searchQuery"
               placeholder="搜索频道名称"
@@ -101,7 +110,7 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="300" fixed="right">
           <template #default="{ row }">
             <el-button type="success" size="small" @click="handleTest(row)">测试</el-button>
             <el-button type="warning" size="small" @click="handleSubscribe(row)">订阅</el-button>
@@ -120,6 +129,14 @@
               @click="handleEdit(row)"
             >
               查看
+            </el-button>
+            <el-button 
+              v-if="isAdmin && row.providerType === 'custom'"
+              type="danger" 
+              size="small" 
+              @click="handleDelete(row)"
+            >
+              删除
             </el-button>
           </template>
         </el-table-column>
@@ -151,6 +168,7 @@
       v-model:visible="testVisible"
       :channel="currentChannel"
     />
+    
   </div>
 </template>
 
@@ -158,9 +176,10 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 import { useProviderStore } from '@/stores/provider'
-import { getChannels, toggleChannel } from '@/api/provider'
+import { getChannels, toggleChannel, deleteChannel } from '@/api/provider'
 import { getAllChannels } from '@/api/channels'
 import { getProxyUrl } from '@/api/auth'
 import ChannelForm from '@/views/provider/components/ChannelForm.vue'
@@ -190,7 +209,7 @@ const testVisible = ref(false)
 const currentChannel = ref(null)
 
 // 从后端获取频道列表
-const fetchChannels = async () => {
+const fetchAllChannels = async () => {
   loading.value = true
   try {
     const params = {
@@ -216,21 +235,21 @@ const fetchChannels = async () => {
 
 onMounted(async () => {
   await providerStore.fetchProviders()
-  await fetchChannels()
+  await fetchAllChannels()
 })
 
 const handleSearch = () => {
   currentPage.value = 1
-  fetchChannels()
+  fetchAllChannels()
 }
 
 const handleSizeChange = () => {
   currentPage.value = 1
-  fetchChannels()
+  fetchAllChannels()
 }
 
 const handlePageChange = () => {
-  fetchChannels()
+  fetchAllChannels()
 }
 
 const handleToggle = async (row, val) => {
@@ -243,6 +262,20 @@ const handleToggle = async (row, val) => {
   }
 }
 
+const handleCreate = () => {
+  // 检查是否有自定义类型的 Provider
+  const customProviders = providerStore.providers.filter(p => p.type === 'custom')
+  
+  if (customProviders.length === 0) {
+    ElMessage.warning('请先创建一个自定义类型的 Provider')
+    return
+  }
+  
+  // 打开表单，不指定 providerId，让用户在表单中选择
+  currentChannel.value = null
+  formVisible.value = true
+}
+
 const handleEdit = (row) => {
   currentChannel.value = row
   formVisible.value = true
@@ -251,6 +284,29 @@ const handleEdit = (row) => {
 const handleTest = (row) => {
   currentChannel.value = row
   testVisible.value = true
+}
+
+const handleDelete = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除频道 "${row.name}" 吗？此操作不可恢复！`,
+      '删除确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await deleteChannel(row.providerId, row.id)
+    ElMessage.success('删除成功')
+    fetchAllChannels()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除频道失败:', error)
+      ElMessage.error('删除频道失败')
+    }
+  }
 }
 </script>
 

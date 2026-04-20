@@ -385,9 +385,8 @@ func handleCustomProviderM3U(ctx *fasthttp.RequestCtx, name string, providerID s
 		lines = append(lines, extInf)
 
 		// 添加 Kodi DRM 配置（如果有）
-		if channel.DRM != nil && channel.DRM.Type == "clearkey" {
-			drmLine := fmt.Sprintf(`#KODIPROP:inputstream.adaptive.drm_legacy=org.w3.clearkey|%s:%s`,
-				channel.DRM.KeyID, channel.DRM.Key)
+		if channel.DRM != nil && channel.DRM.Type == "clearkey" && channel.DRM.Value != "" {
+			drmLine := fmt.Sprintf(`#KODIPROP:inputstream.adaptive.drm_legacy=org.w3.clearkey|%s`, channel.DRM.Value)
 			lines = append(lines, drmLine)
 		}
 
@@ -738,13 +737,9 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string, userToken string) {
 				}
 				// 如果有 DRM 信息，解析并保存
 				if clearkey != "" {
-					parts := strings.SplitN(clearkey, ":", 2)
-					if len(parts) == 2 {
-						channel.DRM = &DRMInfo{
-							Type:  "clearkey",
-							KeyID: parts[0],
-							Key:   parts[1],
-						}
+					channel.DRM = &DRMInfo{
+						Type:  "clearkey",
+						Value: clearkey, // 直接保存原始的 kid:key 字符串
 					}
 				}
 				channelsMu.Lock()

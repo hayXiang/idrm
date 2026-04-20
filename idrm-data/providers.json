@@ -1,14 +1,14 @@
 {
-  "77254e3f67c963a4": {
-    "id": "77254e3f67c963a4",
-    "name": "nba",
+  "410d0e6ba61425f2": {
+    "id": "410d0e6ba61425f2",
+    "name": "4444",
     "type": "remote",
-    "url": "https://live.9528.eu.org/subscribe/npl/mpd?token=rashhman",
+    "url": "https://live.9528.eu.org/stan/live/index.m3u?token=c36f10fd0ff59c3bcce088d7a7a6c410",
     "headers": [],
     "streamHeaders": [],
     "proxy": "",
     "streamProxy": "",
-    "channelCount": 22,
+    "channelCount": 29,
     "config": {
       "bestQuality": true,
       "speedUp": true,
@@ -18,6 +18,28 @@
       "cacheSegmentMemory": 10
     },
     "status": "ok",
+    "statusMessage": "",
+    "createdAt": ""
+  },
+  "84d1561088ff23c0": {
+    "id": "84d1561088ff23c0",
+    "name": "test",
+    "type": "custom",
+    "url": "",
+    "headers": [],
+    "streamHeaders": [],
+    "proxy": "",
+    "streamProxy": "",
+    "channelCount": 2,
+    "config": {
+      "bestQuality": true,
+      "speedUp": true,
+      "toHls": false,
+      "cacheManifest": -1,
+      "cacheSegmentFile": -1,
+      "cacheSegmentMemory": 10
+    },
+    "status": "",
     "statusMessage": "",
     "createdAt": ""
   }

@@ -55,10 +55,6 @@
             >
               <el-icon><Plus /></el-icon>添加
             </el-button>
-            <!-- 订阅地址按钮 -->
-            <el-button type="success" @click="handleSubscribe">
-              <el-icon><Document /></el-icon>订阅地址
-            </el-button>
           </div>
         </div>
       </template>

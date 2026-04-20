@@ -36,8 +36,8 @@
       
       <el-form-item label="角色" prop="role">
         <el-radio-group v-model="form.role" :disabled="isAdminUser || isEdit">
-          <el-radio label="user">普通用户</el-radio>
-          <el-radio label="admin">管理员</el-radio>
+          <el-radio value="user">普通用户</el-radio>
+          <el-radio value="admin">管理员</el-radio>
         </el-radio-group>
       </el-form-item>
       

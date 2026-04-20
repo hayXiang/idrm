@@ -76,7 +76,6 @@ type Channel struct {
 	Name       string   `json:"name"`
 	TvgID      string   `json:"tvgId"`
 	GroupTitle string   `json:"groupTitle"`
-	GameTitle  string   `json:"gameTitle"`
 	Logo       string   `json:"logo"`
 	URL        string   `json:"url"`
 	Enabled    bool     `json:"enabled"`
@@ -86,8 +85,7 @@ type Channel struct {
 // DRMInfo DRM 信息
 type DRMInfo struct {
 	Type  string `json:"type"`
-	KeyID string `json:"keyId"`
-	Key   string `json:"key"`
+	Value string `json:"value"` // ClearKey 配置值：可以是 "kid:key" 或 HTTP URL
 }
 
 // APIResponse 统一 API 响应格式
@@ -361,6 +359,11 @@ func loadChannels() {
 			if channel.TvgID != "" && channel.URL != "" {
 				PROVIDER_BY_TVG_ID.Store(channel.TvgID, provider.Name)
 				RAW_URL_BY_TVG_ID.Store(channel.TvgID, channel.URL)
+				
+				// 如果有 DRM 配置，同步更新 clearKeysMap
+				if channel.DRM != nil && channel.DRM.Type == "clearkey" && channel.DRM.Value != "" {
+					clearKeysMap.Store(channel.TvgID, channel.DRM.Value)
+				}
 			}
 		}
 	}
@@ -1342,6 +1345,8 @@ func CreateProvider(ctx *fasthttp.RequestCtx) {
 		StreamProxy:   req.StreamProxy,
 		ChannelCount:  0,
 		Config:        req.Config,
+		Status:        "loading",
+		StatusMessage: "正在初始化...",
 	}
 
 	providersMu.Lock()
@@ -1361,12 +1366,10 @@ func CreateProvider(ctx *fasthttp.RequestCtx) {
 	saveProviders()
 	saveChannels()
 
-	// 异步加载 M3U（如果是远程类型）
-	if provider.Type == "remote" && provider.URL != "" {
-		go func() {
-			loadM3u(nil, provider.Name, "")
-		}()
-	}
+	// 异步加载 M3U（所有类型都需要初始化）
+	go func() {
+		loadM3u(nil, provider.Name, "")
+	}()
 
 	sendJSON(ctx, 200, provider)
 }
@@ -1831,7 +1834,6 @@ func CreateChannel(ctx *fasthttp.RequestCtx) {
 		Name:       req.Name,
 		TvgID:      req.TvgID,
 		GroupTitle: req.GroupTitle,
-		GameTitle:  req.GameTitle,
 		Logo:       req.Logo,
 		URL:        req.URL,
 		Enabled:    req.Enabled,
@@ -1851,6 +1853,14 @@ func CreateChannel(ctx *fasthttp.RequestCtx) {
 	// 注册 TVG ID 到全局映射（用于代理）
 	PROVIDER_BY_TVG_ID.Store(channel.TvgID, provider.Name)
 	RAW_URL_BY_TVG_ID.Store(channel.TvgID, channel.URL)
+	
+	// 如果有 DRM 配置，更新 clearKeysMap
+	if channel.DRM != nil && channel.DRM.Type == "clearkey" && channel.DRM.Value != "" {
+		clearKeysMap.Store(channel.TvgID, channel.DRM.Value)
+	} else {
+		// 如果没有 DRM 配置，清除可能存在的旧值
+		clearKeysMap.Delete(channel.TvgID)
+	}
 
 	saveChannels()
 	saveProviders()
@@ -1918,7 +1928,6 @@ func UpdateChannel(ctx *fasthttp.RequestCtx) {
 		channel.TvgID = req.TvgID
 	}
 	channel.GroupTitle = req.GroupTitle
-	channel.GameTitle = req.GameTitle
 	channel.Logo = req.Logo
 	if req.URL != "" {
 		channel.URL = req.URL
@@ -1930,6 +1939,14 @@ func UpdateChannel(ctx *fasthttp.RequestCtx) {
 	// 更新 TVG ID 映射（用于代理）
 	PROVIDER_BY_TVG_ID.Store(channel.TvgID, provider.Name)
 	RAW_URL_BY_TVG_ID.Store(channel.TvgID, channel.URL)
+	
+	// 如果有 DRM 配置，更新 clearKeysMap
+	if channel.DRM != nil && channel.DRM.Type == "clearkey" && channel.DRM.Value != "" {
+		clearKeysMap.Store(channel.TvgID, channel.DRM.Value)
+	} else {
+		// 如果没有 DRM 配置，清除可能存在的旧值
+		clearKeysMap.Delete(channel.TvgID)
+	}
 
 	saveChannels()
 
@@ -1994,16 +2011,24 @@ func DeleteChannel(ctx *fasthttp.RequestCtx) {
 	}
 
 	channelsMu.Lock()
-	if _, exists := apiChannels[providerId][channelId]; !exists {
+	channel, exists := apiChannels[providerId][channelId]
+	if !exists {
 		channelsMu.Unlock()
 		sendError(ctx, 404, "频道不存在")
 		return
 	}
+	
+	// 删除前记录 TvgID，用于清除 clearKeysMap
+	tvgID := channel.TvgID
+	
 	delete(apiChannels[providerId], channelId)
 
 	// 更新频道数量
 	provider.ChannelCount = len(apiChannels[providerId])
 	channelsMu.Unlock()
+	
+	// 清除 clearKeysMap 中的对应条目
+	clearKeysMap.Delete(tvgID)
 
 	saveChannels()
 	saveProviders()
