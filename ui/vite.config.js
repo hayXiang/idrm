@@ -16,7 +16,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../idrm-main/dist',
+    outDir: '../dist',
     emptyOutDir: true
   },
   server: {

@@ -1,0 +1,12 @@
+{
+  "1": {
+    "id": "1",
+    "username": "admin",
+    "password": "123456",
+    "role": "admin",
+    "allowedProviders": [],
+    "createdAt": "2026-04-20 08:33:47",
+    "needChangePassword": false,
+    "token": "7dfc340b2a01cf660c7629fbe3bce997"
+  }
+}

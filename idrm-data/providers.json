@@ -1,0 +1,24 @@
+{
+  "77254e3f67c963a4": {
+    "id": "77254e3f67c963a4",
+    "name": "nba",
+    "type": "remote",
+    "url": "https://live.9528.eu.org/subscribe/npl/mpd?token=rashhman",
+    "headers": [],
+    "streamHeaders": [],
+    "proxy": "",
+    "streamProxy": "",
+    "channelCount": 22,
+    "config": {
+      "bestQuality": true,
+      "speedUp": true,
+      "toHls": false,
+      "cacheManifest": -1,
+      "cacheSegmentFile": -1,
+      "cacheSegmentMemory": 10
+    },
+    "status": "ok",
+    "statusMessage": "",
+    "createdAt": ""
+  }
+}
