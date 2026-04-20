@@ -106,18 +106,25 @@ const handleInit = async () => {
   
   loading.value = true
   try {
-    const data = await initSystem({ password: form.password })
+    const response = await initSystem({ password: form.password })
+    
+    // 响应拦截器返回的是 {code: 200, data: {...}}，需要访问 response.data
+    const data = response.data
     
     // 保存 token 和用户信息
     userStore.token = data.token
     userStore.userInfo = data.userInfo
+    userStore.needChangePassword = false
     localStorage.setItem('token', data.token)
+    localStorage.setItem('needChangePassword', 'false')
     
     // 清除初始化标记
     localStorage.removeItem('needSystemInit')
     
-    ElMessage.success('初始化成功，欢迎登录')
-    router.push('/')
+    ElMessage.success('初始化成功')
+    
+    // 直接替换当前路由
+    router.replace('/')
   } catch (error) {
     console.error(error)
   } finally {

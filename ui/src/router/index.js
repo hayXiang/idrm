@@ -81,14 +81,53 @@ router.beforeEach(async (to, from, next) => {
     return
   }
   
+  // 对于公开页面（登录、初始化、修改密码），直接放行
+  if (to.meta.public) {
+    next()
+    return
+  }
+  
+  // 如果用户已登录且有 token，跳过系统状态检查，直接进入
+  if (userStore.token && userStore.userInfo) {
+    // 已登录但还需要修改密码，强制跳转到修改密码页面
+    if (userStore.needChangePassword && to.path !== '/change-password') {
+      next('/change-password')
+      return
+    }
+    
+    // 非管理员访问管理员专属页面，跳转到首页
+    if (to.meta.admin && userStore.userInfo?.role !== 'admin') {
+      next('/')
+      return
+    }
+    
+    next()
+    return
+  }
+  
+  // 对于未登录的用户，先检查系统是否已初始化
+  try {
+    const { getSystemStatus } = await import('@/api/auth')
+    const { data } = await getSystemStatus()
+    
+    // 如果系统未初始化，设置标记并跳转到初始化页面
+    if (!data.initialized) {
+      localStorage.setItem('needSystemInit', 'true')
+      next('/init')
+      return
+    }
+  } catch (error) {
+    console.error('检查系统状态失败:', error)
+  }
+  
   // 未登录且访问非公开页面
-  if (!to.meta.public && !userStore.token) {
+  if (!userStore.token) {
     next('/login')
     return
   }
   
   // 已登录但 userInfo 为 null（页面刷新后），重新获取用户信息
-  if (userStore.token && !userStore.userInfo && to.path !== '/change-password') {
+  if (!userStore.userInfo && to.path !== '/change-password') {
     try {
       await userStore.fetchUserInfo()
     } catch (error) {
@@ -100,7 +139,7 @@ router.beforeEach(async (to, from, next) => {
   }
   
   // 已登录但还需要修改密码，强制跳转到修改密码页面
-  if (userStore.token && userStore.needChangePassword && to.path !== '/change-password') {
+  if (userStore.needChangePassword && to.path !== '/change-password') {
     next('/change-password')
     return
   }

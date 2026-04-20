@@ -1,52 +1,7 @@
 {
   "77254e3f67c963a4": {
-    "018cf54a7ae0b553": {
-      "id": "018cf54a7ae0b553",
-      "name": "04/19 01:00 猛龙 VS 骑士 客场镜头 现场",
-      "tvgId": "g0042500131tor1000475cle",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/raptors_at_cavaliers.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500131tor1000475cleV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "3430dc524dfd538ffc8776e5c7590925",
-        "key": "27cd6290fa983006c72c218a18f65747"
-      }
-    },
-    "071030dc32d335ea": {
-      "id": "071030dc32d335ea",
-      "name": "04/20 09:00 开拓者 VS 马刺 手机专用镜头 现场",
-      "tvgId": "g0042500151por1000444sas",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/blazers_at_spurs.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500151por1000444sasV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "6ea23aab72fa2729693934c067d12177",
-        "key": "e4bf0a8302efa0fcb4bd89aac7abcb31"
-      }
-    },
-    "0a29088f9a76d485": {
-      "id": "0a29088f9a76d485",
-      "name": "04/19 03:30 森林狼 VS 掘金 PrimeVision",
-      "tvgId": "g0042500161min1001604den",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/timberwolves_at_nuggets.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500161min1001604denV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "19c73642ab90888f6c8ced693df99c30",
-        "key": "762bf7cf466d6fda48d8d10f6f8cc3cb"
-      }
-    },
-    "15159fa63362f374": {
-      "id": "15159fa63362f374",
+    "1794e48ffe45568a": {
+      "id": "1794e48ffe45568a",
       "name": "04/19 03:30 森林狼 VS 掘金 手机专用镜头 现场",
       "tvgId": "g0042500161min1000444den",
       "groupTitle": "季后赛",
@@ -60,173 +15,8 @@
         "key": "a148a080ae108b81e980fa095c16cdeb"
       }
     },
-    "3ff0139d8d8b2805": {
-      "id": "3ff0139d8d8b2805",
-      "name": "04/20 03:30 太阳 VS 雷霆 ABC 现场",
-      "tvgId": "g0042500141phx1000447okc",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/suns_at_thunder.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500141phx1000447okcV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "e22ff2b2dccc0f66f1e62e4cf7e1d66e",
-        "key": "0cdbf6501a66dcaaf961cf418f20db39"
-      }
-    },
-    "458156391edd2c1e": {
-      "id": "458156391edd2c1e",
-      "name": "04/19 08:30 火箭 VS 湖人 NBA DataMode",
-      "tvgId": "g0042500171hou1001254lal",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/rockets_at_lakers.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500171hou1001254lalV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "47f08c673159c3d15916e79dd2550591",
-        "key": "ea1dc051b267f8d112cad465384b3e3c"
-      }
-    },
-    "45d11a2e5bbbfad0": {
-      "id": "45d11a2e5bbbfad0",
-      "name": "04/20 09:00 开拓者 VS 马刺 NBC 现场",
-      "tvgId": "g0042500151por1001457sas",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/blazers_at_spurs.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500151por1001457sasV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "b6558ce30a80c5f4e02b64ed262f6581",
-        "key": "6b575b3a0ef31815596e3f2f93be991d"
-      }
-    },
-    "4a1acb6b7bf709a9": {
-      "id": "4a1acb6b7bf709a9",
-      "name": "04/19 06:00 老鹰 VS 尼克斯 手机专用镜头 现场",
-      "tvgId": "g0042500121atl1000444nyk",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/hawks_at_knicks.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500121atl1000444nykV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "7aa58c02f068a1dc0a36db164c2a9d98",
-        "key": "fc17e6ee01daf362740f7ee0b36b2195"
-      }
-    },
-    "677d6ca9c3307501": {
-      "id": "677d6ca9c3307501",
-      "name": "04/19 08:30 火箭 VS 湖人 手机专用镜头 现场",
-      "tvgId": "g0042500171hou1000444lal",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/rockets_at_lakers.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500171hou1000444lalV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "cb0cc67d42564e8563bab6cdd51c27f9",
-        "key": "41fda2063fc328df67032b0ccb44ba14"
-      }
-    },
-    "6ae274be249286aa": {
-      "id": "6ae274be249286aa",
-      "name": "04/20 06:30 魔术 VS 活塞 手机专用镜头 现场",
-      "tvgId": "g0042500101orl1000444det",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/magic_at_pistons.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500101orl1000444detV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "616d540bf3fca3d881c67a84b1b934ae",
-        "key": "f0d1bd1f9f94b90d945f0fade500ccaf"
-      }
-    },
-    "780f3c4ac0165338": {
-      "id": "780f3c4ac0165338",
-      "name": "04/20 09:00 开拓者 VS 马刺 NBA Baller Mode",
-      "tvgId": "g0042500151por1001584sas",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/blazers_at_spurs.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500151por1001584sasV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "5498bd546b61cfe67c42a1cda482c7d3",
-        "key": "0cea04a429add115837f923db43a76f9"
-      }
-    },
-    "7a8f31a9ede60c0a": {
-      "id": "7a8f31a9ede60c0a",
-      "name": "04/20 01:00 76人 VS 凯尔特人 ABC 现场",
-      "tvgId": "g0042500111phi1000447bos",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/76ers_at_celtics.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500111phi1000447bosV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "40b7db69ecc1a05a8c7aeb8335e755e8",
-        "key": "87113de81be76ad5335f1aa00601e668"
-      }
-    },
-    "9cdda92d42b01c5d": {
-      "id": "9cdda92d42b01c5d",
-      "name": "04/19 08:30 火箭 VS 湖人 ABC 现场",
-      "tvgId": "g0042500171hou1000447lal",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/rockets_at_lakers.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500171hou1000447lalV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "4d9ca7618adb409ccf172f47a30eb73c",
-        "key": "b35e3dc438f6bd236ea2da4bb78032a6"
-      }
-    },
-    "aa99ec8c14d2f121": {
-      "id": "aa99ec8c14d2f121",
-      "name": "04/19 03:30 森林狼 VS 掘金 Prime Video 现场",
-      "tvgId": "g0042500161min1001455den",
-      "groupTitle": "季后赛",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/timberwolves_at_nuggets.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500161min1001455denV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "3dfcd0d2a6de3197ca2db9689ca005e7",
-        "key": "8829f26b727ef9c11e2f57dec6c08193"
-      }
-    },
-    "bbfa1af34fd4dba5": {
-      "id": "bbfa1af34fd4dba5",
-      "name": "NBA-TV",
-      "tvgId": "nbatv",
-      "groupTitle": "NBA-TV",
-      "gameTitle": "",
-      "logo": "https://live.9528.eu.org/tvg-logo/NBA",
-      "url": "https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1\u0026start=LIVE\u0026end=END\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
-      "enabled": true,
-      "drm": {
-        "type": "clearkey",
-        "keyId": "1acd2d7afd8cb34099cb832862e3c08d",
-        "key": "b85491a27c2852323ac704a07cf7b779"
-      }
-    },
-    "cb827dbb9a81bb3c": {
-      "id": "cb827dbb9a81bb3c",
+    "23321062f49a1631": {
+      "id": "23321062f49a1631",
       "name": "04/19 01:00 猛龙 VS 骑士 手机专用镜头 现场",
       "tvgId": "g0042500131tor1000444cle",
       "groupTitle": "季后赛",
@@ -240,8 +30,8 @@
         "key": "dde49db452814a4d48cc58d30e4a1135"
       }
     },
-    "e43c00cd735745b7": {
-      "id": "e43c00cd735745b7",
+    "3fc86f84c427f2e4": {
+      "id": "3fc86f84c427f2e4",
       "name": "04/20 03:30 太阳 VS 雷霆 手机专用镜头 现场",
       "tvgId": "g0042500141phx1000444okc",
       "groupTitle": "季后赛",
@@ -255,53 +45,53 @@
         "key": "61bd524b29fd4cbc883f21da596a3975"
       }
     },
-    "e47226c4898a1fa8": {
-      "id": "e47226c4898a1fa8",
-      "name": "04/20 06:30 魔术 VS 活塞 NBC 现场",
-      "tvgId": "g0042500101orl1001457det",
+    "4d80ec3d93fbe3b5": {
+      "id": "4d80ec3d93fbe3b5",
+      "name": "04/19 03:30 森林狼 VS 掘金 Prime Video 现场",
+      "tvgId": "g0042500161min1001455den",
       "groupTitle": "季后赛",
       "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/magic_at_pistons.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500101orl1001457detV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "logo": "https://live.9528.eu.org/logo/nba/timberwolves_at_nuggets.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500161min1001455denV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
       "enabled": true,
       "drm": {
         "type": "clearkey",
-        "keyId": "f2160a8e6c45ffccef264e8ecff1497a",
-        "key": "15fc3f4660eb2485472166017de9114f"
+        "keyId": "3dfcd0d2a6de3197ca2db9689ca005e7",
+        "key": "8829f26b727ef9c11e2f57dec6c08193"
       }
     },
-    "ea2b8d45674d9c48": {
-      "id": "ea2b8d45674d9c48",
-      "name": "04/19 01:00 猛龙 VS 骑士 Prime Video 现场",
-      "tvgId": "g0042500131tor1001455cle",
+    "516243c74c19e2ef": {
+      "id": "516243c74c19e2ef",
+      "name": "04/19 03:30 森林狼 VS 掘金 PrimeVision",
+      "tvgId": "g0042500161min1001604den",
       "groupTitle": "季后赛",
       "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/raptors_at_cavaliers.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500131tor1001455cleV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "logo": "https://live.9528.eu.org/logo/nba/timberwolves_at_nuggets.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500161min1001604denV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
       "enabled": true,
       "drm": {
         "type": "clearkey",
-        "keyId": "3ca98ff05468263eb4023e182a85f73b",
-        "key": "7e2d5a9b3550e40ce1781eba9930394e"
+        "keyId": "19c73642ab90888f6c8ced693df99c30",
+        "key": "762bf7cf466d6fda48d8d10f6f8cc3cb"
       }
     },
-    "ebb8a15911ccc406": {
-      "id": "ebb8a15911ccc406",
-      "name": "04/19 06:00 老鹰 VS 尼克斯 Prime Video 现场",
-      "tvgId": "g0042500121atl1001455nyk",
-      "groupTitle": "季后赛",
+    "674b5f498d3c6b89": {
+      "id": "674b5f498d3c6b89",
+      "name": "NBA-TV",
+      "tvgId": "nbatv",
+      "groupTitle": "NBA-TV",
       "gameTitle": "",
-      "logo": "https://live.9528.eu.org/logo/nba/hawks_at_knicks.png",
-      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500121atl1001455nykV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "logo": "https://live.9528.eu.org/tvg-logo/NBA",
+      "url": "https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1\u0026start=LIVE\u0026end=END\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
       "enabled": true,
       "drm": {
         "type": "clearkey",
-        "keyId": "455737f46a1b3078a6185f52706cc887",
-        "key": "3557763b37e017c76567322df592bbe4"
+        "keyId": "1acd2d7afd8cb34099cb832862e3c08d",
+        "key": "b85491a27c2852323ac704a07cf7b779"
       }
     },
-    "fc3747d3c9444fd7": {
-      "id": "fc3747d3c9444fd7",
+    "6b992cba9f345137": {
+      "id": "6b992cba9f345137",
       "name": "04/19 06:00 老鹰 VS 尼克斯 PrimeVision",
       "tvgId": "g0042500121atl1001604nyk",
       "groupTitle": "季后赛",
@@ -315,8 +105,173 @@
         "key": "709ee94b7df5d40b770c3abef6289563"
       }
     },
-    "ff6cd8fb2233ab46": {
-      "id": "ff6cd8fb2233ab46",
+    "8db4474fba49dca0": {
+      "id": "8db4474fba49dca0",
+      "name": "04/19 01:00 猛龙 VS 骑士 客场镜头 现场",
+      "tvgId": "g0042500131tor1000475cle",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/raptors_at_cavaliers.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500131tor1000475cleV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "3430dc524dfd538ffc8776e5c7590925",
+        "key": "27cd6290fa983006c72c218a18f65747"
+      }
+    },
+    "98e09ace2ecf5d5b": {
+      "id": "98e09ace2ecf5d5b",
+      "name": "04/19 08:30 火箭 VS 湖人 ABC 现场",
+      "tvgId": "g0042500171hou1000447lal",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/rockets_at_lakers.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500171hou1000447lalV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "4d9ca7618adb409ccf172f47a30eb73c",
+        "key": "b35e3dc438f6bd236ea2da4bb78032a6"
+      }
+    },
+    "99b90ad8e5def57e": {
+      "id": "99b90ad8e5def57e",
+      "name": "04/20 03:30 太阳 VS 雷霆 ABC 现场",
+      "tvgId": "g0042500141phx1000447okc",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/suns_at_thunder.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500141phx1000447okcV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "e22ff2b2dccc0f66f1e62e4cf7e1d66e",
+        "key": "0cdbf6501a66dcaaf961cf418f20db39"
+      }
+    },
+    "a3d41b2d52854d52": {
+      "id": "a3d41b2d52854d52",
+      "name": "04/19 06:00 老鹰 VS 尼克斯 Prime Video 现场",
+      "tvgId": "g0042500121atl1001455nyk",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/hawks_at_knicks.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500121atl1001455nykV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "455737f46a1b3078a6185f52706cc887",
+        "key": "3557763b37e017c76567322df592bbe4"
+      }
+    },
+    "a3ddc662e6a0d52e": {
+      "id": "a3ddc662e6a0d52e",
+      "name": "04/20 01:00 76人 VS 凯尔特人 ABC 现场",
+      "tvgId": "g0042500111phi1000447bos",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/76ers_at_celtics.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500111phi1000447bosV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "40b7db69ecc1a05a8c7aeb8335e755e8",
+        "key": "87113de81be76ad5335f1aa00601e668"
+      }
+    },
+    "a3f7a7ee0e3a2f08": {
+      "id": "a3f7a7ee0e3a2f08",
+      "name": "04/19 08:30 火箭 VS 湖人 手机专用镜头 现场",
+      "tvgId": "g0042500171hou1000444lal",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/rockets_at_lakers.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500171hou1000444lalV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "cb0cc67d42564e8563bab6cdd51c27f9",
+        "key": "41fda2063fc328df67032b0ccb44ba14"
+      }
+    },
+    "a4147c35c6f67a94": {
+      "id": "a4147c35c6f67a94",
+      "name": "04/20 09:00 开拓者 VS 马刺 NBC 现场",
+      "tvgId": "g0042500151por1001457sas",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/blazers_at_spurs.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500151por1001457sasV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "b6558ce30a80c5f4e02b64ed262f6581",
+        "key": "6b575b3a0ef31815596e3f2f93be991d"
+      }
+    },
+    "a74607c00a9ce2c1": {
+      "id": "a74607c00a9ce2c1",
+      "name": "04/20 06:30 魔术 VS 活塞 NBC 现场",
+      "tvgId": "g0042500101orl1001457det",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/magic_at_pistons.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500101orl1001457detV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "f2160a8e6c45ffccef264e8ecff1497a",
+        "key": "15fc3f4660eb2485472166017de9114f"
+      }
+    },
+    "a9140a306072fcd3": {
+      "id": "a9140a306072fcd3",
+      "name": "04/20 06:30 魔术 VS 活塞 手机专用镜头 现场",
+      "tvgId": "g0042500101orl1000444det",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/magic_at_pistons.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500101orl1000444detV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "616d540bf3fca3d881c67a84b1b934ae",
+        "key": "f0d1bd1f9f94b90d945f0fade500ccaf"
+      }
+    },
+    "ab63fd3a16caa01f": {
+      "id": "ab63fd3a16caa01f",
+      "name": "04/20 09:00 开拓者 VS 马刺 NBA Baller Mode",
+      "tvgId": "g0042500151por1001584sas",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/blazers_at_spurs.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500151por1001584sasV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "5498bd546b61cfe67c42a1cda482c7d3",
+        "key": "0cea04a429add115837f923db43a76f9"
+      }
+    },
+    "cc6f4d907c499a25": {
+      "id": "cc6f4d907c499a25",
+      "name": "04/19 01:00 猛龙 VS 骑士 Prime Video 现场",
+      "tvgId": "g0042500131tor1001455cle",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/raptors_at_cavaliers.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500131tor1001455cleV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "3ca98ff05468263eb4023e182a85f73b",
+        "key": "7e2d5a9b3550e40ce1781eba9930394e"
+      }
+    },
+    "d4e4b236ec69989e": {
+      "id": "d4e4b236ec69989e",
       "name": "04/20 01:00 76人 VS 凯尔特人 手机专用镜头 现场",
       "tvgId": "g0042500111phi1000444bos",
       "groupTitle": "季后赛",
@@ -328,6 +283,51 @@
         "type": "clearkey",
         "keyId": "b44a47df4259cfaab101615aa8ae2ad7",
         "key": "a15b6c9f9ab6260344bce85cd2fe37d6"
+      }
+    },
+    "e34fc73656bb15ee": {
+      "id": "e34fc73656bb15ee",
+      "name": "04/19 08:30 火箭 VS 湖人 NBA DataMode",
+      "tvgId": "g0042500171hou1001254lal",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/rockets_at_lakers.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500171hou1001254lalV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "47f08c673159c3d15916e79dd2550591",
+        "key": "ea1dc051b267f8d112cad465384b3e3c"
+      }
+    },
+    "ef44f36d926b9d1a": {
+      "id": "ef44f36d926b9d1a",
+      "name": "04/20 09:00 开拓者 VS 马刺 手机专用镜头 现场",
+      "tvgId": "g0042500151por1000444sas",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/blazers_at_spurs.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500151por1000444sasV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "6ea23aab72fa2729693934c067d12177",
+        "key": "e4bf0a8302efa0fcb4bd89aac7abcb31"
+      }
+    },
+    "f25c8961214b814b": {
+      "id": "f25c8961214b814b",
+      "name": "04/19 06:00 老鹰 VS 尼克斯 手机专用镜头 现场",
+      "tvgId": "g0042500121atl1000444nyk",
+      "groupTitle": "季后赛",
+      "gameTitle": "",
+      "logo": "https://live.9528.eu.org/logo/nba/hawks_at_knicks.png",
+      "url": "https://lpnba.akamaized.net/vod-pz/p/hls-wvpr/NBA_g0042500121atl1000444nykV/index.m3u8?addUserInfo=1\u0026PostalCode=0\u0026ISO3166=\u0026sessionId=54fa53e0-9482-477c-8406-47969675bc6e",
+      "enabled": true,
+      "drm": {
+        "type": "clearkey",
+        "keyId": "7aa58c02f068a1dc0a36db164c2a9d98",
+        "key": "fc17e6ee01daf362740f7ee0b36b2195"
       }
     }
   }
