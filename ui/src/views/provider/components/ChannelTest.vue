@@ -51,7 +51,6 @@
           <video
             ref="videoRef"
             controls
-            muted
             playsinline
             style="width: 100%; height: 300px; background: #000; border-radius: 4px;"
             @error="handleVideoError"
@@ -71,7 +70,7 @@
         </div>
         <p class="hint-text" v-if="!videoError && proxyUrl && !testing">
           <el-icon><InfoFilled /></el-icon> 
-          提示：点击"测试播放"按钮后，视频将自动开始播放（已静音）。如需取消静音，请点击视频控件中的音量按钮。
+          提示：点击"测试"按钮后，视频将自动开始播放。如果浏览器阻止自动播放，请点击视频控件的播放按钮。
         </p>
       </div>
     </div>
@@ -265,19 +264,19 @@ const testStream = async () => {
         videoRef.value.addEventListener('error', onError, { once: true })
       })
       
-      // 尝试播放（由于设置了muted，应该可以自动播放）
+      // 尝试播放（注意：由于移除了muted属性，浏览器可能会阻止自动播放）
       try {
         console.log('尝试播放视频...')
         const playPromise = videoRef.value.play()
         
         if (playPromise !== undefined) {
           await playPromise
-          console.log('✓ 视频开始播放')
+          console.log('✓ 视频开始播放（带声音）')
           ElMessage.success('视频已开始播放')
         }
       } catch (playErr) {
-        console.warn('⚠ 自动播放被阻止:', playErr)
-        ElMessage.info('视频已加载，请点击播放按钮开始播放')
+        console.warn('⚠ 自动播放被浏览器阻止（需要用户交互）:', playErr)
+        ElMessage.info('浏览器阻止了自动播放，请点击视频控件的播放按钮')
         // 不设置为错误，因为视频可能已经加载成功
       }
     }
