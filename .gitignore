@@ -5,3 +5,4 @@ idrm.exe
 idrm
 /dist/
 /ui/node_modules/
+/idrm-data/

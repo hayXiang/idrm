@@ -308,6 +308,71 @@ const handleDelete = async (row) => {
     }
   }
 }
+
+const handleSubscribe = async (row) => {
+  try {
+    const { data } = await getProxyUrl({
+      url: row.url,
+      tvgId: row.tvgId
+    })
+    
+    const backendUrl = import.meta.env.DEV ? 'http://127.0.0.1:1234' : `${window.location.protocol}//${window.location.host}`
+    const subscribeUrl = `${backendUrl}${data.proxyUrl}`
+    
+    console.log('准备复制的订阅地址:', subscribeUrl)
+    
+    // 复制到剪贴板
+    let copySuccess = false
+    
+    // 优先使用 Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(subscribeUrl)
+        copySuccess = true
+        console.log('✓ 使用 Clipboard API 复制成功')
+      } catch (clipboardErr) {
+        console.warn('Clipboard API 复制失败，尝试降级方案:', clipboardErr)
+      }
+    }
+    
+    // 如果 Clipboard API 失败，使用降级方案
+    if (!copySuccess) {
+      try {
+        const textarea = document.createElement('textarea')
+        textarea.value = subscribeUrl
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        textarea.style.top = '-9999px'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        
+        const successful = document.execCommand('copy')
+        document.body.removeChild(textarea)
+        
+        if (successful) {
+          copySuccess = true
+          console.log('✓ 使用 execCommand 复制成功')
+        } else {
+          throw new Error('execCommand 返回 false')
+        }
+      } catch (execErr) {
+        console.error('✗ execCommand 复制失败:', execErr)
+        throw execErr
+      }
+    }
+    
+    if (copySuccess) {
+      ElMessage.success('订阅地址已复制到剪贴板')
+    } else {
+      throw new Error('所有复制方法都失败了')
+    }
+  } catch (error) {
+    console.error('获取或复制订阅地址失败:', error)
+    ElMessage.error('复制失败: ' + (error.message || '未知错误'))
+  }
+}
 </script>
 
 <style scoped lang="scss">
