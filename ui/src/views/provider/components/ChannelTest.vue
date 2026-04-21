@@ -1,4 +1,4 @@
-<template>
+你，<template>
   <el-dialog
     title="频道测试"
     v-model="visible"
@@ -47,19 +47,32 @@
       
       <div class="player-preview" v-if="proxyUrl">
         <h4>预览</h4>
-        <video
-          ref="videoRef"
-          :src="proxyUrl"
-          controls
-          autoplay
-          style="width: 100%; height: 300px; background: #000; border-radius: 4px;"
-          @error="handleVideoError"
-        >
-          您的浏览器不支持视频播放
-        </video>
+        <div class="video-wrapper" :class="{ 'is-loading': testing }">
+          <video
+            ref="videoRef"
+            controls
+            muted
+            playsinline
+            style="width: 100%; height: 300px; background: #000; border-radius: 4px;"
+            @error="handleVideoError"
+            @waiting="onVideoWaiting"
+            @playing="onVideoPlaying"
+          >
+            您的浏览器不支持视频播放
+          </video>
+          <!-- 加载遮罩 -->
+          <div v-if="testing" class="loading-overlay">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span>正在加载视频...</span>
+          </div>
+        </div>
         <div v-if="videoError" class="video-error">
           <el-alert :title="videoError" type="error" :closable="false" show-icon />
         </div>
+        <p class="hint-text" v-if="!videoError && proxyUrl && !testing">
+          <el-icon><InfoFilled /></el-icon> 
+          提示：点击"测试播放"按钮后，视频将自动开始播放（已静音）。如需取消静音，请点击视频控件中的音量按钮。
+        </p>
       </div>
     </div>
   </el-dialog>
@@ -68,6 +81,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { InfoFilled, Loading } from '@element-plus/icons-vue'
 import { getProxyUrl } from '@/api/auth'
 
 const props = defineProps({
@@ -118,10 +132,32 @@ watch(() => props.channel, () => {
   }
 }, { immediate: true })
 
-// 监听对话框显示状态
-watch(() => props.visible, (val) => {
+// 监听对话框显示状态，打开时自动加载并播放视频
+watch(() => props.visible, async (val) => {
   if (val && props.channel) {
-    fetchProxyUrl()
+    console.log('📺 测试对话框已打开，准备自动播放视频...')
+    
+    // 先获取代理地址
+    await fetchProxyUrl()
+    
+    // 等待一下确保 DOM 更新
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // 自动开始测试播放
+    if (proxyUrl.value) {
+      console.log('▶️ 开始自动播放视频')
+      await testStream()
+    } else {
+      console.warn('⚠️ 代理地址获取失败，无法自动播放')
+    }
+  } else {
+    // 对话框关闭时重置状态
+    if (!val) {
+      console.log('🔒 测试对话框已关闭，重置状态')
+      testResult.value = null
+      videoError.value = ''
+      testing.value = false
+    }
   }
 })
 
@@ -164,6 +200,17 @@ const handleVideoError = (event) => {
   console.error('视频错误:', video.error, 'URL:', proxyUrl.value)
 }
 
+// 视频等待缓冲
+const onVideoWaiting = () => {
+  console.log('视频正在缓冲...')
+}
+
+// 视频开始播放
+const onVideoPlaying = () => {
+  console.log('✓ 视频已开始播放')
+  testing.value = false
+}
+
 const testStream = async () => {
   testing.value = true
   videoError.value = ''  // 清除之前的错误
@@ -171,13 +218,67 @@ const testStream = async () => {
     // 重新获取代理地址（可能有过期时间等变化）
     await fetchProxyUrl()
     
-    // 触发视频重新加载
+    console.log('========== 开始测试播放 ==========')
+    console.log('频道名称:', props.channel?.name)
+    console.log('原始URL:', props.channel?.url)
+    console.log('代理URL:', proxyUrl.value)
+    
+    // 触发视频重新加载和播放
     if (videoRef.value && proxyUrl.value) {
+      console.log('开始加载视频...')
+      
+      // 设置视频源
+      videoRef.value.src = proxyUrl.value
       videoRef.value.load()
+      
+      // 等待视频可以播放（使用 canplay 或 loadeddata 事件）
+      let isReady = false
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          console.warn('⚠ 视频加载超时（15秒）')
+          // 超时时不直接拒绝，尝试直接播放
+          resolve()
+        }, 15000) // 增加到15秒超时
+        
+        // 监听多个可能的就绪事件
+        const onReady = () => {
+          if (!isReady) {
+            isReady = true
+            clearTimeout(timeout)
+            console.log('✓ 视频已就绪，准备播放')
+            resolve()
+          }
+        }
+        
+        const onError = (e) => {
+          if (!isReady) {
+            isReady = true
+            clearTimeout(timeout)
+            console.error('✗ 视频加载错误:', e)
+            reject(new Error('视频加载失败'))
+          }
+        }
+        
+        // 监听多个事件，任何一个触发就认为可以播放
+        videoRef.value.addEventListener('canplay', onReady, { once: true })
+        videoRef.value.addEventListener('loadeddata', onReady, { once: true })
+        videoRef.value.addEventListener('error', onError, { once: true })
+      })
+      
+      // 尝试播放（由于设置了muted，应该可以自动播放）
       try {
-        await videoRef.value.play()
-      } catch (e) {
-        console.log('自动播放被阻止:', e)
+        console.log('尝试播放视频...')
+        const playPromise = videoRef.value.play()
+        
+        if (playPromise !== undefined) {
+          await playPromise
+          console.log('✓ 视频开始播放')
+          ElMessage.success('视频已开始播放')
+        }
+      } catch (playErr) {
+        console.warn('⚠ 自动播放被阻止:', playErr)
+        ElMessage.info('视频已加载，请点击播放按钮开始播放')
+        // 不设置为错误，因为视频可能已经加载成功
       }
     }
     
@@ -188,8 +289,20 @@ const testStream = async () => {
       statusCode: 200,
       contentType: 'application/vnd.apple.mpegurl'
     }
+  } catch (error) {
+    console.error('测试播放失败:', error)
+    videoError.value = '播放失败: ' + (error.message || '未知错误')
+    testResult.value = {
+      success: false,
+      responseTime: 0,
+      statusCode: 0,
+      contentType: '',
+      error: error.message
+    }
+    ElMessage.error('视频播放失败，请检查控制台日志')
   } finally {
     testing.value = false
+    console.log('========== 测试结束 ==========')
   }
 }
 
@@ -244,8 +357,57 @@ const copyUrl = async () => {
   .player-preview {
     margin-top: 16px;
     
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      height: 300px;
+      border-radius: 4px;
+      overflow: hidden;
+      
+      &.is-loading {
+        pointer-events: none;
+      }
+      
+      .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 14px;
+        
+        .is-loading {
+          font-size: 24px;
+          margin-bottom: 8px;
+        }
+      }
+    }
+    
     .video-error {
       margin-top: 8px;
+    }
+    
+    .hint-text {
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: #ecf5ff;
+      border-left: 3px solid #409eff;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #409eff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      
+      :deep(.el-icon) {
+        flex-shrink: 0;
+      }
     }
     
     .player-placeholder {
