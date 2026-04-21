@@ -2,11 +2,33 @@
   "1": {
     "id": "1",
     "username": "admin",
-    "password": "123456",
+    "password": "12345678",
     "role": "admin",
-    "allowedProviders": [],
+    "allowedProviders": null,
     "createdAt": "2026-04-20 22:47:18",
     "needChangePassword": false,
-    "token": "9da9d9d7967bbb8507e2c6e367088d39"
+    "token": "9da9d9d7967bbb8507e2c6e367088d39xxy"
+  },
+  "197cad3b19ac5d67": {
+    "id": "197cad3b19ac5d67",
+    "username": "test",
+    "password": "test12345",
+    "role": "user",
+    "allowedProviders": [
+      "410d0e6ba61425f2"
+    ],
+    "createdAt": "2026-04-21 10:04:05",
+    "needChangePassword": false,
+    "token": "6bc4236b7f90cb6226914064b10b6302"
+  },
+  "ddba26b7ffabb666": {
+    "id": "ddba26b7ffabb666",
+    "username": "666",
+    "password": "666",
+    "role": "admin",
+    "allowedProviders": [],
+    "createdAt": "2026-04-21 10:32:16",
+    "needChangePassword": false,
+    "token": "ca578970e90fcf10c9b93c03a6f151ee"
   }
 }

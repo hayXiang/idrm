@@ -907,18 +907,49 @@ func InitSystem(ctx *fasthttp.RequestCtx) {
 	sendJSON(ctx, 200, response)
 }
 
-// GetUsers 获取用户列表
+// GetUsers 获取用户列表（根据角色过滤）
 func GetUsers(ctx *fasthttp.RequestCtx) {
-	if !adminMiddleware(ctx) {
+	// 使用 authMiddleware 而不是 adminMiddleware，允许所有登录用户访问
+	token := getTokenFromHeader(ctx)
+	if token == "" {
+		sendError(ctx, 401, "未授权")
+		return
+	}
+
+	currentUser, valid := validateToken(token)
+	if !valid {
+		sendError(ctx, 401, "无效的 Token")
 		return
 	}
 
 	usersMu.RLock()
-	userList := make([]User, 0, len(apiUsers))
+	userList := make([]User, 0)
+	
 	for _, u := range apiUsers {
-		userList = append(userList, u.ToSafeUser())
+		safeUser := u.ToSafeUser()
+		
+		// 根据当前用户角色过滤列表
+		if currentUser.ID == "1" {
+			// 超级管理员：可以看到所有用户
+			userList = append(userList, safeUser)
+		} else if currentUser.Role == "admin" {
+			// 普通管理员：只能看到自己和普通用户
+			if u.ID == currentUser.ID || u.Role == "user" {
+				userList = append(userList, safeUser)
+			}
+		} else if currentUser.Role == "user" {
+			// 普通用户：只能看到自己
+			if u.ID == currentUser.ID {
+				userList = append(userList, safeUser)
+			}
+		}
 	}
 	usersMu.RUnlock()
+
+	// 按 ID 排序，确保列表顺序固定
+	sort.Slice(userList, func(i, j int) bool {
+		return userList[i].ID < userList[j].ID
+	})
 
 	sendJSON(ctx, 200, userList)
 }
@@ -932,6 +963,7 @@ func CreateUser(ctx *fasthttp.RequestCtx) {
 	var req struct {
 		Username         string   `json:"username"`
 		Password         string   `json:"password"`
+		Token            string   `json:"token"`
 		Role             string   `json:"role"`
 		AllowedProviders []string `json:"allowedProviders"`
 	}
@@ -984,19 +1016,69 @@ func CreateUser(ctx *fasthttp.RequestCtx) {
 
 // UpdateUser 更新用户
 func UpdateUser(ctx *fasthttp.RequestCtx) {
-	if !adminMiddleware(ctx) {
+	// 使用 authMiddleware 而不是 adminMiddleware，允许非管理员修改自己
+	token := getTokenFromHeader(ctx)
+	if token == "" {
+		sendError(ctx, 401, "未授权")
 		return
 	}
 
+	currentUser, valid := validateToken(token)
+	if !valid {
+		sendError(ctx, 401, "无效的 Token")
+		return
+	}
+
+	log.Printf("当前登录用户: ID=%s, Username=%s, Role=%s", currentUser.ID, currentUser.Username, currentUser.Role)
+
 	id := ctx.UserValue("id").(string)
-	if id == "1" {
-		sendError(ctx, 403, "不能修改管理员账号")
+	
+	// 获取目标用户
+	usersMu.RLock()
+	targetUser, exists := apiUsers[id]
+	usersMu.RUnlock()
+	
+	if !exists {
+		sendError(ctx, 404, "用户不存在")
+		return
+	}
+
+	// 权限检查
+	canEdit := false
+	
+	// 1. 超级管理员可以编辑所有人
+	if currentUser.ID == "1" {
+		canEdit = true
+	}
+	
+	// 2. 普通用户只能编辑自己
+	if currentUser.Role == "user" && currentUser.ID == id {
+		canEdit = true
+	}
+	
+	// 3. 其他管理员可以编辑自己和普通用户，不能编辑超级管理员和其他管理员
+	if currentUser.Role == "admin" && currentUser.ID != "1" {
+		// 可以编辑自己
+		if currentUser.ID == id {
+			canEdit = true
+		}
+		// 可以编辑普通用户（但不能是超级管理员）
+		if targetUser.Role == "user" && targetUser.ID != "1" {
+			canEdit = true
+		}
+	}
+	
+	if !canEdit {
+		log.Printf("权限拒绝: 当前用户 %s (角色: %s) 尝试修改用户 %s (角色: %s)", 
+			currentUser.Username, currentUser.Role, targetUser.Username, targetUser.Role)
+		sendError(ctx, 403, "没有权限修改该用户")
 		return
 	}
 
 	var req struct {
 		Username         string   `json:"username"`
 		Password         string   `json:"password"`
+		Token            string   `json:"token"`
 		Role             string   `json:"role"`
 		AllowedProviders []string `json:"allowedProviders"`
 	}
@@ -1006,6 +1088,17 @@ func UpdateUser(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	passwordLog := ""
+	if req.Password != "" {
+		passwordLog = "***"
+	}
+	tokenLog := ""
+	if req.Token != "" {
+		tokenLog = "***"
+	}
+	log.Printf("收到更新请求 - 用户ID: %s, 当前用户: %s (角色: %s), 请求数据: Username=%s, Password=%s, Token=%s, Role=%s", 
+		id, currentUser.Username, currentUser.Role, req.Username, passwordLog, tokenLog, req.Role)
+
 	usersMu.Lock()
 	user, exists := apiUsers[id]
 	if !exists {
@@ -1014,16 +1107,25 @@ func UpdateUser(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
+	// 只有超级管理员可以修改角色和权限
+	if currentUser.ID == "1" {
+		if req.Role != "" {
+			user.Role = req.Role
+		}
+		user.AllowedProviders = req.AllowedProviders
+	}
+
 	if req.Username != "" {
 		user.Username = req.Username
 	}
 	if req.Password != "" {
+		log.Printf("用户 %s (ID: %s) 密码已更新", user.Username, user.ID)
 		user.Password = req.Password
 	}
-	if req.Role != "" {
-		user.Role = req.Role
+	if req.Token != "" {
+		log.Printf("用户 %s (ID: %s) Token 已更新", user.Username, user.ID)
+		user.Token = req.Token
 	}
-	user.AllowedProviders = req.AllowedProviders
 	usersMu.Unlock()
 
 	saveUsers()
@@ -1033,12 +1135,38 @@ func UpdateUser(ctx *fasthttp.RequestCtx) {
 
 // DeleteUser 删除用户
 func DeleteUser(ctx *fasthttp.RequestCtx) {
-	if !adminMiddleware(ctx) {
+	// 只有超级管理员可以删除用户
+	token := getTokenFromHeader(ctx)
+	if token == "" {
+		sendError(ctx, 401, "未授权")
+		return
+	}
+
+	currentUser, valid := validateToken(token)
+	if !valid {
+		sendError(ctx, 401, "无效的 Token")
+		return
+	}
+
+	if currentUser.ID != "1" {
+		sendError(ctx, 403, "只有超级管理员可以删除用户")
 		return
 	}
 
 	id := ctx.UserValue("id").(string)
-	if id == "1" {
+	
+	// 检查目标用户
+	usersMu.RLock()
+	targetUser, exists := apiUsers[id]
+	usersMu.RUnlock()
+	
+	if !exists {
+		sendError(ctx, 404, "用户不存在")
+		return
+	}
+	
+	// 不能删除管理员账号（包括超级管理员和其他管理员）
+	if targetUser.Role == "admin" {
 		sendError(ctx, 403, "不能删除管理员账号")
 		return
 	}
@@ -1824,7 +1952,7 @@ func CreateChannel(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if req.Name == "" || req.URL == "" || req.TvgID == "" {
+	if req.Name == "" || req.TvgID == "" || req.URL == "" {
 		sendError(ctx, 400, "频道名称、TVG ID 和 URL 不能为空")
 		return
 	}
@@ -2110,6 +2238,10 @@ func APIHandler(ctx *fasthttp.RequestCtx) {
 	case path == "/subscribe-url" && method == "GET":
 		GetSubscribeURL(ctx)
 
+	// 版本信息
+	case path == "/version" && method == "GET":
+		GetVersion(ctx)
+
 	default:
 		sendError(ctx, 404, "API 不存在")
 	}
@@ -2200,4 +2332,11 @@ func handleChannelRoutes(ctx *fasthttp.RequestCtx, path, method string) {
 	}
 
 	sendError(ctx, 404, "API 不存在")
+}
+
+// GetVersion 获取系统版本信息
+func GetVersion(ctx *fasthttp.RequestCtx) {
+	sendJSON(ctx, 200, map[string]string{
+		"version": Version,
+	})
 }

@@ -71,7 +71,7 @@ var (
 	VISIT_TRACKER              = NewVisitTracker()
 )
 
-var version = "1.0.0.33"
+var Version = "1.0.0.34"
 
 // newHTTPClient 创建支持 SOCKS5 或 HTTP 代理的 net/http Client
 func newHTTPClient(proxyURL string, timeout int) *http.Client {
@@ -203,7 +203,7 @@ func main() {
 		}()
 	}
 
-	log.Printf("代理服务器启动在：%s, 当前版本：%s", BIND_ADDRESS, version)
+	log.Printf("代理服务器启动在：%s, 当前版本：%s", BIND_ADDRESS, Version)
 	if err := fasthttp.ListenAndServe(BIND_ADDRESS, requestHandler); err != nil {
 		log.Fatalf("ListenAndServe error: %s", err)
 	}

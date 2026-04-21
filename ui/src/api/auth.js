@@ -47,3 +47,7 @@ export const getProxyUrl = (params) => {
 export const getSubscribeUrl = (params) => {
   return request.get('/subscribe-url', { params })
 }
+
+export const getVersion = () => {
+  return request.get('/version')
+}

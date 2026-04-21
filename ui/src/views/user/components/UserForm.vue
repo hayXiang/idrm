@@ -34,8 +34,7 @@
         <div class="hint">Token 用于访问 M3U 和代理资源，为空表示不修改</div>
       </el-form-item>
       
-      <el-form-item label="角色" prop="role">
-        <el-radio-group v-model="form.role" :disabled="isAdminUser || isEdit">
+      <el-form-item label="角色" prop="role">        <el-radio-group v-model="form.role" :disabled="isSuperAdmin || isEdit">
           <el-radio value="user">普通用户</el-radio>
           <el-radio value="admin">管理员</el-radio>
         </el-radio-group>
@@ -107,9 +106,14 @@ const providerList = ref([])
 
 const isEdit = computed(() => !!props.data)
 
-// 是否是管理员账号（id 为 1 或 role 为 admin）
-const isAdminUser = computed(() => {
-  return props.data?.id === '1' || props.data?.role === 'admin'
+// 是否是超级管理员账号（id 为 1，完全不能修改）
+const isSuperAdmin = computed(() => {
+  return props.data?.id === '1'
+})
+
+// 是否是管理员角色（可以修改密码和Token，但不能修改角色和权限）
+const isAdminRole = computed(() => {
+  return props.data?.role === 'admin'
 })
 
 const defaultForm = {
@@ -151,6 +155,14 @@ onMounted(() => {
   fetchProviderList()
 })
 
+// 生成随机 Token（与后端 generateUserToken 保持一致）
+const generateRandomToken = () => {
+  // 生成16字节随机数，转换为32位十六进制字符串
+  const array = new Uint8Array(16)
+  crypto.getRandomValues(array)
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
 const generateToken = () => {
   form.value.token = generateRandomToken()
   ElMessage.success('Token 已生成，请点击确定保存')
@@ -167,15 +179,22 @@ const handleSubmit = async () => {
       const updateData = {
         username: form.value.username
       }
-      // 非管理员账号才允许修改角色和权限
-      if (!isAdminUser.value) {
+      // 非管理员角色才允许修改角色和权限（超级管理员也不能改）
+      if (!isAdminRole.value) {
         updateData.role = form.value.role
         updateData.allowedProviders = form.value.allowedProviders
       }
       // 如果有新密码才提交
       if (form.value.newPassword) {
+        console.log('提交密码更新:', { userId: props.data.id, hasPassword: !!form.value.newPassword })
         updateData.password = form.value.newPassword
       }
+      // 如果有新 Token 才提交
+      if (form.value.token) {
+        console.log('提交Token更新:', { userId: props.data.id, hasToken: !!form.value.token })
+        updateData.token = form.value.token
+      }
+      console.log('最终提交数据:', updateData)
       await updateUser(props.data.id, updateData)
     } else {
       await createUser(form.value)

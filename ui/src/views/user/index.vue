@@ -42,10 +42,21 @@
         <el-table-column prop="createdAt" label="创建时间" width="180" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-popconfirm title="确定删除吗？" @confirm="handleDelete(row)">
+            <el-button 
+              v-if="canEditUser(row)"
+              type="primary" 
+              size="small" 
+              @click="handleEdit(row)"
+            >
+              编辑
+            </el-button>
+            <el-popconfirm 
+              v-if="canDeleteUser(row)"
+              title="确定删除吗？" 
+              @confirm="handleDelete(row)"
+            >
               <template #reference>
-                <el-button type="danger" size="small" :disabled="row.role === 'admin'">删除</el-button>
+                <el-button type="danger" size="small">删除</el-button>
               </template>
             </el-popconfirm>
           </template>
@@ -62,17 +73,55 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { getUsers, deleteUser, updateUser } from '@/api/auth'
 import { getProviders } from '@/api/provider'
+import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import UserForm from './components/UserForm.vue'
 
+const userStore = useUserStore()
 const userList = ref([])
 const providerList = ref([])
 const loading = ref(false)
 const formVisible = ref(false)
 const currentRow = ref(null)
+
+// 当前登录用户信息
+const currentUser = computed(() => userStore.userInfo)
+
+// 判断当前用户是否可以编辑目标用户
+const canEditUser = (targetUser) => {
+  if (!currentUser.value) return false
+  
+  // 超级管理员可以编辑所有人
+  if (currentUser.value.id === '1') return true
+  
+  // 普通用户只能编辑自己
+  if (currentUser.value.role === 'user') {
+    return currentUser.value.id === targetUser.id
+  }
+  
+  // 其他管理员可以编辑自己和普通用户，不能编辑超级管理员和其他管理员
+  if (currentUser.value.role === 'admin') {
+    // 可以编辑自己
+    if (currentUser.value.id === targetUser.id) return true
+    // 可以编辑普通用户
+    if (targetUser.role === 'user') return true
+    // 不能编辑超级管理员和其他管理员
+    return false
+  }
+  
+  return false
+}
+
+// 判断当前用户是否可以删除目标用户
+const canDeleteUser = (targetUser) => {
+  if (!currentUser.value) return false
+  
+  // 只有超级管理员可以删除用户
+  return currentUser.value.id === '1' && targetUser.role !== 'admin'
+}
 
 onMounted(() => {
   fetchData()

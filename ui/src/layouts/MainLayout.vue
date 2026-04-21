@@ -24,6 +24,9 @@
           <span>{{ item.title }}</span>
         </el-menu-item>
       </el-menu>
+      <div class="version-info">
+        <span>v{{ version }}</span>
+      </div>
     </el-aside>
     
     <el-container>
@@ -51,13 +54,29 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { getVersion } from '@/api/auth'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const version = ref('0.0.0')
+
+// 获取版本号
+const fetchVersion = async () => {
+  try {
+    const res = await getVersion()
+    version.value = res.data?.version || '0.0.0'
+  } catch (error) {
+    console.error('获取版本号失败', error)
+  }
+}
+
+onMounted(() => {
+  fetchVersion()
+})
 
 const visibleMenus = computed(() => {
   const isAdmin = userStore.userInfo?.role === 'admin'
@@ -88,6 +107,7 @@ const handleCommand = (command) => {
   
   .sidebar {
     background-color: #304156;
+    position: relative;
     
     .logo {
       height: 60px;
@@ -106,6 +126,17 @@ const handleCommand = (command) => {
     
     .menu {
       border-right: none;
+    }
+    
+    .version-info {
+      position: absolute;
+      bottom: 10px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      color: #7a8ba3;
+      font-size: 12px;
+      padding: 8px;
     }
   }
   

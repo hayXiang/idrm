@@ -54,7 +54,7 @@ const routes = [
         path: 'users',
         name: 'Users',
         component: () => import('@/views/user/index.vue'),
-        meta: { title: '用户管理', icon: 'User', admin: true }
+        meta: { title: '用户管理', icon: 'User' }
       },
       {
         path: 'monitor',
