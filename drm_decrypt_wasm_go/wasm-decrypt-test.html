@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM fMP4解密功能测试</title>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            min-height: 100px;
+        }
+        
+        .log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-left: 4px solid #007bff;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .info {
+            background-color: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WASM fMP4解密功能测试</h1>
+        
+        <div class="info">
+            <p><strong>测试说明：</strong>测试WASM解密模块对fMP4数据的解密功能</p>
+            <p><strong>测试数据：</strong>使用提供的Clear Key解密fMP4数据</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="kid">Key ID (KID):</label>
+            <input type="text" id="kid" value="1acd2d7afd8cb34099cb832862e3c08d">
+        </div>
+        
+        <div class="form-group">
+            <label for="key">Key:</label>
+            <input type="text" id="key" value="b85491a27c2852323ac704a07cf7b779">
+        </div>
+        
+        <div class="form-group">
+            <label for="iv">IV (16字节十六进制):</label>
+            <input type="text" id="iv" value="00000000000000000000000000000000">
+        </div>
+        
+        <div class="form-group">
+            <label for="encryptedData">加密的fMP4数据 (十六进制):</label>
+            <textarea id="encryptedData">000000206674797069736f6d0000020069736f6d000000001234567890abcdef1234567890abcdef</textarea>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div>解密次数</div>
+                <div id="decryptCount" class="stat-value">0</div>
+            </div>
+            <div class="stat-card">
+                <div>总处理大小</div>
+                <div id="totalProcessed" class="stat-value">0 B</div>
+            </div>
+            <div class="stat-card">
+                <div>平均解密时间</div>
+                <div id="avgDecryptTime" class="stat-value">0 ms</div>
+            </div>
+            <div class="stat-card">
+                <div>成功率</div>
+                <div id="successRate" class="stat-value">0%</div>
+            </div>
+        </div>
+        
+        <div class="buttons">
+            <button id="decryptBtn">解密数据</button>
+            <button id="testFmp4Btn">测试fMP4解密</button>
+            <button id="resetStatsBtn">重置统计</button>
+        </div>
+        
+        <div class="form-group">
+            <label for="result">解密结果:</label>
+            <textarea id="result" readonly></textarea>
+        </div>
+        
+        <div class="log">
+            <h3>日志:</h3>
+            <pre id="logOutput"></pre>
+        </div>
+    </div>
+
+    <!-- 引入wasm_exec.js脚本 -->
+    <script src="wasm_exec.js"></script>
+    
+    <script>
+        // 统计数据
+        let stats = {
+            decryptCount: 0,
+            totalProcessed: 0,
+            totalDecryptTime: 0,
+            successCount: 0,
+            failCount: 0
+        };
+
+        // 更新统计数据
+        function updateStats(size, decryptTime, success) {
+            stats.decryptCount++;
+            stats.totalProcessed += size;
+            stats.totalDecryptTime += decryptTime;
+            
+            if (success) {
+                stats.successCount++;
+            } else {
+                stats.failCount++;
+            }
+            
+            document.getElementById('decryptCount').textContent = stats.decryptCount;
+            document.getElementById('totalProcessed').textContent = formatBytes(stats.totalProcessed);
+            document.getElementById('avgDecryptTime').textContent = stats.decryptCount > 0 ? 
+                (stats.totalDecryptTime / stats.decryptCount).toFixed(2) + ' ms' : '0 ms';
+            document.getElementById('successRate').textContent = stats.decryptCount > 0 ? 
+                Math.round((stats.successCount / stats.decryptCount) * 100) + '%' : '0%';
+        }
+        
+        // 格式化字节数
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 日志输出函数
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            logOutput.textContent += new Date().toISOString() + ': ' + message + '\n';
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // 初始化WASM模块
+        async function initializeWasm() {
+            try {
+                log('正在初始化WASM模块...');
+                
+                // 检查是否已经初始化
+                if (typeof window.decryptFromBody !== 'undefined') {
+                    log('WASM模块已加载');
+                    return true;
+                }
+                
+                // 检查浏览器是否支持WebAssembly
+                if (!window.WebAssembly) {
+                    throw new Error('WebAssembly is not supported in your browser');
+                }
+                
+                // 检查Go是否已定义
+                if (typeof Go === 'undefined') {
+                    throw new Error('Go is not defined. Make sure wasm_exec.js is loaded before initializing WASM.');
+                }
+                
+                // 加载WASM模块
+                const go = new Go();
+                const wasmModule = await WebAssembly.instantiateStreaming(
+                    fetch('main.wasm'),
+                    go.importObject
+                );
+                
+                // 运行Go程序
+                go.run(wasmModule.instance);
+                
+                log('WASM模块初始化成功');
+                return true;
+            } catch (error) {
+                log('初始化WASM失败: ' + error.message);
+                return false;
+            }
+        }
+
+        // 十六进制字符串转字节数组
+        function hexStringToByteArray(hexString) {
+            if (hexString.length % 2 !== 0) {
+                throw new Error('Invalid hex string');
+            }
+            
+            const arrayBuffer = new Uint8Array(hexString.length / 2);
+            for (let i = 0; i < hexString.length; i += 2) {
+                const byteValue = parseInt(hexString.substr(i, 2), 16);
+                if (isNaN(byteValue)) {
+                    throw new Error('Invalid hex digit');
+                }
+                arrayBuffer[i / 2] = byteValue;
+            }
+            return arrayBuffer;
+        }
+
+        // 字节数组转十六进制字符串
+        function byteArrayToHexString(byteArray) {
+            let hexString = '';
+            for (let i = 0; i < byteArray.length; i++) {
+                const hex = byteArray[i].toString(16).padStart(2, '0');
+                hexString += hex;
+            }
+            return hexString;
+        }
+
+        // 解密fMP4数据
+        async function decryptFmp4Data(encryptedData, kid, key, iv) {
+            try {
+                // 记录开始时间
+                const startTime = performance.now();
+                
+                // 添加密钥到WASM模块
+                const addKeyResult = window.addKey(kid, key);
+                if (!addKeyResult.success) {
+                    throw new Error('无法添加密钥到WASM模块');
+                }
+                
+                // 调用WASM解密函数
+                const result = window.decryptFmp4(encryptedData, key, iv);
+                
+                const endTime = performance.now();
+                const decryptTime = endTime - startTime;
+                
+                if (result.success) {
+                    log(`fMP4解密成功: ${encryptedData.length} -> ${result.data.length} bytes, 耗时: ${decryptTime.toFixed(2)}ms`);
+                    
+                    // 更新统计
+                    updateStats(encryptedData.length, decryptTime, true);
+                    
+                    return {
+                        decryptedData: result.data,
+                        time: decryptTime
+                    };
+                } else {
+                    log(`fMP4解密失败: ${result.error}, 耗时: ${decryptTime.toFixed(2)}ms`);
+                    
+                    // 更新统计
+                    updateStats(encryptedData.length, decryptTime, false);
+                    
+                    return null;
+                }
+            } catch (error) {
+                log(`fMP4解密异常: ${error.message}`);
+                
+                // 更新统计（失败）
+                updateStats(encryptedData.length, 0, false);
+                
+                return null;
+            }
+        }
+
+        // 解密数据
+        async function decryptData() {
+            try {
+                const kid = document.getElementById('kid').value.trim();
+                const key = document.getElementById('key').value.trim();
+                const ivHex = document.getElementById('iv').value.trim();
+                const encryptedHex = document.getElementById('encryptedData').value.trim();
+                
+                if (!kid || !key || !ivHex || !encryptedHex) {
+                    log('请填写所有字段');
+                    return;
+                }
+                
+                // 验证十六进制输入
+                if (!/^[0-9a-fA-F]+$/.test(kid) || !/^[0-9a-fA-F]+$/.test(key) || 
+                    !/^[0-9a-fA-F]+$/.test(ivHex) || !/^[0-9a-fA-F]+$/.test(encryptedHex)) {
+                    log('所有字段必须是十六进制格式');
+                    return;
+                }
+                
+                if (kid.length !== 32) {
+                    log('Key ID必须是32个字符（16字节的十六进制）');
+                    return;
+                }
+                
+                if (key.length !== 32) {
+                    log('Key必须是32个字符（16字节的十六进制）');
+                    return;
+                }
+                
+                if (ivHex.length !== 32) {
+                    log('IV必须是32个字符（16字节的十六进制）');
+                    return;
+                }
+                
+                // 转换数据
+                const encryptedData = hexStringToByteArray(encryptedHex);
+                const iv = hexStringToByteArray(ivHex);
+                
+                // 添加密钥到WASM模块
+                const addKeyResult = window.addKey(kid, key);
+                if (!addKeyResult.success) {
+                    log('无法添加密钥到WASM模块: ' + addKeyResult.error);
+                    return;
+                }
+                
+                // 记录开始时间
+                const startTime = performance.now();
+                
+                // 调用WASM解密函数
+                const result = window.decryptFromBody(encryptedData, kid, iv);
+                
+                const endTime = performance.now();
+                const decryptTime = endTime - startTime;
+                
+                if (result.success) {
+                    log(`解密成功: ${encryptedData.length} -> ${result.data.length} bytes, 耗时: ${decryptTime.toFixed(2)}ms`);
+                    
+                    // 更新统计
+                    updateStats(encryptedData.length, decryptTime, true);
+                    
+                    // 显示结果
+                    const resultHex = byteArrayToHexString(new Uint8Array(result.data));
+                    document.getElementById('result').value = resultHex;
+                } else {
+                    log(`解密失败: ${result.error}, 耗时: ${decryptTime.toFixed(2)}ms`);
+                    
+                    // 更新统计
+                    updateStats(encryptedData.length, decryptTime, false);
+                    
+                    document.getElementById('result').value = `错误: ${result.error}`;
+                }
+            } catch (error) {
+                log(`解密异常: ${error.message}`);
+                
+                // 更新统计（失败）
+                updateStats(0, 0, false);
+                
+                document.getElementById('result').value = `异常: ${error.message}`;
+            }
+        }
+
+        // 测试fMP4解密
+        async function testFmp4Decryption() {
+            try {
+                const kid = document.getElementById('kid').value.trim();
+                const key = document.getElementById('key').value.trim();
+                const ivHex = document.getElementById('iv').value.trim();
+                
+                // 创建一个简单的fMP4数据
+                const sampleFmp4Data = new Uint8Array([
+                    0x00, 0x00, 0x00, 0x18, // size
+                    0x66, 0x74, 0x79, 0x70, // 'ftyp'
+                    0x69, 0x73, 0x6f, 0x6d, // 'isom'
+                    0x00, 0x00, 0x02, 0x00, // version
+                    0x69, 0x73, 0x6f, 0x6d, // 'isom'
+                    // 添加一些模拟的加密数据
+                    ...Array.from({length: 64}, (_, i) => i % 256)
+                ]);
+                
+                log(`开始fMP4解密测试，数据大小: ${sampleFmp4Data.length} bytes`);
+                
+                // 添加密钥到WASM模块
+                const addKeyResult = window.addKey(kid, key);
+                if (!addKeyResult.success) {
+                    log('无法添加密钥到WASM模块: ' + addKeyResult.error);
+                    return;
+                }
+                
+                // 转换IV
+                const iv = hexStringToByteArray(ivHex);
+                
+                // 记录开始时间
+                const startTime = performance.now();
+                
+                // 调用WASM fMP4解密函数
+                const result = window.decryptFmp4(sampleFmp4Data, key, iv);
+                
+                const endTime = performance.now();
+                const decryptTime = endTime - startTime;
+                
+                if (result.success) {
+                    log(`fMP4解密测试成功: ${sampleFmp4Data.length} -> ${result.data.length} bytes, 耗时: ${decryptTime.toFixed(2)}ms`);
+                    
+                    // 更新统计
+                    updateStats(sampleFmp4Data.length, decryptTime, true);
+                    
+                    // 显示结果
+                    const resultHex = byteArrayToHexString(new Uint8Array(result.data));
+                    document.getElementById('result').value = resultHex;
+                } else {
+                    log(`fMP4解密测试失败: ${result.error}, 耗时: ${decryptTime.toFixed(2)}ms`);
+                    
+                    // 更新统计
+                    updateStats(sampleFmp4Data.length, decryptTime, false);
+                    
+                    document.getElementById('result').value = `错误: ${result.error}`;
+                }
+            } catch (error) {
+                log(`fMP4解密测试异常: ${error.message}`);
+                
+                // 更新统计（失败）
+                updateStats(0, 0, false);
+                
+                document.getElementById('result').value = `异常: ${error.message}`;
+            }
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', async () => {
+            log('页面加载完成，正在初始化WASM模块...');
+            
+            const wasmReady = await initializeWasm();
+            if (!wasmReady) {
+                log('WASM模块初始化失败');
+                return;
+            }
+            
+            log('WASM模块准备就绪');
+            
+            // 绑定事件
+            document.getElementById('decryptBtn').addEventListener('click', decryptData);
+            document.getElementById('testFmp4Btn').addEventListener('click', testFmp4Decryption);
+            document.getElementById('resetStatsBtn').addEventListener('click', () => {
+                stats = {
+                    decryptCount: 0,
+                    totalProcessed: 0,
+                    totalDecryptTime: 0,
+                    successCount: 0,
+                    failCount: 0
+                };
+                
+                document.getElementById('decryptCount').textContent = '0';
+                document.getElementById('totalProcessed').textContent = '0 B';
+                document.getElementById('avgDecryptTime').textContent = '0 ms';
+                document.getElementById('successRate').textContent = '0%';
+                
+                log('统计已重置');
+            });
+        });
+    </script>
+</body>
+</html>

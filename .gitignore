@@ -6,3 +6,7 @@ idrm
 /dist/
 /ui/node_modules/
 /idrm-data/
+idrm-darwin-arm64
+.gitignore
+idrm-darwin-amd64
+drm_decrypt_wasm_go/main.wasm

@@ -1,4 +1,4 @@
-package main
+package decrypt
 
 import (
 	"bytes"
@@ -60,10 +60,47 @@ func encodeMP4ToBytes(f *mp4.File) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func modifyInitM4sFromBody(data []byte) ([]byte, *mp4.SinfBox, error) {
+func ModifyInitM4sFromBody(data []byte) ([]byte, *mp4.SinfBox, error) {
 	mp4File, err := mp4.DecodeFile(bytes.NewReader(data))
 	if err != nil {
+		println("Error parsing MP4 file:", err.Error())
 		return nil, nil, fmt.Errorf("解析 MP4 文件失败: %w", err)
+	}
+
+	// 添加日志确认MP4文件创建成功并检查结构
+	if mp4File != nil {
+		println("MP4 file created successfully")
+		
+		if mp4File.Moov != nil {
+			println("Moov box found in MP4 file")
+			if mp4File.Moov.Traks != nil {
+				println("Number of tracks:", len(mp4File.Moov.Traks))
+			}
+		} else {
+			println("No Moov box found in MP4 file - this may indicate a non-standard init segment")
+			
+			// 检查segments和fragments
+			if len(mp4File.Segments) > 0 {
+				println("Segments found in MP4 file:", len(mp4File.Segments))
+				for i, seg := range mp4File.Segments {
+					println("Segment", i, "has", len(seg.Fragments), "fragments")
+					if len(seg.Fragments) > 0 {
+						frag := seg.Fragments[0] // 检查第一个fragment
+						if frag.Moof != nil {
+							println("First fragment contains moof box")
+						}
+					}
+				}
+			} else {
+				println("No segments found in the file")
+			}
+			
+			// 直接返回原始数据，不进行修改
+			return data, nil, nil
+		}
+	} else {
+		println("Failed to create MP4 file")
+		return nil, nil, fmt.Errorf("MP4 file creation failed")
 	}
 
 	sinfBox := modifyInitM4s(mp4File)
@@ -99,19 +136,4 @@ func modifyInitM4sFromFile(inPath, outPath string) error {
 		return fmt.Errorf("写入 MP4 文件失败: %w", err)
 	}
 	return nil
-}
-
-func xmain() {
-	if len(os.Args) != 3 {
-		fmt.Println("用法: mp4ff <输入文件> <输出文件>")
-		return
-	}
-	inPath := os.Args[1]
-	outPath := os.Args[2]
-	err := modifyInitM4sFromFile(inPath, outPath)
-	if err != nil {
-		fmt.Println("处理失败:", err)
-	} else {
-		fmt.Println("处理完成")
-	}
 }

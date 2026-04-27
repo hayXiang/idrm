@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"idrm/utils"
+	"idrm/decrypt"
 	"io"
 	"log"
 	"net"
@@ -1536,7 +1537,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "init-m4s" {
-		modifiedBody, sinfBox, err := modifyInitM4sFromBody(body)
+		modifiedBody, sinfBox, err := decrypt.ModifyInitM4sFromBody(body)
 		if err != nil {
 			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
 			ctx.SetBodyString("移除 DRM 信息失败")

@@ -1,9 +1,16 @@
 package utils
 
 import (
+	"encoding/hex"
 	"fmt"
-	"time"	
+	"time"
 )
+
+// ParseKey 解析密钥字符串
+func ParseKey(keyStr string) ([]byte, error) {
+	return hex.DecodeString(keyStr)
+}
+
 func FormatSize(size int64) string {
 	const (
 		KB = 1024

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAssembly DRM Decryption Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-left: 4px solid #007bff;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebAssembly DRM Decryption Test</h1>
+        
+        <div class="form-group">
+            <label for="keyId">Key ID (KID):</label>
+            <input type="text" id="keyId" placeholder="Enter Key ID (hex)" value="00000000000000000000000000000001">
+        </div>
+        
+        <div class="form-group">
+            <label for="keyValue">Key Value (hex):</label>
+            <input type="text" id="keyValue" placeholder="Enter Key Value (hex)" value="00000000000000000000000000000001">
+        </div>
+        
+        <div class="form-group">
+            <label for="ivValue">Initialization Vector (IV) (hex):</label>
+            <input type="text" id="ivValue" placeholder="Enter IV (hex)" value="00000000000000000000000000000001">
+        </div>
+        
+        <div class="form-group">
+            <label for="inputFile">Encrypted File:</label>
+            <input type="file" id="inputFile">
+        </div>
+        
+        <button id="decryptBtn">Decrypt File</button>
+        <button id="testTsBtn">Test with Sample TS Data</button>
+        <button id="testMp4Btn">Test with Sample MP4 Data</button>
+        
+        <div id="result" class="result hidden"></div>
+        
+        <div class="log">
+            <h3>Log:</h3>
+            <pre id="logOutput"></pre>
+        </div>
+    </div>
+
+    <script>
+        // 日志输出函数
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            logOutput.textContent += new Date().toISOString() + ': ' + message + '\n';
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // 显示结果
+        function showResult(success, message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = 'result ' + (success ? 'success' : 'error');
+            resultDiv.classList.remove('hidden');
+        }
+
+        // 初始化WASM模块
+        async function initializeWasm() {
+            try {
+                log('Initializing WASM module...');
+                
+                // 检查是否已经加载了WASM
+                if (typeof window.decryptFromBody !== 'undefined') {
+                    log('WASM module already loaded');
+                    return true;
+                }
+                
+                // 检查浏览器是否支持WebAssembly
+                if (!window.WebAssembly) {
+                    throw new Error('WebAssembly is not supported in your browser');
+                }
+                
+                // 加载WASM模块
+                const go = new Go();
+                const wasmModule = await WebAssembly.instantiateStreaming(
+                    fetch('main.wasm'),
+                    go.importObject
+                );
+                
+                // 运行Go程序
+                go.run(wasmModule.instance);
+                
+                log('WASM module initialized successfully');
+                return true;
+            } catch (error) {
+                log('Error initializing WASM: ' + error.message);
+                showResult(false, 'Failed to initialize WASM module: ' + error.message);
+                return false;
+            }
+        }
+
+        // 添加密钥
+        function addKey(kid, keyHex) {
+            try {
+                const result = window.addKey(kid, keyHex);
+                log(`Add key result: ${JSON.stringify(result)}`);
+                return result.success;
+            } catch (error) {
+                log(`Error adding key: ${error.message}`);
+                return false;
+            }
+        }
+
+        // 解密函数
+        function decryptData(data, kid, iv) {
+            try {
+                const ivBytes = hexToBytes(iv);
+                const result = window.decryptFromBody(new Uint8Array(data), kid, new Uint8Array(ivBytes));
+                log(`Decrypt result: ${JSON.stringify({success: result.success})}`);
+                return result;
+            } catch (error) {
+                log(`Error during decryption: ${error.message}`);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // 十六进制字符串转字节数组
+        function hexToBytes(hex) {
+            const bytes = [];
+            for (let c = 0; c < hex.length; c += 2) {
+                bytes.push(parseInt(hex.substr(c, 2), 16));
+            }
+            return bytes;
+        }
+
+        // 测试按钮点击事件
+        document.getElementById('decryptBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('inputFile');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showResult(false, 'Please select a file to decrypt');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = async function(e) {
+                const dataArray = new Uint8Array(e.target.result);
+                await processDecryption(dataArray);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        });
+
+        // 测试TS按钮点击事件
+        document.getElementById('testTsBtn').addEventListener('click', async () => {
+            // 创建简单的TS数据模拟
+            const tsData = createSampleTsData();
+            await processDecryption(tsData);
+        });
+
+        // 测试MP4按钮点击事件
+        document.getElementById('testMp4Btn').addEventListener('click', async () => {
+            // 创建简单的MP4数据模拟
+            const mp4Data = createSampleMp4Data();
+            await processDecryption(mp4Data);
+        });
+
+        // 处理解密流程
+        async function processDecryption(dataArray) {
+            const keyId = document.getElementById('keyId').value.trim();
+            const keyValue = document.getElementById('keyValue').value.trim();
+            const ivValue = document.getElementById('ivValue').value.trim();
+
+            if (!keyId || !keyValue || !ivValue) {
+                showResult(false, 'Please fill in all fields (Key ID, Key Value, and IV)');
+                return;
+            }
+
+            // 验证十六进制输入
+            if (!/^[0-9a-fA-F]+$/.test(keyId) || !/^[0-9a-fA-F]+$/.test(keyValue) || !/^[0-9a-fA-F]+$/.test(ivValue)) {
+                showResult(false, 'Key ID, Key Value, and IV must be in hexadecimal format');
+                return;
+            }
+
+            if (keyId.length !== 32 || keyValue.length !== 32 || ivValue.length !== 32) {
+                showResult(false, 'Key ID, Key Value, and IV must each be 32 characters (16 bytes in hex)');
+                return;
+            }
+
+            // 尝试初始化WASM
+            if (!(await initializeWasm())) {
+                showResult(false, 'WASM module not loaded properly');
+                return;
+            }
+
+            // 添加密钥
+            if (!addKey(keyId, keyValue)) {
+                showResult(false, 'Failed to add key');
+                return;
+            }
+
+            log('Starting decryption...');
+            
+            // 执行解密
+            const startTime = performance.now();
+            const result = decryptData(dataArray, keyId, ivValue);
+            const endTime = performance.now();
+            
+            if (result.success) {
+                const fileSize = dataArray.length;
+                const decryptedSize = result.data ? result.data.length : 0;
+                
+                showResult(true, 
+                    `Decryption successful!\n` +
+                    `Original size: ${fileSize} bytes\n` +
+                    `Decrypted size: ${decryptedSize} bytes\n` +
+                    `Time taken: ${(endTime - startTime).toFixed(2)} ms\n` +
+                    `Success rate: ${((decryptedSize/fileSize)*100).toFixed(2)}%`
+                );
+                
+                log(`Decryption completed in ${(endTime - startTime).toFixed(2)} ms`);
+            } else {
+                showResult(false, `Decryption failed: ${result.error}`);
+            }
+        }
+
+        // 创建示例TS数据
+        function createSampleTsData() {
+            // 创建一个简单的TS数据，包含同步字节和一些数据
+            const data = new Uint8Array(188 * 3); // 3个TS包
+            
+            for (let i = 0; i < 3; i++) {
+                // 设置同步字节
+                data[i * 188] = 0x47;
+                
+                // 设置PID (0x100 + i)
+                data[i * 188 + 1] = 0x10 | ((0x100 + i) >> 8);
+                data[i * 188 + 2] = (0x100 + i) & 0xFF;
+                
+                // 填充一些示例数据
+                for (let j = 3; j < 188; j++) {
+                    data[i * 188 + j] = (i * 188 + j) % 256;
+                }
+            }
+            
+            return data;
+        }
+
+        // 创建示例MP4数据 (简化版)
+        function createSampleMp4Data() {
+            // 创建一个简单的MP4文件头，包含moov和mdat box
+            const header = [
+                // ftyp box
+                0x00, 0x00, 0x00, 0x18, // size
+                0x66, 0x74, 0x79, 0x70, // 'ftyp'
+                0x69, 0x73, 0x6f, 0x6d, // 'isom'
+                0x00, 0x00, 0x02, 0x00, // version
+                0x69, 0x73, 0x6f, 0x6d, // 'isom'
+                
+                // mdat box (simplified encrypted data)
+                0x00, 0x00, 0x00, 0x20, // size
+                0x6d, 0x64, 0x61, 0x74, // 'mdat'
+            ];
+            
+            // 添加一些模拟的加密数据
+            for (let i = 0; i < 24; i++) {
+                header.push(Math.floor(Math.random() * 256));
+            }
+            
+            return new Uint8Array(header);
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', async () => {
+            log('Page loaded, attempting to initialize WASM module...');
+            
+            // 尝试初始化WASM模块
+            await initializeWasm();
+        });
+    </script>
+
+    <!-- Go WASM支持脚本 -->
+    <script src="wasm_exec.js"></script>
+</body>
+</html>

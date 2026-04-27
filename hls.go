@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"idrm/utils"
+	"idrm/decrypt"
 	"log"
 	"math"
 	"net/http"
@@ -478,7 +479,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 					return
 				}
 
-				body, sinfBox, err := modifyInitM4sFromBody(responseBody)
+				body, sinfBox, err := decrypt.ModifyInitM4sFromBody(responseBody)
 				if err != nil {
 					return
 				}

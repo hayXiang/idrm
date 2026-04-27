@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, playsinline">
+    <title>iOS DRM Decryption Test with ManagedMediaSource</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.6/shaka-player.compiled.js"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            background: #000; 
+            margin: 0; 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+        }
+        .video-container { 
+            position: relative; 
+            width: 100%; 
+            background: #000; 
+        }
+        video { 
+            width: 100%; 
+            display: block; 
+        }
+        
+        .status-panel { 
+            padding: 20px; 
+            flex-grow: 1; 
+        }
+        .mms-badge { 
+            display: inline-block; 
+            padding: 4px 10px; 
+            border-radius: 15px; 
+            font-size: 12px; 
+            font-weight: bold; 
+        }
+        .supported { 
+            background: #2ecc71; 
+            color: white; 
+        }
+        .unsupported { 
+            background: #e74c3c; 
+            color: white; 
+        }
+        
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        input[type="text"], input[type="url"] {
+            flex: 1;
+            min-width: 250px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background: #333;
+            color: white;
+        }
+        
+        button {
+            padding: 8px 15px;
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #0062CC;
+        }
+        
+        .info-box {
+            background: #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        #logArea {
+            width: 100%;
+            height: 200px;
+            background: #111;
+            color: #00FF00;
+            border: 1px solid #00FF00;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+            overflow-y: scroll;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+            border-bottom: 1px dashed #333;
+        }
+        
+        .log-timestamp {
+            color: #aaa;
+            margin-right: 8px;
+        }
+        
+        .log-info {
+            color: #00FF00;
+        }
+        
+        .log-warning {
+            color: #FFFF00;
+        }
+        
+        .log-error {
+            color: #FF6666;
+        }
+        
+        .log-success {
+            color: #66FF66;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="video-container">
+        <video id="video" playsinline controls autoplay muted></video>
+    </div>
+
+    <div class="status-panel">
+        <h3>iOS DRM 解密测试 <span id="mms-label"></span></h3>
+        <p style="color: #888; font-size: 14px;">
+            当播放器加载新的视频分片时，下方会显示相关的日志信息。
+        </p>
+        
+        <div class="info-box">
+            <strong>提示:</strong> 请使用HLS (m3u8) 或 DASH (mpd) 格式的视频流进行测试。
+            对于HLS流，系统将自动处理加密片段。
+        </div>
+        
+        <div class="controls">
+            <input type="url" id="manifestUrl" placeholder="输入HLS或DASH Manifest URL" value="https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96">
+            <button onclick="loadVideo()">加载视频</button>
+        </div>
+        
+        <div class="controls">
+            <input type="text" id="clearKey" placeholder="输入Clear Key (格式: kid:key)" value="1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779">
+            <button onclick="addKey()">添加密钥</button>
+        </div>
+        
+        <div class="controls">
+            <button onclick="clearLogs()" style="background: #FF3B30;">清空日志</button>
+            <button onclick="copyLogs()" style="background: #5856D6;">复制日志</button>
+        </div>
+        
+        <textarea id="logArea" readonly></textarea>
+    </div>
+
+    <!-- Go WASM 运行时 -->
+    <script src="wasm_exec.js"></script>
+    <script>
+        const mmsLabel = document.getElementById('mms-label');
+        const logArea = document.getElementById('logArea');
+        
+        let wasmInitialized = false;
+        
+        // 日志函数
+        function logMessage(message, level = 'info') {
+            const timestamp = new Date().toISOString().substr(11, 12); // HH:MM:SS.sss
+            const levelClass = `log-${level}`;
+            const logEntry = `[${timestamp}] ${message}`;
+            
+            // 添加到日志区域
+            if (logArea.value) {
+                logArea.value += '\n';
+            }
+            logArea.value += logEntry;
+            
+            // 滚动到底部
+            logArea.scrollTop = logArea.scrollHeight;
+            
+            // 同时输出到控制台
+            console[level === 'error' ? 'error' : level === 'warning' ? 'warn' : 'log'](message);
+        }
+        
+        function clearLogs() {
+            logArea.value = '';
+            logMessage('日志已清空', 'info');
+        }
+        
+        function copyLogs() {
+            logArea.select();
+            document.execCommand('copy');
+            logMessage('日志已复制到剪贴板', 'success');
+        }
+
+        async function initializeWasm() {
+            if (typeof Go === 'undefined') {
+                logMessage('wasm_exec.js not loaded', 'error');
+                return false;
+            }
+
+            try {
+                const go = new Go();
+                const wasmModule = await WebAssembly.instantiateStreaming(
+                    fetch('main.wasm'), go.importObject
+                );
+                go.run(wasmModule.instance);
+                
+                // 检查WASM函数是否可用
+                if (typeof window.addKey !== 'function' || 
+                    typeof window.decryptSegmentM4s !== 'function' ||
+                    typeof window.modifyInitM4s !== 'function') {
+                    logMessage('WASM functions not available', 'error');
+                    return false;
+                }
+                
+                wasmInitialized = true;
+                logMessage('WASM initialized successfully', 'success');
+                return true;
+            } catch (error) {
+                logMessage(`WASM initialization failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function initApp() {
+            // 1. 环境检测
+            const hasMMS = 'ManagedMediaSource' in window;
+            mmsLabel.innerText = hasMMS ? "MMS 支持" : "标准 MSE 模式";
+            mmsLabel.className = `mms-badge ${hasMMS ? 'supported' : 'unsupported'}`;
+            
+            logMessage(`浏览器环境: ${hasMMS ? '支持 MMS' : '仅支持标准 MSE'}`, 'info');
+            
+            // 初始化WASM
+            if (!(await initializeWasm())) {
+                logMessage('WASM 模块初始化失败', 'error');
+                return;
+            }
+
+            shaka.polyfill.installAll();
+            const video = document.getElementById('video');
+            const player = new shaka.Player(video);
+
+            // 2. 配置 Shaka：在 iOS 上强制开启 MMS/MSE 路径
+            player.configure({
+                streaming: {
+                    useNativeHlsOnSafari: false  // 禁用Safari原生HLS，强制使用Shaka处理
+                },
+                drm: {
+                    // 禁用内置DRM，使用我们自己的解密
+                    retryParameters: {
+                        maxAttempts: 3,
+                        baseDelay: 1000,
+                        backoffFactor: 2
+                    }
+                }
+            });
+
+            // 3. 核心：分片过滤器（对应你的解密接口）
+            player.getNetworkingEngine().registerResponseFilter(async (type, response) => {
+                if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
+                    // 拦截manifest并移除#EXT-X-KEY
+                    logMessage('正在处理Manifest...', 'info');
+                    const text = new TextDecoder().decode(response.data);
+                    const lines = text.split('\n');
+                    const filteredLines = [];
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].startsWith('#EXT-X-KEY:')) {
+                            logMessage(`移除加密密钥信息: ${lines[i]}`, 'info');
+                            continue; // 跳过这一行
+                        }
+                        filteredLines.push(lines[i]);
+                    }
+                    
+                    const modifiedManifest = filteredLines.join('\n');
+                    response.data = new TextEncoder().encode(modifiedManifest);
+                    logMessage('Manifest处理完成，移除了加密信息', 'success');
+                } else if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                    const url = response.uri;
+                    const rawData = new Uint8Array(response.data);
+                    
+                    // 获取前 4 个字节的 HEX 码
+                    const hexHeader = Array.from(rawData.slice(0, 4))
+                                           .map(b => b.toString(16).padStart(2, '0'))
+                                           .join(' ');
+
+                    // 记录分片信息
+                    logMessage(`📦 分片拦截成功！URL: ${url.substring(url.lastIndexOf('/')+1)}, Header: 0x${hexHeader}, Size: ${rawData.byteLength} Bytes`, 'info');
+                    
+                    // 尝试从全局变量获取KID
+                    const clearKeyValue = document.getElementById('clearKey').value || '76a6c65c-5409-42a2-b7c0-0d5bdc9e430a:79706578-perpetual-License';
+                    const kid = clearKeyValue.split(':')[0];
+                    
+                    // 如果是初始化片段
+                    if (url.toLowerCase().includes('init') || url.toLowerCase().endsWith('.m4s')) {
+                        try {
+                            logMessage(`处理初始化片段: ${url.substring(url.lastIndexOf('/')+1)}`, 'info');
+                            // 调用WASM修改初始化片段函数
+                            const result = window.modifyInitM4s(rawData, kid);
+                            if (result && result.success) {
+                                logMessage(`✅ 初始化片段处理成功 原大小: ${rawData.byteLength} -> 新大小: ${result.data.length}`, 'success');
+                                response.data = result.data.buffer;
+                            } else {
+                                logMessage(`⚠️ 初始化片段处理失败: ${result?.error || 'Unknown error'}`, 'warning');
+                            }
+                        } catch (error) {
+                            logMessage(`❌ 处理初始化片段时出错: ${error.message}`, 'error');
+                        }
+                    } else {
+                        // 处理媒体片段
+                        try {
+                            logMessage(`处理媒体片段: ${url.substring(url.lastIndexOf('/')+1)}`, 'info');
+                            const result = window.decryptSegmentM4s(rawData, kid);
+                            if (result && result.success) {
+                                logMessage(`✅ 分片解密成功 原大小: ${rawData.byteLength} -> 新大小: ${result.data.length}`, 'success');
+                                response.data = result.data.buffer;
+                            } else {
+                                logMessage(`⚠️ 分片解密失败: ${result?.error || 'Unknown error'}`, 'warning');
+                            }
+                        } catch (error) {
+                            logMessage(`❌ 解密分片时出错: ${error.message}`, 'error');
+                        }
+                    }
+                }
+            });
+
+            // 尝试加载默认HLS流，如果没有配置则跳过
+            const manifestUri = document.getElementById('manifestUrl').value.trim();
+            if (manifestUri) {
+                try {
+                    await player.load(manifestUri);
+                    logMessage(`✅ 视频加载成功: ${manifestUri}`, 'success');
+                } catch (e) {
+                    logMessage(`❌ 加载失败: ${e.name || e.code || 'unknown'} - ${e.message || e}`, 'error');
+                    console.error('Detailed error:', e);
+                }
+            } else {
+                logMessage('💡 请输入HLS或DASH流地址并点击加载视频', 'info');
+            }
+        }
+
+        async function loadVideo() {
+            if (!wasmInitialized) {
+                logMessage('WASM 模块未初始化', 'error');
+                return;
+            }
+            
+            const manifestUri = document.getElementById('manifestUrl').value.trim();
+            if (!manifestUri) {
+                logMessage('请输入有效的流地址', 'error');
+                return;
+            }
+            
+            const video = document.getElementById('video');
+            const player = new shaka.Player(video);
+            
+            // 设置错误事件监听器
+            player.addEventListener('error', (event) => {
+                logMessage(`Shaka Player 错误: ${JSON.stringify(event.detail)}`, 'error');
+            });
+
+            // 重新配置
+            player.configure({
+                streaming: {
+                    useNativeHlsOnSafari: false
+                }
+            });
+
+            // 注册过滤器 - 处理manifest和分段
+            player.getNetworkingEngine().registerResponseFilter(async (type, response) => {
+                if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
+                    // 拦截manifest并移除#EXT-X-KEY
+                    logMessage('正在处理Manifest...', 'info');
+                    const text = new TextDecoder().decode(response.data);
+                    const lines = text.split('\n');
+                    const filteredLines = [];
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].startsWith('#EXT-X-KEY:')) {
+                            logMessage(`移除加密密钥信息: ${lines[i]}`, 'info');
+                            continue; // 跳过这一行
+                        }
+                        filteredLines.push(lines[i]);
+                    }
+                    
+                    const modifiedManifest = filteredLines.join('\n');
+                    response.data = new TextEncoder().encode(modifiedManifest);
+                    logMessage('Manifest处理完成，移除了加密信息', 'success');
+                } else if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                    const url = response.uri;
+                    const rawData = new Uint8Array(response.data);
+                    
+                    const hexHeader = Array.from(rawData.slice(0, 4))
+                                           .map(b => b.toString(16).padStart(2, '0'))
+                                           .join(' ');
+
+                    logMessage(`📦 分片拦截成功！URL: ${url.substring(url.lastIndexOf('/')+1)}, Header: 0x${hexHeader}, Size: ${rawData.byteLength} Bytes`, 'info');
+                    
+                    const clearKeyValue = document.getElementById('clearKey').value || '76a6c65c-5409-42a2-b7c0-0d5bdc9e430a:79706578-perpetual-License';
+                    const kid = clearKeyValue.split(':')[0];
+                    
+                    if (url.toLowerCase().includes('init') || url.toLowerCase().endsWith('.m4s')) {
+                        try {
+                            logMessage(`处理初始化片段: ${url.substring(url.lastIndexOf('/')+1)}`, 'info');
+                            const result = window.modifyInitM4s(rawData, kid);
+                            if (result && result.success) {
+                                logMessage(`✅ 初始化片段处理成功 原大小: ${rawData.byteLength} -> 新大小: ${result.data.length}`, 'success');
+                                response.data = result.data.buffer;
+                            } else {
+                                logMessage(`⚠️ 初始化片段处理失败: ${result?.error || 'Unknown error'}`, 'warning');
+                            }
+                        } catch (error) {
+                            logMessage(`❌ 处理初始化片段时出错: ${error.message}`, 'error');
+                        }
+                    } else {
+                        try {
+                            logMessage(`处理媒体片段: ${url.substring(url.lastIndexOf('/')+1)}`, 'info');
+                            const result = window.decryptSegmentM4s(rawData, kid);
+                            if (result && result.success) {
+                                response.data = result.data.buffer;
+                                logMessage(`✅ 分片解密成功 原大小: ${rawData.byteLength} -> 新大小: ${result.data.length}`, 'success');
+                            } else {
+                                logMessage(`⚠️ 分片解密失败: ${result?.error || 'Unknown error'}`, 'warning');
+                            }
+                        } catch (error) {
+                            logMessage(`❌ 解密分片时出错: ${error.message}`, 'error');
+                        }
+                    }
+                }
+            });
+
+            try {
+                await player.load(manifestUri);
+                logMessage(`✅ 视频加载成功: ${manifestUri}`, 'success');
+            } catch (e) {
+                logMessage(`❌ 加载失败: ${e.name || e.code || 'unknown'} - ${e.message || e}`, 'error');
+                console.error('Detailed error:', e);
+            }
+        }
+
+        function addKey() {
+            if (!wasmInitialized) {
+                logMessage('WASM 模块未初始化', 'error');
+                return;
+            }
+            
+            const clearKeyValue = document.getElementById('clearKey').value;
+            if (!clearKeyValue) {
+                logMessage('请输入密钥', 'error');
+                return;
+            }
+            
+            const [kid, key] = clearKeyValue.split(':');
+            if (!kid || !key) {
+                logMessage('密钥格式错误，请使用 kid:key 格式', 'error');
+                return;
+            }
+            
+            try {
+                const result = window.addKey(kid, key);
+                if (result && result.success) {
+                    logMessage(`✅ 密钥添加成功: ${kid}`, 'success');
+                } else {
+                    logMessage(`❌ 密钥添加失败: ${result?.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                logMessage(`❌ 添加密钥时出错: ${error.message}`, 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shaka Player + WASM DRM 解密测试</title>
+    
+    <!-- Shaka Player CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.5.0/controls.css">
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input[type="text"], input[type="url"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        .player-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+            background-color: black;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        .log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-left: 4px solid #007bff;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .info {
+            background-color: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Shaka Player + WASM DRM 解密测试</h1>
+        
+        <div class="info">
+            <p><strong>测试说明：</strong>使用Shaka Player播放HLS内容，并使用WASM模块解密fMP4片段</p>
+            <p><strong>测试链接：</strong>https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96</p>
+            <p><strong>Clear Key：</strong>1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779</p>
+        </div>
+        
+        <div class="form-group">
+            <label for="m3u8Url">M3U8 URL:</label>
+            <input type="url" id="m3u8Url" value="https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96">
+        </div>
+        
+        <div class="form-group">
+            <label for="clearKey">Clear Key (格式: kid:key):</label>
+            <input type="text" id="clearKey" value="1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779">
+        </div>
+        
+        <div class="buttons">
+            <button id="loadBtn">加载视频</button>
+            <button id="pauseBtn">暂停</button>
+            <button id="playBtn">播放</button>
+        </div>
+        
+        <div class="player-container">
+            <video id="videoPlayer" playsinline controls></video>
+        </div>
+        
+        <div class="log">
+            <h3>日志:</h3>
+            <pre id="logOutput"></pre>
+        </div>
+    </div>
+
+    <!-- Shaka Player -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.5.0/shaka-player.compiled.js"></script>
+    
+    <script>
+        // 日志输出函数
+        function log(message) {
+            const logOutput = document.getElementById('logOutput');
+            logOutput.textContent += new Date().toISOString() + ': ' + message + '\n';
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // 初始化WASM模块
+        async function initializeWasm() {
+            try {
+                log('正在初始化WASM模块...');
+                
+                // 检查浏览器是否支持WebAssembly
+                if (!window.WebAssembly) {
+                    throw new Error('WebAssembly is not supported in your browser');
+                }
+                
+                // 加载WASM模块
+                const go = new Go();
+                const wasmModule = await WebAssembly.instantiateStreaming(
+                    fetch('main.wasm'),
+                    go.importObject
+                );
+                
+                // 运行Go程序
+                go.run(wasmModule.instance);
+                
+                log('WASM模块初始化成功');
+                return true;
+            } catch (error) {
+                log('初始化WASM失败: ' + error.message);
+                return false;
+            }
+        }
+
+        // 解析Clear Key
+        function parseClearKey(clearKeyValue) {
+            if (!clearKeyValue.includes(':')) {
+                throw new Error('Clear Key格式错误，请使用 kid:key 格式');
+            }
+            
+            const [kid, key] = clearKeyValue.split(':');
+            return { kid, key };
+        }
+
+        // 初始化Shaka Player
+        async function initShakaPlayer() {
+            // 等待WASM初始化
+            if (!(await initializeWasm())) {
+                log('WASM模块初始化失败');
+                return null;
+            }
+            
+            const video = document.getElementById('videoPlayer');
+            const player = new shaka.Player(video);
+
+            // 配置DRM
+            player.configure({
+                drm: {
+                    // 使用Clear Key DRM
+                    servers: {
+                        'org.w3.clearkey': JSON.stringify({
+                            keys: [{
+                                kty: 'oct',
+                                kid: document.getElementById('clearKey').value.split(':')[0],
+                                k: document.getElementById('clearKey').value.split(':')[1]
+                            }]
+                        })
+                    }
+                },
+                streaming: {
+                    // 配置流媒体选项
+                    bufferingGoal: 30,
+                    rebufferingGoal: 5,
+                    bufferBehind: 30
+                }
+            });
+
+            // 设置错误处理
+            player.addEventListener('error', onErrorEvent);
+
+            return player;
+        }
+
+        // 错误处理
+        function onErrorEvent(event) {
+            log('Shaka Player 错误: ' + event.detail);
+        }
+
+        // 主函数
+        async function main() {
+            try {
+                log('正在初始化Shaka Player...');
+                
+                const player = await initShakaPlayer();
+                if (!player) {
+                    log('Shaka Player初始化失败');
+                    return;
+                }
+                
+                // 加载按钮事件
+                document.getElementById('loadBtn').addEventListener('click', async () => {
+                    try {
+                        const m3u8Url = document.getElementById('m3u8Url').value;
+                        const clearKey = document.getElementById('clearKey').value;
+                        
+                        if (!m3u8Url) {
+                            log('请提供M3U8 URL');
+                            return;
+                        }
+                        
+                        if (!clearKey || !clearKey.includes(':')) {
+                            log('请提供有效的Clear Key (格式: kid:key)');
+                            return;
+                        }
+                        
+                        log('正在加载视频: ' + m3u8Url);
+                        
+                        // 解析Clear Key
+                        const { kid, key } = parseClearKey(clearKey);
+                        
+                        // 配置Clear Key
+                        player.configure({
+                            drm: {
+                                servers: {
+                                    'org.w3.clearkey': JSON.stringify({
+                                        keys: [{
+                                            kty: 'oct',
+                                            kid: kid,
+                                            k: key
+                                        }]
+                                    })
+                                }
+                            }
+                        });
+                        
+                        await player.load(m3u8Url);
+                        log('视频加载成功');
+                    } catch (error) {
+                        log('加载视频失败: ' + error.message);
+                    }
+                });
+                
+                // 播放/暂停按钮事件
+                document.getElementById('playBtn').addEventListener('click', async () => {
+                    try {
+                        await player.play();
+                        log('视频播放');
+                    } catch (error) {
+                        log('播放失败: ' + error.message);
+                    }
+                });
+                
+                document.getElementById('pauseBtn').addEventListener('click', async () => {
+                    try {
+                        player.pause();
+                        log('视频暂停');
+                    } catch (error) {
+                        log('暂停失败: ' + error.message);
+                    }
+                });
+                
+                log('Shaka Player初始化完成');
+            } catch (error) {
+                log('初始化失败: ' + error.message);
+            }
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', async () => {
+            log('页面加载完成，正在初始化...');
+            await main();
+        });
+    </script>
+</body>
+</html>

@@ -12,7 +12,14 @@ CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o ${BIN_NAME}-${GOOS}-${GO
 GOARCH=amd64
 CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o ${BIN_NAME}-${GOOS}-${GOARCH}
 
+#macOS
+GOOS=darwin
+GOARCH=amd64
+CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o ${BIN_NAME}-${GOOS}-${GOARCH}
+GOARCH=arm64
+CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} go build -o ${BIN_NAME}-${GOOS}-${GOARCH}
+
 #windows
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o ${BIN_NAME}.exe
 chmod a+x idrm*
-scp -P60112 idrm-android-arm64 idrm-linux-amd64 idrm-linux-arm64 idrm.exe root@public.hxiang.eu.org:/mnt/data/local-disk1/public/idrm/
+scp -P60112 idrm-android-arm64 idrm-linux-amd64 idrm-linux-arm64 idrm-darwin-amd64 idrm-darwin-arm64 idrm.exe root@public.hxiang.eu.org:/mnt/data/local-disk1/public/idrm/

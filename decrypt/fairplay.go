@@ -1,9 +1,8 @@
-package main
+package decrypt
 
 import (
 	"crypto/cipher"
 	"idrm/utils"
-
 	"github.com/Eyevinn/mp4ff/mp4"
 )
 
@@ -18,7 +17,7 @@ func generateIV(mediaSequence int32, index int) [16]byte {
 	return iv
 }
 
-func DecryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, sinf *mp4.SinfBox) {
+func decryptFairplaySample(block cipher.Block, mdat *mp4.MdatBox, senc *mp4.SencBox, traf *mp4.TrafBox, i int, offset uint32, sinf *mp4.SinfBox) {
 	encrypted := mdat.Data
 	var iv16 [16]byte
 	iv := getIV(senc, sinf, i, &iv16)
