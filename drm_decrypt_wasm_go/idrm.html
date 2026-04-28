@@ -106,6 +106,13 @@
         border: 1px solid #d1d5db;
         border-radius: 4px;
     }
+    
+    /* 日志区域滚动控制 */
+    .log-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 md:p-8">
@@ -211,9 +218,12 @@
 
                 <!-- Log Terminal -->
                 <div class="bg-gray-900 rounded-xl overflow-hidden flex flex-col h-64 shadow-inner">
-                    <div class="bg-gray-800 px-4 py-2 flex justify-between items-center">
+                    <div class="bg-gray-800 px-4 py-2 flex justify-between items-center log-controls">
                         <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">拦截监控 (ManagedMSE 激活)</span>
-                        <button id="copyLogBtn" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded transition">复制日志</button>
+                        <div>
+                            <button id="toggleScrollBtn" class="text-xs bg-yellow-600 hover:bg-yellow-500 text-white px-2 py-1 rounded transition mr-2">停止滚动</button>
+                            <button id="copyLogBtn" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded transition">复制日志</button>
+                        </div>
                     </div>
                     <div class="p-4 overflow-y-auto flex-1 text-green-400">
                         <pre id="logOutput" class="whitespace-pre-wrap"></pre>
@@ -257,6 +267,14 @@
         let stats = { decryptedSegments: 0, totalDecryptTime: 0, successCount: 0 };
         const logOutput = document.getElementById('logOutput');
         let player = null;
+        
+        // 日志滚动控制变量
+        let autoScrollEnabled = true;
+        const toggleScrollBtn = document.getElementById('toggleScrollBtn');
+        let scrollButtonText = {
+            enable: '开启滚动',
+            disable: '停止滚动'
+        };
 
         function log(msg, category = 'INFO') {
             const now = new Date();
@@ -267,12 +285,59 @@
             const timestampedLogMsg = `[${now.getTime()}] ${logMsg}`;
             
             logOutput.textContent += timestampedLogMsg + '\n';
-            logOutput.parentElement.scrollTop = logOutput.parentElement.scrollHeight;
+            
+            // 仅在自动滚动启用时才滚动到底部
+            if (autoScrollEnabled) {
+                logOutput.parentElement.scrollTop = logOutput.parentElement.scrollHeight;
+            }
+            
             console.log(logMsg);
             
             // 定期清理超过1分钟的旧日志
             cleanupOldLogs();
         }
+        
+        // 切换自动滚动状态
+        toggleScrollBtn.addEventListener('click', function() {
+            autoScrollEnabled = !autoScrollEnabled;
+            
+            if (autoScrollEnabled) {
+                // 开启自动滚动时，确保滚动到底部
+                logOutput.parentElement.scrollTop = logOutput.parentElement.scrollHeight;
+                toggleScrollBtn.textContent = scrollButtonText.disable;
+                toggleScrollBtn.classList.remove('bg-red-600');
+                toggleScrollBtn.classList.add('bg-yellow-600');
+            } else {
+                toggleScrollBtn.textContent = scrollButtonText.enable;
+                toggleScrollBtn.classList.remove('bg-yellow-600');
+                toggleScrollBtn.classList.add('bg-red-600');
+            }
+        });
+        
+        // 当用户手动滚动时，暂时禁用自动滚动
+        logOutput.parentElement.addEventListener('scroll', function() {
+            const isScrolledToBottom = 
+                logOutput.parentElement.scrollHeight - logOutput.parentElement.clientHeight <= 
+                logOutput.parentElement.scrollTop + 1; // 1像素的容差
+            
+            // 如果用户滚动到底部，则重新启用自动滚动
+            if (isScrolledToBottom) {
+                if (!autoScrollEnabled) {
+                    autoScrollEnabled = true;
+                    toggleScrollBtn.textContent = scrollButtonText.disable;
+                    toggleScrollBtn.classList.remove('bg-red-600');
+                    toggleScrollBtn.classList.add('bg-yellow-600');
+                }
+            } else {
+                // 如果用户没有滚动到底部，则禁用自动滚动
+                if (autoScrollEnabled) {
+                    autoScrollEnabled = false;
+                    toggleScrollBtn.textContent = scrollButtonText.enable;
+                    toggleScrollBtn.classList.remove('bg-yellow-600');
+                    toggleScrollBtn.classList.add('bg-red-600');
+                }
+            }
+        });
         
         // 清理超过1分钟的旧日志
         function cleanupOldLogs() {
