@@ -6,10 +6,10 @@
     <title>Shaka Player + WASM fMP4 解密拦截 (iOS 兼容版)</title>
     
     <!-- Shaka Player CSS -->
-<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/shaka-player@4.16.15/dist/controls.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/shaka-player@5.1.2/dist/controls.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Shaka Player UI -->
-   <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.16.15/dist/shaka-player.ui.js"></script>
+   <script src="https://cdn.jsdelivr.net/npm/shaka-player@5.1.2/dist/shaka-player.ui.js"></script>
      <script defer src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js"></script>
     
     <style>
@@ -97,7 +97,7 @@
             <div class="lg:col-span-2 space-y-6">
                 <div class="bg-black rounded-xl overflow-hidden shadow-2xl custom-v-height relative group">
                     <div data-shaka-player-container data-shaka-player-cast-receiver-id="1BA79154">
-                        <video autoplay data-shaka-player id="videoPlayer" style="width:100%;height:100%"></video>
+                        <video autoplay playsinline webkit-playsinline data-shaka-player id="videoPlayer" style="width:100%;height:100%"></video>
                     </div>
                 </div>
 
@@ -291,9 +291,7 @@
             // 设置播放器配置
             player.configure({
                 streaming: {
-                    useNativeHlsOnSafari: false,
                     preferNativeHls: false,
-                    startAtLiveEdge: true,
                     // 1. 播放器尝试保持的总缓存量（默认 30s，网络不稳定建议加到 60s）
                     bufferingGoal: 60,
 
@@ -437,11 +435,11 @@
             });
         }
 
-        window.addEventListener('DOMContentLoaded', async () => {
+ 
+        
+        document.addEventListener("shaka-ui-loaded", async () => {
             await initializeWasm();
-            document.addEventListener("shaka-ui-loaded", ()=> {
-                initShaka();
-            })
+            await initShaka();
             // 预设1按钮事件
             document.getElementById('preset1Btn').addEventListener('click', () => {
                 document.getElementById('m3u8Url').value = 'https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96';
