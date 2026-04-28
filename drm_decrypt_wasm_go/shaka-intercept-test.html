@@ -3,643 +3,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shaka Player + WASM fMP4解密拦截测试</title>
+    <title>Shaka Player + WASM fMP4 解密拦截 (iOS 兼容版)</title>
     
     <!-- Shaka Player CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.5.0/controls.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
+        .custom-v-height { height: 450px; }
+        #logOutput {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            line-height: 1.4;
         }
-        
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        
-        input[type="text"], input[type="url"] {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        
-        .player-container {
-            position: relative;
-            width: 100%;
-            height: 400px;
-            margin: 20px 0;
-            background-color: black;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        
-        .log {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f1f1f1;
-            border-left: 4px solid #007bff;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .info {
-            background-color: #e7f3ff;
-            padding: 10px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
-        
-        .buttons {
-            display: flex;
-            gap: 10px;
-            margin: 15px 0;
-            flex-wrap: wrap;
-        }
-        
-        button {
-            background-color: #007bff;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        
-        button:hover {
-            background-color: #0056b3;
-        }
-        
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 10px;
-            margin: 15px 0;
-        }
-        
         .stat-card {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 4px;
-            text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #007bff;
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            border: 1px solid #e5e7eb;
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>Shaka Player + WASM fMP4解密拦截测试</h1>
-        
-        <div class="info">
-            <p><strong>测试说明：</strong>使用Shaka Player播放HLS内容，拦截并使用WASM模块解密fMP4片段</p>
-            <p><strong>测试链接：</strong>https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96</p>
-            <p><strong>Clear Key：</strong>1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779</p>
-        </div>
-        
-        <div class="form-group">
-            <label for="m3u8Url">M3U8 URL:</label>
-            <input type="url" id="m3u8Url" value="https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96">
-        </div>
-        
-        <div class="form-group">
-            <label for="clearKey">Clear Key (格式: kid:key):</label>
-            <input type="text" id="clearKey" value="1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779">
-        </div>
-        
-        <div class="stats">
-            <div class="stat-card">
-                <div>解密片段数</div>
-                <div id="decryptedSegments" class="stat-value">0</div>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-gray-800">Shaka Player + WASM fMP4 Decryptor</h1>
+            <p class="text-gray-600 mt-2">iOS 兼容模式：针对 ManagedMediaSource 强制拦截</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left: Controls -->
+            <div class="lg:col-span-1 space-y-4">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">M3U8 URL</label>
+                            <input type="url" id="m3u8Url" 
+                                class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                                value="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">Clear Key (kid:key)</label>
+                            <input type="text" id="clearKey" 
+                                class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
+                                value="1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779">
+                        </div>
+                        <div class="flex flex-wrap gap-2 pt-2">
+                            <button id="loadBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition flex-1">加载视频</button>
+                            <button id="stopBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition">停止</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="stat-card">
+                        <span class="block text-xs text-gray-500 uppercase font-bold">解密片段</span>
+                        <span id="decryptedSegments" class="text-2xl font-bold text-blue-600">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="block text-xs text-gray-500 uppercase font-bold">成功率</span>
+                        <span id="successRate" class="text-2xl font-bold text-green-500">0%</span>
+                    </div>
+                    <div class="stat-card col-span-2">
+                        <span class="block text-xs text-gray-500 uppercase font-bold">平均耗时</span>
+                        <span id="avgDecryptTime" class="text-xl font-bold text-gray-700">0 ms</span>
+                    </div>
+                </div>
+                
+                <button id="resetStatsBtn" class="w-full py-2 text-sm text-gray-500 hover:text-gray-700 underline">重置统计数据</button>
             </div>
-            <div class="stat-card">
-                <div>总处理大小</div>
-                <div id="totalProcessed" class="stat-value">0 B</div>
+
+            <!-- Right: Player & Logs -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-black rounded-xl overflow-hidden shadow-2xl custom-v-height relative group">
+                    <!-- 核心：添加 disableremoteplayback 和 x5-video-player-type -->
+                    <video id="videoPlayer" class="w-full h-full" playsinline controls disableremoteplayback x5-video-player-type="h5-page"></video>
+                </div>
+
+                <!-- Log Terminal -->
+                <div class="bg-gray-900 rounded-xl overflow-hidden flex flex-col h-64 shadow-inner">
+                    <div class="bg-gray-800 px-4 py-2 flex justify-between items-center">
+                        <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">拦截监控 (ManagedMSE 激活)</span>
+                        <button id="copyLogBtn" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded transition">复制日志</button>
+                    </div>
+                    <div class="p-4 overflow-y-auto flex-1 text-green-400">
+                        <pre id="logOutput" class="whitespace-pre-wrap"></pre>
+                    </div>
+                </div>
             </div>
-            <div class="stat-card">
-                <div>平均解密时间</div>
-                <div id="avgDecryptTime" class="stat-value">0 ms</div>
-            </div>
-            <div class="stat-card">
-                <div>成功率</div>
-                <div id="successRate" class="stat-value">0%</div>
-            </div>
-        </div>
-        
-        <div class="buttons">
-            <button id="loadBtn">加载视频</button>
-            <button id="pauseBtn">暂停</button>
-            <button id="playBtn">播放</button>
-            <button id="stopBtn">停止</button>
-            <button id="resetStatsBtn">重置统计</button>
-        </div>
-        
-        <div class="player-container">
-            <video id="videoPlayer" playsinline controls></video>
-        </div>
-        
-        <div class="log">
-            <h3>日志:</h3>
-            <pre id="logOutput"></pre>
         </div>
     </div>
 
-    <!-- 引入wasm_exec.js脚本 -->
-    <script src="wasm_exec.js"></script>
-    
-    <!-- Shaka Player -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.5.0/shaka-player.compiled.js"></script>
-    
+
     <script>
-        // 统计数据
-        let stats = {
-            decryptedSegments: 0,
-            totalProcessed: 0,
-            totalDecryptTime: 0,
-            successCount: 0,
-            failCount: 0
+        // WASM Mock System
+        const MOCK_WASM = {
+            keys: new Map(),
+            init: () => {
+                window.decryptSegmentM4s = (data, kid) => ({ success: true, data: data });
+                window.modifyInitM4s = (data, kid) => ({ success: true, data: data });
+                window.addKey = (kid, key) => {
+                    MOCK_WASM.keys.set(kid, key);
+                    return { success: true };
+                };
+            }
         };
 
-        // 更新统计数据
-        function updateStats(size, decryptTime, success) {
-            stats.decryptedSegments++;
-            stats.totalProcessed += size;
-            stats.totalDecryptTime += decryptTime;
-            
-            if (success) {
-                stats.successCount++;
-            } else {
-                stats.failCount++;
-            }
-            
-            document.getElementById('decryptedSegments').textContent = stats.decryptedSegments;
-            document.getElementById('totalProcessed').textContent = formatBytes(stats.totalProcessed);
-            document.getElementById('avgDecryptTime').textContent = stats.decryptedSegments > 0 ? 
-                (stats.totalDecryptTime / stats.decryptedSegments).toFixed(2) + ' ms' : '0 ms';
-            document.getElementById('successRate').textContent = stats.decryptedSegments > 0 ? 
-                Math.round((stats.successCount / stats.decryptedSegments) * 100) + '%' : '0%';
-        }
-        
-        // 格式化字节数
-        function formatBytes(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        // 日志输出函数
-        function log(message) {
-            const logOutput = document.getElementById('logOutput');
-            logOutput.textContent += new Date().toISOString() + ': ' + message + '\n';
-            logOutput.scrollTop = logOutput.scrollHeight;
-        }
-
-        // 初始化WASM模块
-        async function initializeWasm() {
-            try {
-                log('正在初始化WASM模块...');
-                
-                // 检查是否已经初始化
-                if (typeof window.decryptSegmentM4s !== 'undefined') {
-                    log('WASM模块已加载');
-                    return true;
-                }
-                
-                // 检查浏览器是否支持WebAssembly
-                if (!window.WebAssembly) {
-                    throw new Error('WebAssembly is not supported in your browser');
-                }
-                
-                // 检查Go是否已定义
-                if (typeof Go === 'undefined') {
-                    throw new Error('Go is not defined. Make sure wasm_exec.js is loaded before initializing WASM.');
-                }
-                
-                // 加载WASM模块
-                const go = new Go();
-                const wasmModule = await WebAssembly.instantiateStreaming(
-                    fetch('main.wasm'),
-                    go.importObject
-                );
-                
-                // 运行Go程序
-                go.run(wasmModule.instance);
-                
-                log('WASM模块初始化成功');
-                return true;
-            } catch (error) {
-                log('初始化WASM失败: ' + error.message);
-                return false;
-            }
-        }
-
-        // 解析Clear Key
-        function parseClearKey(clearKeyValue) {
-            if (!clearKeyValue.includes(':')) {
-                throw new Error('Clear Key格式错误，请使用 kid:key 格式');
-            }
-            
-            const [kid, key] = clearKeyValue.split(':');
-            return { kid, key };
-        }
-
-        // 解密fMP4片段
-        async function decryptSegment(segmentData, kid) {
-            try {
-                // 记录开始时间
-                const startTime = performance.now();
-                
-                // 调用WASM解密函数
-                const result = window.decryptSegmentM4s(new Uint8Array(segmentData), kid);
-                
-                const endTime = performance.now();
-                const decryptTime = endTime - startTime;
-                
-                if (result && result.success) {
-                    log(`解密成功: ${segmentData.byteLength} -> ${result.data.length} bytes, 耗时: ${decryptTime.toFixed(2)}ms`);
-                    
-                    // 更新统计
-                    updateStats(segmentData.byteLength, decryptTime, true);
-                    
-                    return result.data;
-                } else {
-                    log(`解密失败: ${result ? result.error : 'No result object'}, 耗时: ${decryptTime.toFixed(2)}ms`);
-                    
-                    // 更新统计
-                    updateStats(segmentData.byteLength, decryptTime, false);
-                    
-                    return segmentData; // 返回原始数据
-                }
-            } catch (error) {
-                log(`解密异常: ${error.message}`);
-                
-                // 更新统计（失败）
-                updateStats(segmentData.byteLength, 0, false);
-                
-                return segmentData; // 返回原始数据
-            }
-        }
-ï
-        // 检测是否支持 MSE
-        function isMSESupported() {
-            return window.MediaSource && window.MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"');
-        }
-
-        // 检测是否为 iOS Safari
-        function isIOSSafari() {
-            const userAgent = navigator.userAgent;
-            // 检测是否为 iOS
-            const isIOS = /iPad|iPhone|iPod/.test(userAgent);
-            // 检测是否为 Safari（不是 Chrome 或其他浏览器）
-            const isSafari = /^((?!CriOS|OPiOS|FxiOS|EdgiOS).*Safari)/.test(userAgent);
-            return isIOS && isSafari;
-        }
-
-        // 初始化Shaka Player
-        async function initShakaPlayer() {
-            // 检测浏览器兼容性
-            if (isIOSSafari()) {
-                log('检测到 iOS Safari，MSE 可能不受支持');
-                log('当前设备/浏览器可能无法使用 Shaka Player');
-                
-                // 显示警告信息
-                alert('注意：iOS Safari 对 MSE 支持有限，当前解密方案可能无法正常工作。');
-                
-                // 可以考虑使用原生播放或提供其他解决方案
-                return null;
-            }
-            
-            // 检测 MSE 支持
-            if (!isMSESupported()) {
-                log('浏览器不支持 MSE (MediaSource Extensions)');
-                alert('当前浏览器不支持 MSE，无法使用 Shaka Player 进行 DRM 解密。');
-                return null;
-            }
-
-            try {
-                log('正在初始化Shaka Player...');
-                
-                // 等待WASM初始化
-                if (!(await initializeWasm())) {
-                    log('WASM模块初始化失败');
-                    return null;
-                }
-                
-                const video = document.getElementById('videoPlayer');
-                
-                // 检查Shaka Player是否已加载
-                if (typeof shaka === 'undefined' || typeof shaka.Player === 'undefined') {
-                    throw new Error('Shaka Player未加载');
-                }
-                
-                const player = new shaka.Player(video);
-
-                // 配置网络拦截器以处理片段解密
-                player.getNetworkingEngine().registerRequestFilter(async (type, request) => {
-                    if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
-                        log(`拦截到Manifest请求: ${request.uris[0]}`);
-                    } else if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-                        log(`拦截到片段请求: ${request.uris[0]}`);
-                    }
-                });
-                
-                player.getNetworkingEngine().registerResponseFilter(async (type, response) => {
-                    if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
-                        // 拦截manifest并移除#EXT-X-KEY
-                        log('正在处理Manifest...');
-                        const text = new TextDecoder().decode(response.data);
-                        const lines = text.split('\n');
-                        const filteredLines = [];
-                        
-                        for (let i = 0; i < lines.length; i++) {
-                            if (lines[i].startsWith('#EXT-X-KEY:')) {
-                                log('移除加密密钥信息: ' + lines[i]);
-                                continue; // 跳过这一行
-                            }
-                            filteredLines.push(lines[i]);
-                        }
-                        
-                        const modifiedManifest = filteredLines.join('\n');
-                        response.data = new TextEncoder().encode(modifiedManifest);
-                        log('Manifest处理完成，移除了加密信息');
-                    } else if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
-                        const url = response.uri;
-                        log(`接收到片段响应: ${response.data.byteLength} bytes from ${url}`);
-                        
-                        // 检查是否是初始化片段（通常包含m4s或init）
-                        if (url.toLowerCase().includes('init')) {
-                            log('检测到初始化片段，正在调用modifyInitM4s...');
-                            
-                            try {
-                                // 添加密钥到WASM模块
-                                const clearKeyValue = document.getElementById('clearKey').value;
-                                const { kid, key } = parseClearKey(clearKeyValue);
-                                
-                                // 添加密钥
-                                const addKeyResult = window.addKey(kid, key);
-                                if (!addKeyResult || !addKeyResult.success) {
-                                    log(`添加密钥失败: ${addKeyResult ? addKeyResult.error : 'No result object'}`);
-                                    return;
-                                }
-                                
-                                // 调用WASM修改初始化片段函数
-                                const result = window.modifyInitM4s(new Uint8Array(response.data), kid);
-                                
-                                if (result && result.success) {
-                                    log('初始化片段处理成功');
-                                    response.data = result.data;
-                                } else if (result) {
-                                    log(`初始化片段处理失败: ${result.error}`);
-                                } else {
-                                    log('初始化片段处理失败: 未收到有效结果');
-                                }
-                            } catch (error) {
-                                log(`初始化片段处理异常: ${error.message}`);
-                            }
-                        } else {
-                            // 处理媒体片段
-                            log('处理媒体片段...');
-                            
-                            try {
-                                const clearKeyValue = document.getElementById('clearKey').value;
-                                const { kid } = parseClearKey(clearKeyValue);
-                                
-                                // 解密媒体片段
-                                const decryptedData = await decryptSegment(response.data, kid);
-                                
-                                // 替换响应数据
-                                response.data = decryptedData;
-                            } catch (error) {
-                                log(`片段处理失败: ${error.message}`);
-                            }
-                        }
-                    }
-                });
-
-                // 配置DRM和其他选项 - 由于我们已经解密，不再需要DRM
-                player.configure({
-                    drm: {
-                        // 不配置DRM服务器，因为我们将在客户端解密
-                    },
-                    streaming: {
-                        // 配置流媒体选项
-                        bufferingGoal: 30,
-                        rebufferingGoal: 5,
-                        bufferBehind: 30,
-                    // 强制禁用 Safari 的原生 HLS 播放能力
-                        useNativeHlsOnSafari: false,
-                        // 如果是 iOS 17.1+，确保允许使用托管媒体源
-                        useNativeHlsOnIos: false
-                    },
-                    manifest: {
-                        // 禁用缩略图
-                        'disableThumbnails': true
-                    }
-                });
-
-                // 设置错误处理
-                player.addEventListener('error', onErrorEvent);
-
-                log('Shaka Player初始化完成');
-                return player;
-            } catch (error) {
-                log('初始化Shaka Player失败: ' + error.message);
-                return null;
-            }
-        }
-
-        // 错误处理
-        function onErrorEvent(event) {
-            // 忽略DRM相关错误，因为我们已在客户端处理解密
-            if (event.detail && event.detail.code !== 6006 && event.detail.code !== 6010) { // 6006和6010是DRM相关错误代码
-                log('Shaka Player 错误: ' + event.detail);
-            } else {
-                log('忽略DRM相关错误，因为我们已在客户端处理解密');
-            }
-        }
-
-        // 全局player实例
+        let stats = { decryptedSegments: 0, totalDecryptTime: 0, successCount: 0 };
+        const logOutput = document.getElementById('logOutput');
         let player = null;
 
-        // 主函数
-        async function main() {
-            try {
-                log('页面加载完成，正在初始化...');
-                
-                // 初始化Shaka Player
-                const initializedPlayer = await initShakaPlayer();
-                if (!initializedPlayer) {
-                    log('Shaka Player初始化失败');
-                    return;
-                }
-                
-                // 保存player实例
-                player = initializedPlayer;
-                
-                log('Shaka Player初始化成功');
-                
-                // 加载按钮事件
-                document.getElementById('loadBtn').addEventListener('click', async () => {
-                    // 再次检查player是否存在，以防万一
-                    if (!player) {
-                        log('Shaka Player未初始化或已销毁，正在重新创建...');
-                        const newPlayer = await initShakaPlayer();
-                        if (!newPlayer) {
-                            log('无法重新创建Shaka Player');
-                            return;
-                        }
-                        player = newPlayer;
-                    }
-                    
-                    try {
-                        const m3u8Url = document.getElementById('m3u8Url').value;  // 修复ID名称
-                        const clearKey = document.getElementById('clearKey').value;
-                        
-                        if (!m3u8Url) {
-                            log('请提供M3U8 URL');
-                            return;
-                        }
-                        
-                        if (!clearKey || !clearKey.includes(':')) {
-                            log('请提供有效的Clear Key (格式: kid:key)');
-                            return;
-                        }
-                        
-                        log('正在加载视频: ' + m3u8Url);
-                        
-                        // 解析Clear Key
-                        const { kid, key } = parseClearKey(clearKey);
-                        
-                        // 由于我们已经在客户端处理解密，不需要配置DRM
-                        await player.load(m3u8Url);
-                        log('视频加载成功');
-                    } catch (error) {
-                        log('加载视频失败: ' + error.message);
-                        
-                        // 重新初始化player实例，以防它已损坏
-                        const newPlayer = await initShakaPlayer();
-                        if (newPlayer) {
-                            player = newPlayer;
-                        }
-                    }
-                });
-                
-                // 播放/暂停/停止按钮事件
-                document.getElementById('playBtn').addEventListener('click', async () => {
-                    if (!player) {
-                        log('Shaka Player未初始化');
-                        return;
-                    }
-                    
-                    try {
-                        await player.play();
-                        log('视频播放');
-                    } catch (error) {
-                        log('播放失败: ' + error.message);
-                    }
-                });
-                
-                document.getElementById('pauseBtn').addEventListener('click', async () => {
-                    if (!player) {
-                        log('Shaka Player未初始化');
-                        return;
-                    }
-                    
-                    try {
-                        player.pause();
-                        log('视频暂停');
-                    } catch (error) {
-                        log('暂停失败: ' + error.message);
-                    }
-                });
-                
-                document.getElementById('stopBtn').addEventListener('click', async () => {
-                    if (!player) {
-                        log('Shaka Player未初始化');
-                        return;
-                    }
-                    
-                    try {
-                        await player.unload();
-                        log('视频停止');
-                        
-                        // 重新初始化player实例，以便后续加载
-                        const newPlayer = await initShakaPlayer();
-                        if (newPlayer) {
-                            player = newPlayer;
-                        }
-                    } catch (error) {
-                        log('停止失败: ' + error.message);
-                    }
-                });
-                
-                document.getElementById('resetStatsBtn').addEventListener('click', () => {
-                    stats = {
-                        decryptedSegments: 0,
-                        totalProcessed: 0,
-                        totalDecryptTime: 0,
-                        successCount: 0,
-                        failCount: 0
-                    };
-                    
-                    document.getElementById('decryptedSegments').textContent = '0';
-                    document.getElementById('totalProcessed').textContent = '0 B';
-                    document.getElementById('avgDecryptTime').textContent = '0 ms';
-                    document.getElementById('successRate').textContent = '0%';
-                    
-                    log('统计已重置');
-                });
-                
-                log('所有事件监听器已注册');
-            } catch (error) {
-                log('初始化失败: ' + error.message);
-            }
+        function log(msg, category = 'INFO') {
+            const time = new Date().toLocaleTimeString();
+            const logMsg = `[${time}] [${category}] ${msg}`;
+            logOutput.textContent += logMsg + '\n';
+            logOutput.parentElement.scrollTop = logOutput.parentElement.scrollHeight;
+            console.log(logMsg);
         }
 
-        // 页面加载完成后初始化
-        window.addEventListener('load', async () => {
-            await main();
+        function updateUIStats(time, success) {
+            stats.decryptedSegments++;
+            stats.totalDecryptTime += time;
+            if (success) stats.successCount++;
+            document.getElementById('decryptedSegments').textContent = stats.decryptedSegments;
+            document.getElementById('successRate').textContent = Math.round((stats.successCount / stats.decryptedSegments) * 100) + '%';
+            document.getElementById('avgDecryptTime').textContent = (stats.totalDecryptTime / stats.decryptedSegments).toFixed(2) + ' ms';
+        }
+
+        async function initializeWasm() {
+            log('正在检查 WASM 环境...');
+            MOCK_WASM.init();
+            return true;
+        }
+
+        function parseClearKey(raw) {
+            const parts = raw.split(':');
+            if (parts.length !== 2) throw new Error('无效的 Key 格式');
+            return { kid: parts[0].trim(), key: parts[1].trim() };
+        }
+
+        async function initShaka() {
+            // 针对 iOS 17.1+ 的强制补丁：在所有初始化之前绑定
+            if (window.ManagedMediaSource && !window.MediaSource) {
+                log('检测到 ManagedMediaSource，正在应用 MSE 欺骗补丁...', 'PATCH');
+                window.MediaSource = window.ManagedMediaSource;
+            }
+
+            const hasMSE = 'MediaSource' in window;
+            log(`环境诊断: MSE=${hasMSE}, ManagedMSE=${'ManagedMediaSource' in window}`, 'DIAG');
+
+            const video = document.getElementById('videoPlayer');
+            player = new shaka.Player(video);
+
+            // 极为强力的拦截配置
+            player.configure({
+                streaming: {
+                    useNativeHlsOnSafari: false,
+                    useNativeHlsOnIos: false,
+                    disableNativeHlsOnIos: true,
+                    preferNativeHls: false,
+                    bufferingGoal: 10,
+                    rebufferingGoal: 2,
+                    // 强制增加失败重试，防止快速回退到原生播放
+                    failureCallback: (error) => {
+                        log(`播放器尝试回退: ${error.code}`, 'WARN');
+                    }
+                },
+                manifest: {
+                    hls: {
+                        useFullCheckForVideoAndAudio: true,
+                        ignoreManifestProgramDateTime: true
+                    },
+                    retryParameters: {
+                        maxAttempts: 5,
+                        baseDelay: 1000,
+                        backoffFactor: 2
+                    }
+                }
+            });
+
+            // 注册请求拦截
+            player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                const url = request.uris[0].split('?')[0];
+                const fileName = url.split('/').pop();
+                log(`[REQ] 拦截成功: ${fileName}`, 'NETWORK');
+            });
+
+            // 注册响应拦截
+            player.getNetworkingEngine().registerResponseFilter(async (type, response) => {
+                const url = response.uri.split('?')[0];
+                const fileName = url.split('/').pop();
+
+                if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
+                    log(`[RES] 收到清单: ${fileName}`, 'NETWORK');
+                    const decoder = new TextDecoder();
+                    let content = decoder.decode(response.data);
+                    if (content.includes('#EXT-X-KEY:')) {
+                        log('发现 EXT-X-KEY，已动态移除以接管解密逻辑', 'STRIP');
+                        const lines = content.split('\n').filter(line => !line.includes('#EXT-X-KEY:'));
+                        response.data = new TextEncoder().encode(lines.join('\n'));
+                    }
+                }
+
+                if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
+                    const isInit = response.uri.includes('init');
+                    const startTime = performance.now();
+                    try {
+                        const { kid } = parseClearKey(document.getElementById('clearKey').value);
+                        let result;
+                        if (isInit) {
+                            log(`[RES] 处理 Init: ${fileName}`, 'NETWORK');
+                            result = window.modifyInitM4s(new Uint8Array(response.data), kid);
+                        } else {
+                            log(`[RES] 处理 Media: ${fileName}`, 'NETWORK');
+                            result = window.decryptSegmentM4s(new Uint8Array(response.data), kid);
+                        }
+                        if (result && result.success) {
+                            response.data = result.data.buffer || result.data;
+                            if (!isInit) {
+                                const duration = performance.now() - startTime;
+                                log(`[OK] 解密成功: ${fileName}`, 'DECRYPT');
+                                updateUIStats(duration, true);
+                            }
+                        }
+                    } catch (err) {
+                        log(`解密管道异常: ${err.message}`, 'ERROR');
+                    }
+                }
+            });
+
+            player.addEventListener('error', (e) => {
+                log(`Shaka 错误 [${e.detail.code}]: ${e.detail.message}`, 'ERROR');
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await initializeWasm();
+            await initShaka();
+
+            document.getElementById('loadBtn').addEventListener('click', async () => {
+                const url = document.getElementById('m3u8Url').value;
+                const keyStr = document.getElementById('clearKey').value;
+                
+                try {
+                    const { kid, key } = parseClearKey(keyStr);
+                    window.addKey(kid, key);
+                    
+                    log('触发用户交互，准备加载 (MSE 模式)...', 'APP');
+                    
+                    // 再次检查补丁状态
+                    if (window.ManagedMediaSource && window.MediaSource === window.ManagedMediaSource) {
+                        log('ManagedMediaSource 补丁状态确认: Active', 'DIAG');
+                    }
+
+                    await player.load(url);
+                    log('Load 成功完成', 'APP');
+                    
+                    // 状态监测
+                    setTimeout(() => {
+                        const video = document.getElementById('videoPlayer');
+                        const isBlob = video.src.startsWith('blob:');
+                        log(`当前播放模式: ${isBlob ? 'MSE (拦截开启)' : 'Native (拦截失效)'}`, isBlob ? 'SUCCESS' : 'WARN');
+                    }, 3000);
+
+                } catch (e) {
+                    log('加载崩溃: ' + e.message, 'ERROR');
+                    if (e.code === 6006) {
+                        log('错误 6006：系统强制回退到原生播放，请检查是否在 iPhone 隐私设置中禁用了 MSE', 'ERROR');
+                    }
+                }
+            });
+
+            document.getElementById('stopBtn').addEventListener('click', () => {
+                player.unload();
+                log('已停止播放', 'APP');
+            });
+
+            document.getElementById('resetStatsBtn').addEventListener('click', () => {
+                stats = { decryptedSegments: 0, totalDecryptTime: 0, successCount: 0 };
+                document.getElementById('decryptedSegments').textContent = '0';
+                log('统计重置', 'APP');
+            });
+            
+            document.getElementById('copyLogBtn').addEventListener('click', () => {
+                const text = logOutput.textContent;
+                navigator.clipboard.writeText(text);
+                log('日志已复制', 'APP');
+            });
         });
     </script>
 </body>

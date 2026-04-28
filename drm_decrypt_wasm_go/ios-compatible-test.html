@@ -251,7 +251,13 @@
             // 2. 配置 Shaka：在 iOS 上强制开启 MMS/MSE 路径
             player.configure({
                 streaming: {
-                    useNativeHlsOnSafari: false  // 禁用Safari原生HLS，强制使用Shaka处理
+                                // 强制禁用 Safari 的原生 HLS 播放能力
+                        useNativeHlsOnSafari: false,
+                        // 如果是 iOS 17.1+，确保允许使用托管媒体源
+                        useNativeHlsOnIos: false
+                },
+                manifest:{
+                    disableThumbnails: true // 禁用缩略图请求，减少不必要的网络请求
                 },
                 drm: {
                     // 禁用内置DRM，使用我们自己的解密
@@ -367,13 +373,6 @@
                 logMessage(`Shaka Player 错误: ${JSON.stringify(event.detail)}`, 'error');
             });
 
-            // 重新配置
-            player.configure({
-                streaming: {
-                    useNativeHlsOnSafari: false
-                }
-            });
-
             // 注册过滤器 - 处理manifest和分段
             player.getNetworkingEngine().registerResponseFilter(async (type, response) => {
                 if (type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
@@ -407,7 +406,7 @@
                     const clearKeyValue = document.getElementById('clearKey').value || '76a6c65c-5409-42a2-b7c0-0d5bdc9e430a:79706578-perpetual-License';
                     const kid = clearKeyValue.split(':')[0];
                     
-                    if (url.toLowerCase().includes('init') || url.toLowerCase().endsWith('.m4s')) {
+                    if (url.toLowerCase().includes('init')) {
                         try {
                             logMessage(`处理初始化片段: ${url.substring(url.lastIndexOf('/')+1)}`, 'info');
                             const result = window.modifyInitM4s(rawData, kid);
