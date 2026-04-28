@@ -6,8 +6,11 @@
     <title>Shaka Player + WASM fMP4 解密拦截 (iOS 兼容版)</title>
     
     <!-- Shaka Player CSS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.5.0/controls.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/shaka-player@4.16.15/dist/controls.css">
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Shaka Player UI -->
+   <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.16.15/dist/shaka-player.ui.js"></script>
+     <script defer src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js"></script>
     
     <style>
         .custom-v-height { height: 450px; }
@@ -23,6 +26,14 @@
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
             border: 1px solid #e5e7eb;
         }
+
+            .shaka-video-container {
+      height: 100%;
+    }
+
+    .shaka-spinner-container {
+      display: none !important;
+    }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 md:p-8">
@@ -85,8 +96,9 @@
             <!-- Right: Player & Logs -->
             <div class="lg:col-span-2 space-y-6">
                 <div class="bg-black rounded-xl overflow-hidden shadow-2xl custom-v-height relative group">
-                    <!-- 核心：添加 disableremoteplayback 和 x5-video-player-type -->
-                    <video autoplay id="videoPlayer" class="w-full h-full" playsinline controls disableremoteplayback x5-video-player-type="h5-page"></video>
+                    <div data-shaka-player-container data-shaka-player-cast-receiver-id="1BA79154">
+                        <video autoplay data-shaka-player id="videoPlayer" style="width:100%;height:100%"></video>
+                    </div>
                 </div>
 
                 <!-- Log Terminal -->
@@ -102,8 +114,6 @@
             </div>
         </div>
     </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.5.0/shaka-player.compiled.js"></script>
 
     <script src="wasm_exec.js"></script>
     <script>
@@ -141,11 +151,55 @@
         let player = null;
 
         function log(msg, category = 'INFO') {
-            const time = new Date().toLocaleTimeString();
+            const now = new Date();
+            const time = now.toLocaleTimeString();
             const logMsg = `[${time}] [${category}] ${msg}`;
-            logOutput.textContent += logMsg + '\n';
+            
+            // 添加时间戳到日志条目，以便稍后过滤
+            const timestampedLogMsg = `[${now.getTime()}] ${logMsg}`;
+            
+            logOutput.textContent += timestampedLogMsg + '\n';
             logOutput.parentElement.scrollTop = logOutput.parentElement.scrollHeight;
             console.log(logMsg);
+            
+            // 定期清理超过1分钟的旧日志
+            cleanupOldLogs();
+        }
+        
+        // 清理超过1分钟的旧日志
+        function cleanupOldLogs() {
+            const currentTime = new Date().getTime();
+            const oneMinuteAgo = currentTime - 60000; // 60秒 = 60000毫秒
+            
+            const logLines = logOutput.textContent.split('\n');
+            const recentLogLines = [];
+            
+            for (const line of logLines) {
+                if (!line.trim()) {
+                    // 空行直接保留
+                    recentLogLines.push(line);
+                    continue;
+                }
+                
+                // 尝试解析时间戳
+                const timestampMatch = line.match(/^\[(\d+)\]/);
+                if (timestampMatch) {
+                    const logTime = parseInt(timestampMatch[1]);
+                    if (logTime > oneMinuteAgo) {
+                        // 保留1分钟内的日志，但移除时间戳
+                        const actualLogLine = line.substring(timestampMatch[0].length + 1); // +1 for the space
+                        recentLogLines.push(actualLogLine);
+                    }
+                } else {
+                    // 如果没有时间戳，则保留（可能是静态文本）
+                    recentLogLines.push(line);
+                }
+            }
+            
+            // 只有当日志行数减少时才更新内容
+            if (recentLogLines.length < logLines.length) {
+                logOutput.textContent = recentLogLines.filter(line => line.trim()).join('\n');
+            }
         }
 
         function updateUIStats(time, success) {
@@ -230,33 +284,41 @@
             log(`环境诊断: MSE=${hasMSE}, ManagedMSE=${'ManagedMediaSource' in window}`, 'DIAG');
 
             const video = document.getElementById('videoPlayer');
-            player = new shaka.Player(video);
-
-            // 极为强力的拦截配置
+            const ui = video["ui"];  
+            const controls = ui.getControls();
+            player = controls.getPlayer();
+                        
+            // 设置播放器配置
             player.configure({
                 streaming: {
                     useNativeHlsOnSafari: false,
                     preferNativeHls: false,
-                    bufferingGoal: 10,
-                    rebufferingGoal: 2,
-                    // 强制增加失败重试，防止快速回退到原生播放
-                    failureCallback: (error) => {
-                        log(`播放器尝试回退: ${error.code}`, 'WARN');
-                    }
+                    startAtLiveEdge: true,
+                    // 1. 播放器尝试保持的总缓存量（默认 30s，网络不稳定建议加到 60s）
+                    bufferingGoal: 60,
+
+                    // 2. 视频起播前必须下载够多少秒（默认 2s，卡顿建议设为 5-10s）
+                    rebufferingGoal: 5,
+
+                    // 3. 发生卡顿（Buffer耗尽）后，重新恢复播放前需要存够多少秒
+                    // 建议设为与 rebufferingGoal 一致，或者略小
+                    bufferBehind: 30, // 保留已经播放过的缓存量，方便回拖  
                 },
+                abr: {
+                // 默认是 0.95，改为 0.7 意味着只有当带宽远超需求时才升档
+                bandwidthUpgradeTarget: 0.7,
+                // 默认是 0.85，降低这个值会让播放器更保守，优先保流畅
+                bandwidthDowngradeTarget: 0.9,
+                // 初始带宽估值（10Mbps），帮助播放器在起播时选择合适的档位
+                defaultBandwidthEstimate: 10000000,
+                enabled: true
+              },
                 manifest: {
-                    disableThumbnails: true,
-                    retryParameters: {
-                        maxAttempts: 5,
-                        baseDelay: 1000,
-                        backoffFactor: 2
-                    },
-                    hls: {
-                        ignoreManifestProgramDateTime: true
-                    }
-                }
+                    disableThumbnails: true
+                }        
             });
 
+            
             // 注册请求拦截
             player.getNetworkingEngine().registerRequestFilter((type, request) => {
                 const url = request.uris[0].split('?')[0];
@@ -273,13 +335,41 @@
                     log(`[RES] 收到清单: ${fileName}`, 'NETWORK');
                     const decoder = new TextDecoder();
                     let content = decoder.decode(response.data);
+
+                    // 检查是否是 HLS Master Playlist
+                    if (content.includes('#EXT-X-STREAM-INF')) {
+                        const lines = content.split('\n');
+                        const filteredLines = [];
+
+                        for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (!line) continue;
+
+                        // 识别视频轨道声明
+                        if (line.startsWith('#EXT-X-STREAM-INF:')) {
+                            const resMatch = line.match(/RESOLUTION=\d+x(\d+)/i);
+                            if (resMatch) {
+                            const height = parseInt(resMatch[1]);
+                            // 如果分辨率高度 < 1080，则跳过这一行和紧随其后的 URL 行
+                            if (height < 720) {
+                                i++; // 跳过 URL 行
+                                continue;
+                            }
+                            }
+                        }
+                        // 保留其他所有行（头部、音频声明、高清视频轨道）
+                        filteredLines.push(line);
+                        }
+                        response.data = new TextEncoder().encode(filteredLines.join('\n'));
+                    }
                     
                     // 检查是否是HLS manifest (m3u8)
-                    if (content.includes('#EXT-X-KEY:')) {
+                    else if (content.includes('#EXT-X-KEY:')) {
                         log('发现 EXT-X-KEY，已动态移除以接管解密逻辑', 'STRIP');
                         const lines = content.split('\n').filter(line => !line.includes('#EXT-X-KEY:'));
                         response.data = new TextEncoder().encode(lines.join('\n'));
                     } 
+
                     // 检查是否是DASH manifest (mpd)
                     else if (url.toLowerCase().includes('.mpd') || content.includes('<MPD') || content.includes('urn:mpeg:dash:schema:mpd')) {
                         log('发现 DASH MPD 清单，正在移除 DRM 信息', 'STRIP');
@@ -297,8 +387,7 @@
                         let result;
                         if (isInit) {
                             log(`[RES] 处理 Init: ${fileName}`, 'NETWORK');
-                            // 直接传递kid和key，避免使用全局状态
-                            window.addKey(kid, key);
+                            window.addKey(kid, key); // 将密钥添加到全局，供 WASM 使用
                             result = window.modifyInitM4s(new Uint8Array(response.data), kid);
                         } else {
                             log(`[RES] 处理 Media: ${fileName}`, 'NETWORK');
@@ -350,8 +439,9 @@
 
         window.addEventListener('DOMContentLoaded', async () => {
             await initializeWasm();
-            await initShaka();
-
+            document.addEventListener("shaka-ui-loaded", ()=> {
+                initShaka();
+            })
             // 预设1按钮事件
             document.getElementById('preset1Btn').addEventListener('click', () => {
                 document.getElementById('m3u8Url').value = 'https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96';
@@ -363,7 +453,7 @@
             document.getElementById('preset2Btn').addEventListener('click', () => {
                 document.getElementById('m3u8Url').value = 'https://fsly.stream.peacocktv.com/Content/CMAF_OL2-CTR-4s-v2/Live/channel(lc131pdfws)/master.mpd';
                 document.getElementById('clearKey').value = '0045c27d95e7db8e7b1e15dea75cc76c:a3657cc31900b41db5279edf4656f3f3';
-                log('已载入预设2: ', 'Tennis channel 2');
+                log('已载入预设2: Angel One Demo', 'APP');
             });
 
             document.getElementById('loadBtn').addEventListener('click', async () => {
@@ -380,6 +470,7 @@
                     if (window.ManagedMediaSource && window.MediaSource === window.ManagedMediaSource) {
                         log('ManagedMediaSource 补丁状态确认: Active', 'DIAG');
                     }
+                    window.addKey(kid, key); // 仍然调用以确保密钥在WASM中注册
 
                     await player.load(url);
                     log('Load 成功完成', 'APP');
