@@ -46,6 +46,66 @@
         background-color: #3b82f6;
         color: white;
     }
+    
+    /* 新增样式：添加新预设按钮容器 */
+    .add-preset-container {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .new-preset-form {
+        display: none;
+        margin-top: 10px;
+        padding: 10px;
+        background: #f9fafb;
+        border-radius: 8px;
+    }
+    
+    .new-preset-input {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    
+    .new-preset-btn {
+        background-color: #10b981;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 5px;
+    }
+    
+    .new-preset-btn.cancel {
+        background-color: #9ca3af;
+    }
+    
+    .new-preset-btn.delete {
+        background-color: #ef4444;
+    }
+    
+    /* 多组密钥输入样式 */
+    .key-input-container {
+        margin-bottom: 10px;
+    }
+    
+    .key-input-row {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 5px;
+    }
+    
+    .key-input {
+        flex: 1;
+        padding: 6px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+    }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 md:p-8">
@@ -64,8 +124,38 @@
                             <label class="block text-sm font-semibold text-gray-700 mb-1">预设测试信号</label>
                             <div class="flex gap-2 mb-2">
                                 <button id="preset1Btn" class="preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">NBA TV (m3u8)</button>
-                                <button id="preset2Btn" class="preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">Tennis Channel 2(mpd)</button>
-                                <button id="preset3Btn" class="preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">HBO Max (mpd)</button>
+                                <button id="preset2Btn" class="preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">Tennis Channel 2 (mpd)</button>
+                                <button id="preset3Btn" class="preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">Premier League TV (mpd)</button>
+                            </div>
+                            
+                            <!-- 动态预设按钮容器 -->
+                            <div id="dynamicPresetsContainer" class="flex gap-2 mt-2 flex-wrap"></div>
+                            
+                            <!-- 添加新预设按钮 -->
+                            <div class="add-preset-container">
+                                <button id="addPresetBtn" class="w-full py-2 text-sm text-gray-500 hover:text-gray-700 underline">+ 添加自定义预设</button>
+                                
+                                <!-- 添加新预设的表单 -->
+                                <div id="newPresetForm" class="new-preset-form">
+                                    <input type="text" id="presetName" class="new-preset-input" placeholder="输入预设名称">
+                                    <input type="text" id="presetUrl" class="new-preset-input" placeholder="输入URL地址">
+                                    
+                                    <div class="key-input-container">
+                                        <label class="block text-sm font-semibold text-gray-700 mb-1">输入多组KID:KEY (可选)</label>
+                                        <div id="keysContainer">
+                                            <div class="key-input-row">
+                                                <input type="text" class="key-input" placeholder="格式: kid:key (e.g. 1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779)">
+                                                <button type="button" class="add-key-btn bg-green-600 hover:bg-green-700 text-white px-2 rounded">+</button>
+                                            </div>
+                                        </div>
+                                        <div class="mt-1 text-xs text-gray-500">点击 "+" 添加更多 kid:key 对</div>
+                                    </div>
+                                    
+                                    <div>
+                                        <button id="savePresetBtn" class="new-preset-btn">保存</button>
+                                        <button id="cancelPresetBtn" class="new-preset-btn cancel">取消</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div>
@@ -362,14 +452,8 @@
                 return content;
             }
         }
-
-        function parseClearKey(raw) {
-            const parts = raw.split(':');
-            if (parts.length !== 2) throw new Error('无效的 Key 格式');
-            return { kid: parts[0].trim(), key: parts[1].trim() };
-        }
         
-        // 获取所有KID:Key对的函数
+        // 获取所有KID:key对的函数
         function getAllClearKeys() {
             const inputs = document.querySelectorAll('.clearKeyInput');
             const keys = [];
@@ -387,15 +471,27 @@
             return keys;
         }
         
-        // 添加新的KID:Key输入框
+        // 添加新的Key:KID输入框
         function addNewKeyInput() {
             const container = document.getElementById('clearKeyContainer');
             const div = document.createElement('div');
             div.className = 'flex gap-1 mb-1';
             div.innerHTML = `
                 <input type="text" class="clearKeyInput w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm" 
-                    placeholder="Format: kid:key (e.g. 1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779)">
+                    placeholder="Format: key:kid (e.g. b85491a27c2852323ac704a07cf7b779:1acd2d7afd8cb34099cb832862e3c08d)">
                 <button type="button" class="removeKeyBtn bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-medium">-</button>
+            `;
+            container.appendChild(div);
+        }
+        
+        // 添加新的预设密钥输入框
+        function addNewPresetKeyInput() {
+            const container = document.getElementById('keysContainer');
+            const div = document.createElement('div');
+            div.className = 'key-input-row';
+            div.innerHTML = `
+                <input type="text" class="key-input" placeholder="Format: key:kid (e.g. b85491a27c2852323ac704a07cf7b779:1acd2d7afd8cb34099cb832862e3c08d)">
+                <button type="button" class="remove-key-btn bg-red-600 hover:bg-red-700 text-white px-2 rounded">-</button>
             `;
             container.appendChild(div);
         }
@@ -403,6 +499,23 @@
         
         // 为添加按钮绑定事件
         document.getElementById('addKeyBtn').addEventListener('click', addNewKeyInput);
+        
+        // 为预设表单中的添加密钥按钮绑定事件
+        document.getElementById('keysContainer').addEventListener('click', function(e) {
+            if (e.target.classList.contains('add-key-btn')) {
+                addNewPresetKeyInput();
+            }
+            
+            if (e.target.classList.contains('remove-key-btn')) {
+                const container = e.target.parentElement;
+                if (document.querySelectorAll('.key-input-row').length > 1) {
+                    container.remove();
+                } else {
+                    // 如果只剩一个输入框，清空而不是删除
+                    container.querySelector('.key-input').value = '';
+                }
+            }
+        });
         
         // 使用事件委托处理删除按钮
         document.getElementById('clearKeyContainer').addEventListener('click', function(e) {
@@ -417,6 +530,133 @@
             document.getElementById('preset1Btn').classList.remove('active');
             document.getElementById('preset2Btn').classList.remove('active');
             document.getElementById('preset3Btn').classList.remove('active');
+            
+            // 也移除动态添加的预设按钮的激活状态
+            const dynamicButtons = document.querySelectorAll('#dynamicPresetsContainer button');
+            dynamicButtons.forEach(btn => btn.classList.remove('active'));
+        }
+        
+        // 从localStorage获取预设数据
+        function getPresetsFromStorage() {
+            const presetsStr = localStorage.getItem('presets');
+            return presetsStr ? JSON.parse(presetsStr) : [];
+        }
+        
+        // 保存预设数据到localStorage
+        function savePresetsToStorage(presets) {
+            localStorage.setItem('presets', JSON.stringify(presets));
+        }
+        
+        // 删除预设数据
+        function deletePreset(index) {
+            const presets = getPresetsFromStorage();
+            presets.splice(index, 1);
+            savePresetsToStorage(presets);
+        }
+        
+        // 从预设中获取所有密钥
+        function getKeysFromPreset(preset) {
+            if (!preset.keys || !Array.isArray(preset.keys)) {
+                // 兼容旧格式，如果只有单个key
+                if (preset.key) {
+                    // 旧格式是 kid:key，不需要翻转
+                    const parts = preset.key.split(':');
+                    return [{ kid: parts[0], key: parts[1] }]; // 正确顺序
+                }
+                return [];
+            }
+            
+            // 新格式，处理 kid:key 格式
+            return preset.keys.map(k => {
+                const parts = k.split(':');
+                return { kid: parts[0], key: parts[1] }; // 正确顺序
+            });
+        }
+        
+        // 创建一个新的预设按钮
+        function createPresetButton(preset, index) {
+            const button = document.createElement('button');
+            button.className = 'preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition relative';
+            button.textContent = preset.name;
+            button.dataset.index = index;
+            
+            // 添加删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'absolute top-0 right-0 m-1 text-xs bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center';
+            deleteBtn.textContent = '×';
+            deleteBtn.title = '删除此预设';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 阻止冒泡到父按钮
+                
+                if(confirm(`确定要删除预设 "${preset.name}" 吗？`)) {
+                    deletePreset(index);
+                    renderDynamicPresets();
+                    log(`已删除预设: ${preset.name}`, 'APP');
+                }
+            });
+            
+            button.appendChild(deleteBtn);
+            
+            button.addEventListener('click', () => {
+                player.unload();
+                document.getElementById('m3u8Url').value = preset.url;
+                
+                // 清空现有的输入框
+                const container = document.getElementById('clearKeyContainer');
+                container.innerHTML = '';
+                
+                // 获取预设的密钥
+                const keys = getKeysFromPreset(preset);
+                
+                if (keys.length > 0) {
+                    // 为每个密钥创建输入框
+                    keys.forEach((keyObj, idx) => {
+                        const formattedValue = `${keyObj.kid}:${keyObj.key}`;
+                        
+                        if (idx === 0) {
+                            // 第一个密钥直接填充到现有的输入框
+                            const firstInput = container.querySelector('.clearKeyInput');
+                            if (firstInput) {
+                                firstInput.value = formattedValue;
+                            } else {
+                                addNewKeyInput();
+                                const newInput = container.querySelector('.clearKeyInput');
+                                newInput.value = formattedValue;
+                            }
+                        } else {
+                            // 其他密钥添加新的输入框
+                            addNewKeyInput();
+                            const allInputs = container.querySelectorAll('.clearKeyInput');
+                            const lastInput = allInputs[allInputs.length - 1];
+                            lastInput.value = formattedValue;
+                        }
+                    });
+                } else {
+                    // 如果没有密钥，至少保留一个空输入框
+                    addNewKeyInput();
+                }
+                
+                log(`已载入预设: ${preset.name}`, 'APP');
+                
+                // 移除其他按钮的激活状态，然后给当前按钮添加激活状态
+                removeActivePresetClass();
+                button.classList.add('active');
+                document.getElementById('loadBtn').click();
+            });
+            
+            return button;
+        }
+        
+        // 渲染动态预设按钮
+        function renderDynamicPresets() {
+            const container = document.getElementById('dynamicPresetsContainer');
+            container.innerHTML = ''; // 清空现有内容
+            
+            const presets = getPresetsFromStorage();
+            presets.forEach((preset, index) => {
+                const button = createPresetButton(preset, index);
+                container.appendChild(button);
+            });
         }
 
         async function initShaka() {
@@ -675,9 +915,12 @@
         document.addEventListener("shaka-ui-loaded", async () => {
             await initializeWasm();
             await initShaka();
+            
+            // 初始化动态预设按钮
+            renderDynamicPresets();
+            
             // 预设1按钮事件
             document.getElementById('preset1Btn').addEventListener('click', () => {
-                player.unload();
                 document.getElementById('m3u8Url').value = 'https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96';
                 // 清空现有输入框并添加预设值
                 const container = document.getElementById('clearKeyContainer');
@@ -694,6 +937,7 @@
                 // 移除其他按钮的激活状态，然后给当前按钮添加激活状态
                 removeActivePresetClass();
                 document.getElementById('preset1Btn').classList.add('active');
+                document.getElementById('loadBtn').click();
             });
 
             // 预设2按钮事件
@@ -717,29 +961,30 @@
                 // 移除其他按钮的激活状态，然后给当前按钮添加激活状态
                 removeActivePresetClass();
                 document.getElementById('preset2Btn').classList.add('active');
+                document.getElementById('loadBtn').click();
             });
 
-            // 预设3按钮事件 - HBO Max
+            // 预设3按钮事件 - 英超TV
             document.getElementById('preset3Btn').addEventListener('click', () => {
                 player.unload();
-                document.getElementById('m3u8Url').value = 'https://channel.singtelcast.com/out/v1/empcg-singtel-cast3-prdiz-channel-group-default/empc-singtel-cast3-prdiz-channel-6420/empcoe-singtel-cast3-prdiz-channel-6420-dash/index-dash.mpd'; // 替换为实际的HBO Max URL
+                document.getElementById('m3u8Url').value = 'https://fsly.stream.peacocktv.com/Content/CMAF_OL2-CTR-4s-v2/Live/channel(vc1021n07j)/master.mpd'; // 替换为实际的HBO Max URL
                 // 清空现有输入框并添加预设值
                 const container = document.getElementById('clearKeyContainer');
                 const inputs = container.querySelectorAll('.clearKeyInput');
                 if(inputs[0]) {
-                    inputs[0].value = '0b010e74d4d73fb0a83bfa1f14c2fe49:9d479ffbb5a2abfd8e289f1c84a38957';
+                    inputs[0].value = '0045afccbe17b08dc663dafecd72675c:739f48fc959e9944981a043e86f76913';
                 }
-                // c
-                if(inputs.length < 2) {
-                    addNewKeyInput();
-                } 
-                const newInputs = container.querySelectorAll('.clearKeyInput');
-                newInputs[newInputs.length - 1].value = '87210eae5a11372abfe35a4a2fb47f4c:03d8fdee0f096258adfbd5b9010b0bf3';
+                
+                 // 如果有其他输入框，清空它们
+                for(let i = 1; i < inputs.length; i++) {
+                    inputs[i].value = '';
+                }
                 log('已载入预设3: HBO Max (多组KID)', 'APP');
                 
                 // 移除其他按钮的激活状态，然后给当前按钮添加激活状态
                 removeActivePresetClass();
                 document.getElementById('preset3Btn').classList.add('active');
+                document.getElementById('loadBtn').click();
             });
 
             document.getElementById('loadBtn').addEventListener('click', async () => {
@@ -819,6 +1064,68 @@
                 const text = logOutput.textContent;
                 navigator.clipboard.writeText(text);
                 log('日志已复制', 'APP');
+            });
+            
+            // 添加新预设按钮的事件
+            document.getElementById('addPresetBtn').addEventListener('click', () => {
+                document.getElementById('newPresetForm').style.display = 'block';
+            });
+            
+            // 保存新预设的事件
+            document.getElementById('savePresetBtn').addEventListener('click', () => {
+                const name = document.getElementById('presetName').value.trim();
+                const url = document.getElementById('presetUrl').value.trim();
+                
+                if (!name || !url) {
+                    alert('请填写预设名称和URL地址');
+                    return;
+                }
+                
+                // 获取所有密钥输入框的值
+                const keyInputs = document.querySelectorAll('#keysContainer .key-input');
+                const keys = [];
+                for (let input of keyInputs) {
+                    if (input.value.trim()) {
+                        const parts = input.value.trim().split(':');
+                        if (parts.length === 2) {
+                            keys.push(`${parts[0]}:${parts[1]}`);
+                        }
+                    }
+                }
+                
+                // 获取现有预设
+                const presets = getPresetsFromStorage();
+                
+                // 添加新预设，支持多组密钥
+                presets.push({ name, url, keys: keys });
+                
+                // 保存到localStorage
+                savePresetsToStorage(presets);
+                
+                // 重新渲染动态预设按钮
+                renderDynamicPresets();
+                
+                // 隐藏表单并清空输入
+                document.getElementById('newPresetForm').style.display = 'none';
+                document.getElementById('presetName').value = '';
+                document.getElementById('presetUrl').value = '';
+                
+                // 清空密钥输入框，但保留一个空的
+                const keysContainer = document.getElementById('keysContainer');
+                keysContainer.innerHTML = '<div class="key-input-row"><input type="text" class="key-input" placeholder="格式: kid:key (e.g. 1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779)"><button type="button" class="add-key-btn bg-green-600 hover:bg-green-700 text-white px-2 rounded">+</button></div>';
+                
+                log(`已添加新预设: ${name}`, 'APP');
+            });
+            
+            // 取消添加新预设的事件
+            document.getElementById('cancelPresetBtn').addEventListener('click', () => {
+                document.getElementById('newPresetForm').style.display = 'none';
+                document.getElementById('presetName').value = '';
+                document.getElementById('presetUrl').value = '';
+                
+                // 清空密钥输入框，但保留一个空的
+                const keysContainer = document.getElementById('keysContainer');
+                keysContainer.innerHTML = '<div class="key-input-row"><input type="text" class="key-input" placeholder="格式: kid:key (e.g. 1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779)"><button type="button" class="add-key-btn bg-green-600 hover:bg-green-700 text-white px-2 rounded">+</button></div>';
             });
         });
     </script>
