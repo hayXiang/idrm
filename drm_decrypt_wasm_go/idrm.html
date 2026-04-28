@@ -38,6 +38,13 @@
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <div class="space-y-4">
                         <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1">预设测试信号</label>
+                            <div class="flex gap-2 mb-2">
+                                <button id="preset1Btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">NBA TV (m3u8)</button>
+                                <button id="preset2Btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">Tennis Channel 2(mpd)</button>
+                            </div>
+                        </div>
+                        <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1">M3U8 URL</label>
                             <input type="url" id="m3u8Url" 
                                 class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
@@ -79,7 +86,7 @@
             <div class="lg:col-span-2 space-y-6">
                 <div class="bg-black rounded-xl overflow-hidden shadow-2xl custom-v-height relative group">
                     <!-- 核心：添加 disableremoteplayback 和 x5-video-player-type -->
-                    <video id="videoPlayer" class="w-full h-full" playsinline controls disableremoteplayback x5-video-player-type="h5-page"></video>
+                    <video autoplay id="videoPlayer" class="w-full h-full" playsinline controls disableremoteplayback x5-video-player-type="h5-page"></video>
                 </div>
 
                 <!-- Log Terminal -->
@@ -150,6 +157,62 @@
             document.getElementById('avgDecryptTime').textContent = (stats.totalDecryptTime / stats.decryptedSegments).toFixed(2) + ' ms';
         }
 
+        // 从MPD中移除DRM信息
+        function removeDRMFromMPD(content) {
+            try {
+                // 创建DOM解析器处理XML
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(content, 'application/xml');
+                
+                // 检查是否有解析错误
+                const parserError = xmlDoc.querySelector('parsererror');
+                if (parserError) {
+                    log('MPD XML解析错误，将作为文本处理', 'WARN');
+                    return removeDRMFromMPDAsText(content);
+                }
+                
+                // 移除Period下的ContentProtection元素
+                const contentProtectionElements = xmlDoc.querySelectorAll('ContentProtection');
+                contentProtectionElements.forEach(element => {
+                    element.remove();
+                });
+                
+                // 移除MPD内的cenc:pssh元素（如果存在）
+                const psshElements = xmlDoc.querySelectorAll('[*|schemeIdUri="urn:mpeg:dash:mp4protection:2011"], [*|schemeIdUri*="cenc"], [*|schemeIdUri*="common encryption"]');
+                psshElements.forEach(element => {
+                    element.remove();
+                });
+                
+                // 序列化回字符串
+                const serializer = new XMLSerializer();
+                return serializer.serializeToString(xmlDoc);
+            } catch (e) {
+                log(`解析MPD时出错: ${e.message}，将作为文本处理`, 'WARN');
+                return removeDRMFromMPDAsText(content);
+            }
+        }
+
+        // 文本模式下移除DRM信息
+        function removeDRMFromMPDAsText(content) {
+            try {
+                // 移除ContentProtection相关的XML元素
+                let filteredContent = content.replace(/<ContentProtection[^>]*>[\s\S]*?<\/ContentProtection>/g, '');
+                
+                // 移除cenc:pssh相关的XML元素
+                filteredContent = filteredContent.replace(/<cenc:pssh[^>]*>[\s\S]*?<\/cenc:pssh>/g, '');
+                
+                // 移除其他可能的DRM相关元素
+                filteredContent = filteredContent.replace(/<widevine:license[^>]*>[\s\S]*?<\/widevine:license>/g, '');
+                filteredContent = filteredContent.replace(/<marlin:chlgkey[^>]*>[\s\S]*?<\/marlin:chlgkey>/g, '');
+                filteredContent = filteredContent.replace(/<marlin:enckey[^>]*>[\s\S]*?<\/marlin:enckey>/g, '');
+                
+                return filteredContent;
+            } catch (e) {
+                log(`文本模式处理MPD时出错: ${e.message}，返回原始内容`, 'ERROR');
+                return content;
+            }
+        }
+
         function parseClearKey(raw) {
             const parts = raw.split(':');
             if (parts.length !== 2) throw new Error('无效的 Key 格式');
@@ -210,10 +273,19 @@
                     log(`[RES] 收到清单: ${fileName}`, 'NETWORK');
                     const decoder = new TextDecoder();
                     let content = decoder.decode(response.data);
+                    
+                    // 检查是否是HLS manifest (m3u8)
                     if (content.includes('#EXT-X-KEY:')) {
                         log('发现 EXT-X-KEY，已动态移除以接管解密逻辑', 'STRIP');
                         const lines = content.split('\n').filter(line => !line.includes('#EXT-X-KEY:'));
                         response.data = new TextEncoder().encode(lines.join('\n'));
+                    } 
+                    // 检查是否是DASH manifest (mpd)
+                    else if (url.toLowerCase().includes('.mpd') || content.includes('<MPD') || content.includes('urn:mpeg:dash:schema:mpd')) {
+                        log('发现 DASH MPD 清单，正在移除 DRM 信息', 'STRIP');
+                        // 解析并移除MPD中的DRM相关内容
+                        const filteredContent = removeDRMFromMPD(content);
+                        response.data = new TextEncoder().encode(filteredContent);
                     }
                 }
 
@@ -226,7 +298,7 @@
                         if (isInit) {
                             log(`[RES] 处理 Init: ${fileName}`, 'NETWORK');
                             // 直接传递kid和key，避免使用全局状态
-                            window.addKey(kid, key); 
+                            window.addKey(kid, key);
                             result = window.modifyInitM4s(new Uint8Array(response.data), kid);
                         } else {
                             log(`[RES] 处理 Media: ${fileName}`, 'NETWORK');
@@ -236,7 +308,7 @@
                             }
                             
                             // 调用解密函数并记录结果
-                            const result = window.decryptSegmentM4s(new Uint8Array(response.data), kid, key);
+                            const result = window.decryptSegmentM4s(new Uint8Array(response.data), kid);
                             
                             // 添加调试日志，检查结果
                             if (!result) {
@@ -247,15 +319,14 @@
                             
                             if (result && result.success) {
                                 response.data = result.data.buffer || result.data;
-                                if (!isInit) {
-                                    const duration = performance.now() - startTime;
-                                    log(`[OK] 解密成功: ${fileName}`, 'DECRYPT');
-                                    updateUIStats(duration, true);
-                                }
+                                const duration = performance.now() - startTime;
+                                log(`[OK] 解密成功: ${fileName}`, 'DECRYPT');
+                                updateUIStats(duration, true);
                             } else {
                                 log(`[ERROR] WASM function failed for ${fileName}: ${result ? result.error || JSON.stringify(result) : 'no result'}`, 'ERROR');
                             }
                         }
+                        
                         if (result && result.success) {
                             response.data = result.data.buffer || result.data;
                             if (!isInit) {
@@ -263,6 +334,8 @@
                                 log(`[OK] 解密成功: ${fileName}`, 'DECRYPT');
                                 updateUIStats(duration, true);
                             }
+                        } else if (isInit) {
+                            log(`[ERROR] WASM function failed for ${fileName}: ${result ? result.error || JSON.stringify(result) : 'no result'}`, 'ERROR');
                         }
                     } catch (err) {
                         log(`解密管道异常: ${err.message}`, 'ERROR');
@@ -278,6 +351,20 @@
         window.addEventListener('DOMContentLoaded', async () => {
             await initializeWasm();
             await initShaka();
+
+            // 预设1按钮事件
+            document.getElementById('preset1Btn').addEventListener('click', () => {
+                document.getElementById('m3u8Url').value = 'https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96';
+                document.getElementById('clearKey').value = '1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779';
+                log('已载入预设1: NBA TV', 'APP');
+            });
+
+            // 预设2按钮事件
+            document.getElementById('preset2Btn').addEventListener('click', () => {
+                document.getElementById('m3u8Url').value = 'https://fsly.stream.peacocktv.com/Content/CMAF_OL2-CTR-4s-v2/Live/channel(lc131pdfws)/master.mpd';
+                document.getElementById('clearKey').value = '0045c27d95e7db8e7b1e15dea75cc76c:a3657cc31900b41db5279edf4656f3f3';
+                log('已载入预设2: ', 'Tennis channel 2');
+            });
 
             document.getElementById('loadBtn').addEventListener('click', async () => {
                 const url = document.getElementById('m3u8Url').value;
