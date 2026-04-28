@@ -225,7 +225,84 @@
                     return removeDRMFromMPDAsText(content);
                 }
                 
-                // 移除Period下的ContentProtection元素
+                // 遍历所有AdaptationSet，查找ContentProtection并提取KID
+                const adaptationSets = xmlDoc.querySelectorAll('AdaptationSet');
+                adaptationSets.forEach(adaptationSet => {
+                    const adpId = adaptationSet.getAttribute('id');
+                    let kid = null;
+                    
+                    // 在当前AdaptationSet下查找ContentProtection元素
+                    const contentProtections = adaptationSet.querySelectorAll('ContentProtection');
+                    contentProtections.forEach(cp => {
+                        const schemeIdUri = cp.getAttribute('schemeIdUri');
+                        
+                        // 检查是否是CENC或其他支持的DRM方案
+                        if (schemeIdUri && (schemeIdUri.includes('mpeg:dash:mp4protection:2011') || 
+                           schemeIdUri.includes('cenc') || 
+                           schemeIdUri.includes('common encryption'))) {
+                            
+                            // 尝试获取KID值
+                            kid = cp.getAttribute('cenc:default_KID');
+                            if (!kid) {
+                                kid = cp.getAttribute('default_KID');
+                                if (!kid) {
+                                    // 如果没有找到KID属性，尝试在ContentProtection内部查找
+                                    const kidElement = cp.querySelector('cenc\\:default_KID, default_KID');
+                                    if (kidElement) {
+                                        kid = kidElement.textContent;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    // 如果找到了KID，处理该AdaptationSet下的SegmentTemplate
+                    if (kid) {
+                        const segmentTemplates = adaptationSet.querySelectorAll('SegmentTemplate');
+                        segmentTemplates.forEach(st => {
+                            // 更新media属性
+                            const mediaAttr = st.getAttribute('media');
+                            if (mediaAttr) {
+                                // 添加 KID 作为片段标识符
+                                const separator = mediaAttr.includes('#') ? '&' : '#';
+                                st.setAttribute('media', mediaAttr + separator + 'kid=' + kid);
+                            }
+                            
+                            // 更新initialization属性
+                            const initAttr = st.getAttribute('initialization');
+                            if (initAttr) {
+                                // 添加 KID 作为片段标识符
+                                const separator = initAttr.includes('#') ? '&' : '#';
+                                st.setAttribute('initialization', initAttr + separator + 'kid=' + kid);
+                            }
+                        });
+                        
+                        // 同样处理Representation下的SegmentTemplate
+                        const representations = adaptationSet.querySelectorAll('Representation');
+                        representations.forEach(rep => {
+                            const repSegmentTemplates = rep.querySelectorAll('SegmentTemplate');
+                            repSegmentTemplates.forEach(st => {
+                                // 更新media属性
+                                const mediaAttr = st.getAttribute('media');
+                                if (mediaAttr) {
+                                    // 添加 KID 作为片段标识符
+                                    const separator = mediaAttr.includes('#') ? '&' : '#';
+                                    st.setAttribute('media', mediaAttr + separator + 'kid=' + kid);
+                                }
+                                
+                                // 更新initialization属性
+                                const initAttr = st.getAttribute('initialization');
+                                if (initAttr) {
+                                    // 添加 KID 作为片段标识符
+                                    const separator = initAttr.includes('#') ? '&' : '#';
+                                    st.setAttribute('initialization', initAttr + separator + 'kid=' + kid);
+                                }
+                            });
+                        });
+                    }
+                });
+                
+                // 移除ContentProtection相关的XML元素
                 const contentProtectionElements = xmlDoc.querySelectorAll('ContentProtection');
                 contentProtectionElements.forEach(element => {
                     element.remove();
@@ -316,12 +393,38 @@
                 }        
             });
 
+            // 初始化一个Map来存储uriKid映射，并记录插入顺序
+            if (typeof window.uriKidMap === 'undefined') {
+                window.uriKidMap = new Map();
+            }
             
-            // 注册请求拦截
-            player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                const url = request.uris[0].split('?')[0];
-                const fileName = url.split('/').pop();
-                log(`[REQ] 拦截成功: ${fileName}`, 'NETWORK');
+            player.getNetworkingEngine().registerRequestFilter(function(type, request) {
+                // 只处理媒体段和初始化段的请求
+                if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT || type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
+                    const uri = request.uris[0];                    
+                    if (uri.includes('#kid=')) {
+                        const parts = uri.split('#kid=');
+                        const realUri = parts[0];
+                        const kid = parts[1].replaceAll("-", "").trim(); // 移除可能的连字符并去除空白
+                        
+                        // 检查映射大小，如果达到或超过100个条目，则删除最早添加的条目
+                        if (window.uriKidMap.size >= 100) {
+                            // 获取Map的第一个键（最老的条目）并删除
+                            const firstKey = window.uriKidMap.keys().next().value;
+                            window.uriKidMap.delete(firstKey);
+                        }
+                        
+                        // 添加新的映射关系
+                        window.uriKidMap.set(realUri, kid);
+
+                        // --- 核心操作 ---
+                        // 1. 你现在拿到了 kid，可以用它来进行后续解密
+                        console.log(`正在请求 KID 为 ${kid} 的切片，当前映射总数: ${window.uriKidMap.size}`);
+                        
+                        // 2. 必须把 URL 还原，否则服务器会报 404
+                        request.uris[0] = realUri; 
+                    }
+                }
             });
 
             // 注册响应拦截
@@ -381,12 +484,15 @@
                     const isInit = response.uri.includes('init');
                     const startTime = performance.now();
                     try {
-                        const { kid, key } = parseClearKey(document.getElementById('clearKey').value);
+                        let { kid, key } = parseClearKey(document.getElementById('clearKey').value);
+                        const cached_kid = window.uriKidMap.get(response.uri);
+                        if (cached_kid) {
+                            kid = cached_kid;
+                        }
                         let result;
                         if (isInit) {
                             log(`[RES] 处理 Init: ${fileName}`, 'NETWORK');
-                            window.addKey(kid, key); // 将密钥添加到全局，供 WASM 使用
-                            result = window.modifyInitM4s(new Uint8Array(response.data), kid);
+                            result = window.modifyInitM4s(new Uint8Array(response.data), kid)
                         } else {
                             log(`[RES] 处理 Media: ${fileName}`, 'NETWORK');
                             if (typeof window.decryptSegmentM4s !== 'function') {
@@ -459,9 +565,7 @@
                 const keyStr = document.getElementById('clearKey').value;
                 
                 try {
-                    const { kid, key } = parseClearKey(keyStr);
-                    // 不再调用window.addKey(kid, key)，直接在解密时传递密钥
-                    
+                    const { kid, key } = parseClearKey(keyStr);       
                     log('触发用户交互，准备加载 (MSE 模式)...', 'APP');
                     
                     // 再次检查补丁状态
