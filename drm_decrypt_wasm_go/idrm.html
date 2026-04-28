@@ -34,6 +34,18 @@
     .shaka-spinner-container {
       display: none !important;
     }
+    
+    /* 新增样式：预设按钮点击时的边框高亮 */
+    .preset-btn {
+        transition: all 0.3s ease;
+    }
+    
+    .preset-btn.active {
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5) !important;
+        border-color: #3b82f6;
+        background-color: #3b82f6;
+        color: white;
+    }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 md:p-8">
@@ -51,9 +63,9 @@
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1">预设测试信号</label>
                             <div class="flex gap-2 mb-2">
-                                <button id="preset1Btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">NBA TV (m3u8)</button>
-                                <button id="preset2Btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">Tennis Channel 2(mpd)</button>
-                                <button id="preset3Btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">HBO Max (mpd)</button>
+                                <button id="preset1Btn" class="preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">NBA TV (m3u8)</button>
+                                <button id="preset2Btn" class="preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">Tennis Channel 2(mpd)</button>
+                                <button id="preset3Btn" class="preset-btn flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">HBO Max (mpd)</button>
                             </div>
                         </div>
                         <div>
@@ -399,6 +411,13 @@
                 container.remove();
             }
         });
+        
+        // 函数：移除所有预设按钮的激活状态
+        function removeActivePresetClass() {
+            document.getElementById('preset1Btn').classList.remove('active');
+            document.getElementById('preset2Btn').classList.remove('active');
+            document.getElementById('preset3Btn').classList.remove('active');
+        }
 
         async function initShaka() {
             // 针对 iOS 17.1+ 的强制补丁：在所有初始化之前绑定
@@ -658,6 +677,7 @@
             await initShaka();
             // 预设1按钮事件
             document.getElementById('preset1Btn').addEventListener('click', () => {
+                player.unload();
                 document.getElementById('m3u8Url').value = 'https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96';
                 // 清空现有输入框并添加预设值
                 const container = document.getElementById('clearKeyContainer');
@@ -670,10 +690,15 @@
                     inputs[i].value = '';
                 }
                 log('已载入预设1: NBA TV', 'APP');
+                
+                // 移除其他按钮的激活状态，然后给当前按钮添加激活状态
+                removeActivePresetClass();
+                document.getElementById('preset1Btn').classList.add('active');
             });
 
             // 预设2按钮事件
             document.getElementById('preset2Btn').addEventListener('click', () => {
+                player.unload();
                 document.getElementById('m3u8Url').value = 'https://fsly.stream.peacocktv.com/Content/CMAF_OL2-CTR-4s-v2/Live/channel(lc131pdfws)/master.mpd';
                 // 清空现有输入框并添加预设值
                 const container = document.getElementById('clearKeyContainer');
@@ -688,10 +713,15 @@
                 }
                
                 log('已载入预设2: Tennis Channel', 'APP');
+                
+                // 移除其他按钮的激活状态，然后给当前按钮添加激活状态
+                removeActivePresetClass();
+                document.getElementById('preset2Btn').classList.add('active');
             });
 
             // 预设3按钮事件 - HBO Max
             document.getElementById('preset3Btn').addEventListener('click', () => {
+                player.unload();
                 document.getElementById('m3u8Url').value = 'https://channel.singtelcast.com/out/v1/empcg-singtel-cast3-prdiz-channel-group-default/empc-singtel-cast3-prdiz-channel-6420/empcoe-singtel-cast3-prdiz-channel-6420-dash/index-dash.mpd'; // 替换为实际的HBO Max URL
                 // 清空现有输入框并添加预设值
                 const container = document.getElementById('clearKeyContainer');
@@ -706,6 +736,10 @@
                 const newInputs = container.querySelectorAll('.clearKeyInput');
                 newInputs[newInputs.length - 1].value = '87210eae5a11372abfe35a4a2fb47f4c:03d8fdee0f096258adfbd5b9010b0bf3';
                 log('已载入预设3: HBO Max (多组KID)', 'APP');
+                
+                // 移除其他按钮的激活状态，然后给当前按钮添加激活状态
+                removeActivePresetClass();
+                document.getElementById('preset3Btn').classList.add('active');
             });
 
             document.getElementById('loadBtn').addEventListener('click', async () => {
