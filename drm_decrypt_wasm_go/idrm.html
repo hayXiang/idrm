@@ -41,7 +41,7 @@
                             <label class="block text-sm font-semibold text-gray-700 mb-1">M3U8 URL</label>
                             <input type="url" id="m3u8Url" 
                                 class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
-                                value="https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8">
+                                value="https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1">Clear Key (kid:key)</label>
@@ -98,19 +98,36 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.5.0/shaka-player.compiled.js"></script>
 
+    <script src="wasm_exec.js"></script>
     <script>
-        // WASM Mock System
-        const MOCK_WASM = {
-            keys: new Map(),
-            init: () => {
-                window.decryptSegmentM4s = (data, kid) => ({ success: true, data: data });
-                window.modifyInitM4s = (data, kid) => ({ success: true, data: data });
-                window.addKey = (kid, key) => {
-                    MOCK_WASM.keys.set(kid, key);
-                    return { success: true };
-                };
+        async function initializeWasm() {
+            if (typeof Go === 'undefined') {
+                log('wasm_exec.js not loaded', 'error');
+                return false;
             }
-        };
+
+            try {
+                const go = new Go();
+                const wasmModule = await WebAssembly.instantiateStreaming(
+                    fetch('main.wasm'), go.importObject
+                );
+                go.run(wasmModule.instance);
+                
+                // 检查WASM函数是否可用 - 只检查必需的函数
+                if (typeof window.decryptSegmentM4s !== 'function' ||
+                    typeof window.modifyInitM4s !== 'function') {
+                    log('WASM functions not available', 'error');
+                    return false;
+                }
+                
+                wasmInitialized = true;
+                log('WASM initialized successfully', 'success');
+                return true;
+            } catch (error) {
+                log(`WASM initialization failed: ${error.message}`, 'error');
+                return false;
+            }
+        }
 
         let stats = { decryptedSegments: 0, totalDecryptTime: 0, successCount: 0 };
         const logOutput = document.getElementById('logOutput');
@@ -131,12 +148,6 @@
             document.getElementById('decryptedSegments').textContent = stats.decryptedSegments;
             document.getElementById('successRate').textContent = Math.round((stats.successCount / stats.decryptedSegments) * 100) + '%';
             document.getElementById('avgDecryptTime').textContent = (stats.totalDecryptTime / stats.decryptedSegments).toFixed(2) + ' ms';
-        }
-
-        async function initializeWasm() {
-            log('正在检查 WASM 环境...');
-            MOCK_WASM.init();
-            return true;
         }
 
         function parseClearKey(raw) {
@@ -162,8 +173,6 @@
             player.configure({
                 streaming: {
                     useNativeHlsOnSafari: false,
-                    useNativeHlsOnIos: false,
-                    disableNativeHlsOnIos: true,
                     preferNativeHls: false,
                     bufferingGoal: 10,
                     rebufferingGoal: 2,
@@ -173,14 +182,14 @@
                     }
                 },
                 manifest: {
-                    hls: {
-                        useFullCheckForVideoAndAudio: true,
-                        ignoreManifestProgramDateTime: true
-                    },
+                    disableThumbnails: true,
                     retryParameters: {
                         maxAttempts: 5,
                         baseDelay: 1000,
                         backoffFactor: 2
+                    },
+                    hls: {
+                        ignoreManifestProgramDateTime: true
                     }
                 }
             });
@@ -212,14 +221,40 @@
                     const isInit = response.uri.includes('init');
                     const startTime = performance.now();
                     try {
-                        const { kid } = parseClearKey(document.getElementById('clearKey').value);
+                        const { kid, key } = parseClearKey(document.getElementById('clearKey').value);
                         let result;
                         if (isInit) {
                             log(`[RES] 处理 Init: ${fileName}`, 'NETWORK');
+                            // 直接传递kid和key，避免使用全局状态
+                            window.addKey(kid, key); 
                             result = window.modifyInitM4s(new Uint8Array(response.data), kid);
                         } else {
                             log(`[RES] 处理 Media: ${fileName}`, 'NETWORK');
-                            result = window.decryptSegmentM4s(new Uint8Array(response.data), kid);
+                            if (typeof window.decryptSegmentM4s !== 'function') {
+                                log('decryptSegmentM4s function not available', 'ERROR');
+                                return;
+                            }
+                            
+                            // 调用解密函数并记录结果
+                            const result = window.decryptSegmentM4s(new Uint8Array(response.data), kid, key);
+                            
+                            // 添加调试日志，检查结果
+                            if (!result) {
+                                log(`[ERROR] decryptSegmentM4s returned null/undefined for ${fileName}`, 'ERROR');
+                            } else if (typeof result === 'object' && result.hasOwnProperty('success') === false) {
+                                log(`[DEBUG] decryptSegmentM4s result structure: ${JSON.stringify(Object.keys(result))}`, 'DEBUG');
+                            }
+                            
+                            if (result && result.success) {
+                                response.data = result.data.buffer || result.data;
+                                if (!isInit) {
+                                    const duration = performance.now() - startTime;
+                                    log(`[OK] 解密成功: ${fileName}`, 'DECRYPT');
+                                    updateUIStats(duration, true);
+                                }
+                            } else {
+                                log(`[ERROR] WASM function failed for ${fileName}: ${result ? result.error || JSON.stringify(result) : 'no result'}`, 'ERROR');
+                            }
                         }
                         if (result && result.success) {
                             response.data = result.data.buffer || result.data;
@@ -250,7 +285,7 @@
                 
                 try {
                     const { kid, key } = parseClearKey(keyStr);
-                    window.addKey(kid, key);
+                    // 不再调用window.addKey(kid, key)，直接在解密时传递密钥
                     
                     log('触发用户交互，准备加载 (MSE 模式)...', 'APP');
                     
