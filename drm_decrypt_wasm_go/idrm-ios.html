@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS.js + WASM fMP4解密拦截测试</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入wasm_exec.js脚本 -->
+    <script src="wasm_exec.js"></script>
+    <style>
+        body { background-color: #0f172a; color: #f1f5f9; }
+        .console-box { font-family: 'Courier New', Courier, monospace; height: 200px; overflow-y: auto; background: #1e293b; border: 1px solid #334155; }
+        video { background: #000; width: 100%; border-radius: 8px; }
+        .stat-card { background: #1e293b; padding: 10px; border-radius: 6px; text-align: center; border: 1px solid #334155; }
+        .stat-value { font-size: 1.2em; font-weight: bold; color: #60a5fa; }
+        .log {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-left: 4px solid #007bff;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-blue-400">HLS.js Custom Loader Tester</h1>
+            <p class="text-slate-400 mt-2">测试自定义 Manifest 加载逻辑、I-frame 过滤及请求拦截</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- 左侧：播放器与控制 -->
+            <div class="lg:col-span-2 space-y-4">
+                <div class="relative group">
+                    <video id="video" controls playsinline></video>
+                    <div id="status-badge" class="absolute top-4 right-4 bg-black/60 px-3 py-1 rounded-full text-xs border border-white/20">
+                        等待初始化...
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-700">
+                    <div class="flex flex-col space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-300">HLS 流地址 (.m3u8)</label>
+                            <div class="flex gap-2">
+                                <input id="m3u8-url" type="text" 
+                                    class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                    value="https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96">
+                                <button id="load-btn" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded font-bold transition">加载</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                             <div class="col-span-2">
+                                <label class="block text-sm font-medium mb-1 text-slate-300">Clear Key (kid:key)</label>
+                                <input id="clear-key" type="text" 
+                                    class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" 
+                                    value="1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779">
+                            </div>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="disable-iframe" class="w-4 h-4 rounded border-slate-600 bg-slate-900 text-blue-600">
+                                <span>禁用 I-frame 渲染 (缩略图)</span>
+                            </label>
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="intercept-manifest" checked class="w-4 h-4 rounded border-slate-600 bg-slate-900 text-blue-600">
+                                <span>拦截并记录 Manifest 内容</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Section -->
+                <div class="grid grid-cols-4 gap-4 text-sm">
+                    <div class="stat-card">
+                        <div class="text-slate-400 text-xs uppercase">解密片段</div>
+                        <div id="stat-decrypted" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-slate-400 text-xs uppercase">总大小</div>
+                        <div id="stat-size" class="stat-value">0 B</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-slate-400 text-xs uppercase">平均耗时</div>
+                        <div id="stat-time" class="stat-value">0 ms</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="text-slate-400 text-xs uppercase">成功率</div>
+                        <div id="stat-rate" class="stat-value">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：控制台与信息 -->
+            <div class="space-y-4">
+                <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 h-[500px] flex flex-col">  <!-- 固定高度 -->
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-2 flex justify-between">
+                        实时日志 
+                        <button id="clear-console" class="text-xs text-blue-400 hover:underline">清空</button>
+                    </h2>
+                    <div id="console" class="console-box p-3 text-xs leading-relaxed rounded flex-1 overflow-y-auto">
+                        <div>[System] 播放器就绪，等待加载流...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-slate-800 p-6 rounded-xl border border-slate-700">
+            <h3 class="text-lg font-bold mb-4">自定义加载器核心代码说明</h3>
+            <div class="grid md:grid-cols-2 gap-6 text-sm text-slate-400">
+                <div>
+                    <h4 class="text-white mb-2 font-mono">1. pLoader (Playlist Loader)</h4>
+                    <p>通过配置 <code>pLoader</code>，我们可以接管 <code>.m3u8</code> 文件的网络请求。在这里你可以手动过滤掉特定的变体流，或者修改 Manifest 的文本内容（例如强制删除某些清晰度）。</p>
+                </div>
+                <div>
+                    <h4 class="text-white mb-2 font-mono">2. xhrSetup</h4>
+                    <p>如果你只需要在请求头中添加鉴权信息或简单的 URL 修改，可以使用 <code>xhrSetup</code>。它比重写整个 Loader 更轻量。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const video = document.getElementById('video');
+            const loadBtn = document.getElementById('load-btn');
+            const m3u8Input = document.getElementById('m3u8-url');
+            const clearKeyInput = document.getElementById('clear-key');
+            const consoleEl = document.getElementById('console');
+            const statusBadge = document.getElementById('status-badge');
+            const disableIframeCheck = document.getElementById('disable-iframe');
+            const interceptCheck = document.getElementById('intercept-manifest');
+            const clearBtn = document.getElementById('clear-console');
+
+            // Stats elements
+            const statDecrypted = document.getElementById('stat-decrypted');
+            const statSize = document.getElementById('stat-size');
+            const statTime = document.getElementById('stat-time');
+            const statRate = document.getElementById('stat-rate');
+
+            let hls = null;
+            let stats = { decrypted: 0, size: 0, time: 0, success: 0, fail: 0 };
+
+            function log(msg, type = 'info') {
+                const time = new Date().toLocaleTimeString().split(' ')[0];
+                const color = type === 'error' ? 'text-red-400' : (type === 'warn' ? 'text-yellow-400' : 'text-blue-300');
+                const div = document.createElement('div');
+                div.className = `mb-1 ${color}`;
+                div.innerHTML = `<span class="text-slate-600">[${time}]</span> ${msg}`;
+                consoleEl.appendChild(div);
+                
+                // 限制日志行数，最多保留100行
+                while (consoleEl.children.length > 100) {
+                    consoleEl.removeChild(consoleEl.firstChild);
+                }
+                
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+            }
+
+            clearBtn.onclick = () => consoleEl.innerHTML = '';
+
+            function updateStats(size, decryptTime, success) {
+                stats.decrypted++;
+                stats.size += size;
+                stats.time += decryptTime;
+                if (success) stats.success++; else stats.fail++;
+
+                statDecrypted.textContent = stats.decrypted;
+                
+                // Format size
+                let s = stats.size;
+                let unit = 'B';
+                if (s > 1024) { s /= 1024; unit = 'KB'; }
+                if (s > 1024) { s /= 1024; unit = 'MB'; }
+                statSize.textContent = s.toFixed(1) + ' ' + unit;
+
+                statTime.textContent = (stats.time / stats.decrypted).toFixed(1) + ' ms';
+                statRate.textContent = Math.round((stats.success / stats.decrypted) * 100) + '%';
+            }
+
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            // Initialize WASM
+            async function initializeWasm() {
+                try {
+                    if (typeof window.decryptSegmentM4s !== 'undefined') {
+                        log('WASM模块已加载');
+                        return true;
+                    }
+                    if (!window.WebAssembly) throw new Error('WebAssembly not supported');
+                    if (typeof Go === 'undefined') throw new Error('Go is not defined (wasm_exec.js missing?)');
+
+                    const go = new Go();
+                    const wasmModule = await WebAssembly.instantiateStreaming(
+                        fetch('main.wasm'),
+                        go.importObject
+                    );
+                    go.run(wasmModule.instance);
+                    log('WASM模块初始化成功');
+                    return true;
+                } catch (error) {
+                    log('初始化WASM失败: ' + error.message, 'error');
+                    return false;
+                }
+            }
+
+            // Custom Loader Class
+            class CustomLoader {
+                constructor(config) {
+                    this.loader = new Hls.DefaultConfig.loader(config);
+                    this.stats = this.loader.stats || { loading: { start: 0, first: 0, end: 0 }, buffer: { start: 0, end: 0 } };
+                }
+
+                destroy() { if (this.loader && this.loader.destroy) this.loader.destroy(); }
+                abort() { if (this.loader && this.loader.abort) this.loader.abort(); }
+
+                load(context, config, callbacks) {
+                    const originalSuccess = callbacks.onSuccess;
+                    
+                    callbacks.onSuccess = async (response, stats, context) => {
+                        // 1. Handle Manifest/Playlist (Text filtering)
+                        if (context.url.toLowerCase().includes('m3u8')){
+                            if (interceptCheck.checked) {
+                                let text = response.data;
+
+                                if (text) {
+                                    const lines = text.split('\n');
+                                    const filteredLines = lines.filter(line => {
+                                        if (line.startsWith('#EXT-X-KEY:')) {
+                                            log('过滤 Manifest 密钥: ' + line.substring(0, 30) + '...');
+                                            return false;
+                                        }
+                                        return true;
+                                    });                                    
+                                    response.data = filteredLines.join('\n');
+                                }
+                            }
+                            return originalSuccess(response, stats, context);
+                        }
+
+                        // 2. Handle Media Fragments (WASM Decryption)
+                        const clearKeyValue = clearKeyInput.value.trim();
+                        if (!clearKeyValue || !clearKeyValue.includes(':')) {
+                            return originalSuccess(response, stats, context);
+                        }
+
+                        const [kid, key] = clearKeyValue.split(':');
+                        const startTime = performance.now();
+
+                        try {
+                            const [kid, key] = clearKeyValue.split(':');
+
+                            // Check if it's an init segment
+                            if (context.url.toLowerCase().includes('init')) {
+                                log('处理初始化片段 (Init Segment)...');
+                                
+                                // Add key to WASM module
+                                if (typeof window.addKey === 'function') {
+                                    const addKeyResult = window.addKey(kid, key);
+                                    if (!addKeyResult || !addKeyResult.success) {
+                                        log(`添加密钥失败: ${addKeyResult ? addKeyResult.error : 'No result object'}`);
+                                    } else {
+                                        log(`密钥添加成功: ${kid}`);
+                                    }
+                                } else {
+                                    log('addKey函数未定义，跳过密钥添加');
+                                }
+                                
+                                if (typeof window.modifyInitM4s === 'function') {
+                                    const result = window.modifyInitM4s(new Uint8Array(response.data), kid);
+                                    if (result && result.success) {
+                                        response.data = result.data;
+                                        log('初始化片段修改成功');
+                                    } else {
+                                        log('初始化片段修改失败: ' + (result ? result.error : 'Unknown'), 'warn');
+                                    }
+                                }
+                            } else {
+                                // Decrypt media segment
+                                if (typeof window.decryptSegmentM4s === 'function') {
+                                    const result = window.decryptSegmentM4s(new Uint8Array(response.data), kid, key);
+                                    if (result && result.success) {
+                                        response.data = result.data;
+                                        const endTime = performance.now();
+                                        updateStats(result.data.byteLength, endTime - startTime, true);
+                                        log(`解密成功: ${formatBytes(result.data.byteLength)}`);
+                                    } else {
+                                        const endTime = performance.now();
+                                        updateStats(response.data.byteLength, endTime - startTime, false);
+                                        log('解密失败: ' + (result ? result.error : 'No result'), 'error');
+                                    }
+                                } else {
+                                    log('WASM解密函数未定义', 'error');
+                                }
+                            }
+                        } catch (e) {
+                            log('片段处理异常: ' + e.message, 'error');
+                        }
+
+                        return originalSuccess(response, stats, context);
+                    };
+
+                    this.loader.load(context, config, callbacks);
+                }
+            }
+
+            async function initPlayer() {
+                if (hls) {
+                    hls.destroy();
+                    log('销毁旧实例', 'warn');
+                }
+
+                // Reset stats
+                stats = { decrypted: 0, size: 0, time: 0, success: 0, fail: 0 };
+                statDecrypted.textContent = '0';
+                statSize.textContent = '0 B';
+                statTime.textContent = '0 ms';
+                statRate.textContent = '0%';
+
+                if (!Hls.isSupported()) {
+                    log('当前浏览器不支持 HLS.js', 'error');
+                    return;
+                }
+
+                const url = m3u8Input.value.trim();
+                if (!url) return;
+
+                // Initialize WASM if not already done
+                await initializeWasm();
+
+                const config = {
+                    enableIFrameStream: !disableIframeCheck.checked,
+                    loader: CustomLoader, // Use our custom loader for all requests
+                    enableWorker: false, // Disable worker to ensure WASM context is available if needed, though modern browsers handle it well.
+                    lowLatencyMode: true
+                };
+
+                hls = new Hls(config);
+
+                hls.on(Hls.Events.MEDIA_ATTACHED, () => log('Media Attached'));
+                hls.on(Hls.Events.MANIFEST_PARSED, (e, data) => {
+                    log(`Manifest 解析完成，共 ${data.levels.length} 个码率层`);
+                    statusBadge.innerText = '已就绪';
+                    video.play().catch(e => log('自动播放被阻止: ' + e.message, 'warn'));
+                });
+
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        log(`致命错误: ${data.type} - ${data.details}`, 'error');
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                log('尝试恢复网络错误...');
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                log('尝试恢复媒体错误...');
+                                hls.recoverMediaError();
+                                break;
+                        }
+                    } else {
+                        log(`警告: ${data.details}`, 'warn');
+                    }
+                });
+
+                hls.loadSource(url);
+                hls.attachMedia(video);
+                log(`加载流: ${url}`);
+            }
+
+            loadBtn.onclick = initPlayer;
+
+            log('页面初始化完成，正在预加载 WASM...');
+            await initializeWasm();
+        });
+    </script>
+</body>
+</html>
