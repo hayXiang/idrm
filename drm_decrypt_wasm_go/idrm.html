@@ -53,19 +53,25 @@
                             <div class="flex gap-2 mb-2">
                                 <button id="preset1Btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">NBA TV (m3u8)</button>
                                 <button id="preset2Btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">Tennis Channel 2(mpd)</button>
+                                <button id="preset3Btn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium transition">HBO Max (mpd)</button>
                             </div>
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1">M3U8 URL</label>
                             <input type="url" id="m3u8Url" 
                                 class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
-                                value="https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96">
+                                value="">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1">Clear Key (kid:key)</label>
-                            <input type="text" id="clearKey" 
-                                class="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                                value="1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779">
+                            <div id="clearKeyContainer">
+                                <div class="flex gap-1 mb-1">
+                                    <input type="text" class="clearKeyInput w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm" 
+                                        placeholder="Format: kid:key (e.g. 1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779)">
+                                    <button type="button" id="addKeyBtn" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg font-medium">+</button>
+                                </div>
+                            </div>
+                            <div class="mt-1 text-xs text-gray-500">点击 "+" 添加更多 kid:key 对</div>
                         </div>
                         <div class="flex flex-wrap gap-2 pt-2">
                             <button id="loadBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition flex-1">加载视频</button>
@@ -258,6 +264,7 @@
                     
                     // 如果找到了KID，处理该AdaptationSet下的SegmentTemplate
                     if (kid) {
+                        kid = kid.replace(/-/g, ''); // 移除可能的连字符
                         const segmentTemplates = adaptationSet.querySelectorAll('SegmentTemplate');
                         segmentTemplates.forEach(st => {
                             // 更新media属性
@@ -349,6 +356,49 @@
             if (parts.length !== 2) throw new Error('无效的 Key 格式');
             return { kid: parts[0].trim(), key: parts[1].trim() };
         }
+        
+        // 获取所有KID:Key对的函数
+        function getAllClearKeys() {
+            const inputs = document.querySelectorAll('.clearKeyInput');
+            const keys = [];
+            for (let input of inputs) {
+                if (input.value.trim()) {
+                    const parts = input.value.trim().split(':');
+                    if (parts.length === 2) {
+                        keys.push({
+                            kid: parts[0].trim(),
+                            key: parts[1].trim()
+                        });
+                    }
+                }
+            }
+            return keys;
+        }
+        
+        // 添加新的KID:Key输入框
+        function addNewKeyInput() {
+            const container = document.getElementById('clearKeyContainer');
+            const div = document.createElement('div');
+            div.className = 'flex gap-1 mb-1';
+            div.innerHTML = `
+                <input type="text" class="clearKeyInput w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm" 
+                    placeholder="Format: kid:key (e.g. 1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779)">
+                <button type="button" class="removeKeyBtn bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-medium">-</button>
+            `;
+            container.appendChild(div);
+        }
+        
+        
+        // 为添加按钮绑定事件
+        document.getElementById('addKeyBtn').addEventListener('click', addNewKeyInput);
+        
+        // 使用事件委托处理删除按钮
+        document.getElementById('clearKeyContainer').addEventListener('click', function(e) {
+            if (e.target.classList.contains('removeKeyBtn')) {
+                const container = e.target.parentElement;
+                container.remove();
+            }
+        });
 
         async function initShaka() {
             // 针对 iOS 17.1+ 的强制补丁：在所有初始化之前绑定
@@ -364,6 +414,7 @@
             const ui = video["ui"];  
             const controls = ui.getControls();
             player = controls.getPlayer();
+            
                         
             // 设置播放器配置
             player.configure({
@@ -400,12 +451,27 @@
             
             player.getNetworkingEngine().registerRequestFilter(function(type, request) {
                 // 只处理媒体段和初始化段的请求
-                if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT || type === shaka.net.NetworkingEngine.RequestType.MANIFEST) {
+                if (type === shaka.net.NetworkingEngine.RequestType.SEGMENT) {
                     const uri = request.uris[0];                    
                     if (uri.includes('#kid=')) {
                         const parts = uri.split('#kid=');
                         const realUri = parts[0];
-                        const kid = parts[1].replaceAll("-", "").trim(); // 移除可能的连字符并去除空白
+                        const kidParam = parts[1];
+                        
+                        // 解析可能存在的多组 kid:key，以 & 分隔
+                        let kids = [];
+                        if (kidParam.includes('&')) {
+                            // 如果有多个参数，分割并提取所有 kid 相关部分
+                            const params = kidParam.split('&');
+                            for (const param of params) {
+                                if (param.startsWith('kid=')) {
+                                    kids.push(param.substring(4)); // 移除 'kid=' 前缀
+                                }
+                            }
+                        } else {
+                            // 单个 kid
+                            kids.push(kidParam);
+                        }
                         
                         // 检查映射大小，如果达到或超过100个条目，则删除最早添加的条目
                         if (window.uriKidMap.size >= 100) {
@@ -414,12 +480,12 @@
                             window.uriKidMap.delete(firstKey);
                         }
                         
-                        // 添加新的映射关系
-                        window.uriKidMap.set(realUri, kid);
+                        // 添加新的映射关系，存储多个kids数组
+                        window.uriKidMap.set(realUri, kids);
 
                         // --- 核心操作 ---
-                        // 1. 你现在拿到了 kid，可以用它来进行后续解密
-                        console.log(`正在请求 KID 为 ${kid} 的切片，当前映射总数: ${window.uriKidMap.size}`);
+                        // 1. 你现在拿到了 kids，可以用它来进行后续解密
+                        console.log(`正在请求包含 ${kids.length} 个KID的切片: ${JSON.stringify(kids)}，当前映射总数: ${window.uriKidMap.size}`);
                         
                         // 2. 必须把 URL 还原，否则服务器会报 404
                         request.uris[0] = realUri; 
@@ -484,15 +550,65 @@
                     const isInit = response.uri.includes('init');
                     const startTime = performance.now();
                     try {
-                        let { kid, key } = parseClearKey(document.getElementById('clearKey').value);
-                        const cached_kid = window.uriKidMap.get(response.uri);
-                        if (cached_kid) {
-                            kid = cached_kid;
+                        // 获取所有KID:Key对
+                        let allKeys = getAllClearKeys();
+                        if (allKeys.length === 0) {
+                            log('没有找到有效的 KID:Key 对', 'ERROR');
+                            return;
                         }
+                        
+                        let kid, key;
+                        // 检查是否有多组 KID:Key
+                        if (allKeys.length > 0) {
+                            // 如果是从 uriKidMap 中获取了特定的 KID
+                            const cached_kids = window.uriKidMap.get(response.uri);
+                            if (cached_kids && Array.isArray(cached_kids) && cached_kids.length > 0) {
+                                // 使用映射中的第一个 KID（或者可以实现更复杂的匹配逻辑）
+                                const target_kid = cached_kids[0];
+                                // 在所有密钥中找到匹配的 KID
+                                const matchedKeyObj = allKeys.find(item => item.kid === target_kid);
+                                if (matchedKeyObj) {
+                                    kid = matchedKeyObj.kid;
+                                    key = matchedKeyObj.key;
+                                } else {
+                                    log(`没有找到有效的 KID:Key, KID = ${target_kid}`, 'ERROR');
+                                    player.unload();
+                                    log('已停止播放', 'APP');
+                                    return;
+                                }
+                            } else {
+                                // 如果没有缓存的 KID，使用第一个
+                                kid = allKeys[0].kid;
+                                key = allKeys[0].key;
+                            }
+                        } else {
+                            // 单个 KID:Key 的情况
+                            const cached_kid = window.uriKidMap.get(response.uri);
+                            if (cached_kid) {
+                                kid = cached_kid;
+                            } else {
+                                // 如果没有找到任何键，抛出错误
+                                log('没有找到有效的 KID:Key 对', 'ERROR');
+                                return;
+                            }
+                            key = ''; // 这里不应该到达，因为我们应该已经有键了
+                        }
+                        
                         let result;
                         if (isInit) {
                             log(`[RES] 处理 Init: ${fileName}`, 'NETWORK');
-                            result = window.modifyInitM4s(new Uint8Array(response.data), kid)
+    
+                            result = window.modifyInitM4s(new Uint8Array(response.data), kid);
+                            if (result && result.success) {
+                                response.data = result.data.buffer || result.data;
+                                const duration = performance.now() - startTime;
+                                if (!isInit) {
+                                    log(`[OK] 初始化文件成功: ${fileName}`, 'DECRYPT');
+                                    updateUIStats(duration, true);
+                                }
+                            } else {
+                                log(`[ERROR] 初始化文件成功 失败 for ${fileName}: ${result ? result.error || JSON.stringify(result) : 'no result'}`, 'ERROR');
+                            }
                         } else {
                             log(`[RES] 处理 Media: ${fileName}`, 'NETWORK');
                             if (typeof window.decryptSegmentM4s !== 'function') {
@@ -513,22 +629,13 @@
                             if (result && result.success) {
                                 response.data = result.data.buffer || result.data;
                                 const duration = performance.now() - startTime;
-                                log(`[OK] 解密成功: ${fileName}`, 'DECRYPT');
-                                updateUIStats(duration, true);
+                                if (!isInit) {
+                                    log(`[OK] 解密成功: ${fileName}`, 'DECRYPT');
+                                    updateUIStats(duration, true);
+                                }
                             } else {
                                 log(`[ERROR] WASM function failed for ${fileName}: ${result ? result.error || JSON.stringify(result) : 'no result'}`, 'ERROR');
                             }
-                        }
-                        
-                        if (result && result.success) {
-                            response.data = result.data.buffer || result.data;
-                            if (!isInit) {
-                                const duration = performance.now() - startTime;
-                                log(`[OK] 解密成功: ${fileName}`, 'DECRYPT');
-                                updateUIStats(duration, true);
-                            }
-                        } else if (isInit) {
-                            log(`[ERROR] WASM function failed for ${fileName}: ${result ? result.error || JSON.stringify(result) : 'no result'}`, 'ERROR');
                         }
                     } catch (err) {
                         log(`解密管道异常: ${err.message}`, 'ERROR');
@@ -538,6 +645,9 @@
 
             player.addEventListener('error', (e) => {
                 log(`Shaka 错误 [${e.detail.code}]: ${e.detail.message}`, 'ERROR');
+                if (e.detail.code === 1001) {
+                    log(`网络请求失败！地址：${e.detail.data[0]}，HTTP 状态码为:, ${e.detail.data[1]}`, 'ERROR');
+                }         
             });
         }
 
@@ -549,46 +659,114 @@
             // 预设1按钮事件
             document.getElementById('preset1Btn').addEventListener('click', () => {
                 document.getElementById('m3u8Url').value = 'https://lpnba.akamaized.net/live-pz/p/hls-wvpr/NBATVI/index.m3u8?addUserInfo=1&start=LIVE&end=END&PostalCode=0&ISO3166=&sessionId=1fc59b3a-cadb-4d4d-89d8-e07c32f5fd96';
-                document.getElementById('clearKey').value = '1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779';
+                // 清空现有输入框并添加预设值
+                const container = document.getElementById('clearKeyContainer');
+                const inputs = container.querySelectorAll('.clearKeyInput');
+                if(inputs[0]) {
+                    inputs[0].value = '1acd2d7afd8cb34099cb832862e3c08d:b85491a27c2852323ac704a07cf7b779';
+                }
+                // 如果有其他输入框，清空它们
+                for(let i = 1; i < inputs.length; i++) {
+                    inputs[i].value = '';
+                }
                 log('已载入预设1: NBA TV', 'APP');
             });
 
             // 预设2按钮事件
             document.getElementById('preset2Btn').addEventListener('click', () => {
                 document.getElementById('m3u8Url').value = 'https://fsly.stream.peacocktv.com/Content/CMAF_OL2-CTR-4s-v2/Live/channel(lc131pdfws)/master.mpd';
-                document.getElementById('clearKey').value = '0045c27d95e7db8e7b1e15dea75cc76c:a3657cc31900b41db5279edf4656f3f3';
-                log('已载入预设2: Angel One Demo', 'APP');
+                // 清空现有输入框并添加预设值
+                const container = document.getElementById('clearKeyContainer');
+                const inputs = container.querySelectorAll('.clearKeyInput');
+                if(inputs[0]) {
+                    inputs[0].value = '0045c27d95e7db8e7b1e15dea75cc76c:a3657cc31900b41db5279edf4656f3f3';
+                }
+
+                 // 如果有其他输入框，清空它们
+                for(let i = 1; i < inputs.length; i++) {
+                    inputs[i].value = '';
+                }
+               
+                log('已载入预设2: Tennis Channel', 'APP');
+            });
+
+            // 预设3按钮事件 - HBO Max
+            document.getElementById('preset3Btn').addEventListener('click', () => {
+                document.getElementById('m3u8Url').value = 'https://channel.singtelcast.com/out/v1/empcg-singtel-cast3-prdiz-channel-group-default/empc-singtel-cast3-prdiz-channel-6420/empcoe-singtel-cast3-prdiz-channel-6420-dash/index-dash.mpd'; // 替换为实际的HBO Max URL
+                // 清空现有输入框并添加预设值
+                const container = document.getElementById('clearKeyContainer');
+                const inputs = container.querySelectorAll('.clearKeyInput');
+                if(inputs[0]) {
+                    inputs[0].value = '0b010e74d4d73fb0a83bfa1f14c2fe49:9d479ffbb5a2abfd8e289f1c84a38957';
+                }
+                // c
+                if(inputs.length < 2) {
+                    addNewKeyInput();
+                } 
+                const newInputs = container.querySelectorAll('.clearKeyInput');
+                newInputs[newInputs.length - 1].value = '87210eae5a11372abfe35a4a2fb47f4c:03d8fdee0f096258adfbd5b9010b0bf3';
+                log('已载入预设3: HBO Max (多组KID)', 'APP');
             });
 
             document.getElementById('loadBtn').addEventListener('click', async () => {
                 const url = document.getElementById('m3u8Url').value;
-                const keyStr = document.getElementById('clearKey').value;
                 
                 try {
-                    const { kid, key } = parseClearKey(keyStr);       
+                    // 获取所有KID:Key对
+                    const allKeys = getAllClearKeys();
+                    
+                    if (allKeys.length === 0) {
+                        log('请输入至少一个有效的 KID:Key 对', 'ERROR');
+                        return;
+                    }
+                    
+                    let kid, key;
+                    
+                    // 检查是否有多个 KID:Key
+                    if (allKeys.length > 0) {
+                        // 使用第一个作为默认值
+                        kid = allKeys[0].kid;
+                        key = allKeys[0].key;
+                        
+                        // 将所有密钥添加到 WASM 模块
+                        for (const keyObj of allKeys) {
+                            window.addKey(keyObj.kid, keyObj.key);
+                        }
+                        
+                        log(`批量添加 ${allKeys.length} 组 KID:Key`, 'APP');
+                    } else {
+                        // 如果没有找到任何键，抛出错误
+                        log('没有找到有效的 KID:Key 对', 'ERROR');
+                        return;
+                    }
+                    
                     log('触发用户交互，准备加载 (MSE 模式)...', 'APP');
                     
                     // 再次检查补丁状态
                     if (window.ManagedMediaSource && window.MediaSource === window.ManagedMediaSource) {
                         log('ManagedMediaSource 补丁状态确认: Active', 'DIAG');
                     }
-                    window.addKey(kid, key); // 仍然调用以确保密钥在WASM中注册
 
                     await player.load(url);
                     log('Load 成功完成', 'APP');
                     
                     // 状态监测
-                    setTimeout(() => {
-                        const video = document.getElementById('videoPlayer');
-                        const isBlob = video.src.startsWith('blob:');
-                        log(`当前播放模式: ${isBlob ? 'MSE (拦截开启)' : 'Native (拦截失效)'}`, isBlob ? 'SUCCESS' : 'WARN');
-                    }, 3000);
-
+                    player.addEventListener('streaming.failure', (e) => {
+                        log(`流处理失败: ${e.detail}`, 'ERROR');
+                    });
+                    
+                    player.addEventListener('adaptation', () => {
+                        log('自适应流切换', 'INFO');
+                    });
+                    
+                    player.addEventListener('error', (e) => {
+                        log(`播放器错误: ${e.detail}`, 'ERROR');
+                    });
                 } catch (e) {
-                    log('加载崩溃: ' + e.message, 'ERROR');
-                    if (e.code === 6006) {
-                        log('错误 6006：系统强制回退到原生播放，请检查是否在 iPhone 隐私设置中禁用了 MSE', 'ERROR');
-                    }
+                    log(`加载失败: ${e.message}`, 'ERROR');
+                    if (e.code === 1001) {
+                        log(`网络请求失败！地址：${e.data[0]}，HTTP 状态码为:, ${e.data[1]}`, 'ERROR');
+                    }  
                 }
             });
 
