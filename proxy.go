@@ -10,8 +10,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"idrm/utils"
 	"idrm/decrypt"
+	"idrm/utils"
 	"io"
 	"log"
 	"net"
@@ -72,7 +72,7 @@ var (
 	VISIT_TRACKER              = NewVisitTracker()
 )
 
-var Version = "1.0.0.34"
+var Version = "1.0.0.35"
 
 // newHTTPClient 创建支持 SOCKS5 或 HTTP 代理的 net/http Client
 func newHTTPClient(proxyURL string, timeout int) *http.Client {

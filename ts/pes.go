@@ -132,6 +132,7 @@ func (pes *PES) SplitToTS() {
 		data = data[payloadSize:]
 
 		ts := TSPacket{}
+		ts.packageIndex = pes.tsPayload[tsPackageIndex].packageIndex
 		ts.Init(tsBuffer)
 		tsPackets = append(tsPackets, &ts)
 		tsPackageIndex++

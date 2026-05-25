@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
 )
 
 const PTM_CHANGE_ONLY = false
@@ -51,7 +52,6 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 				for _, pmt_ts := range pmt_packages {
 					modifyPMTStreamType(pmt_ts, ts.PID, streamType)
 				}
-				pmt_packages = pmt_packages[:0]
 			} else {
 				streamType = detectCodec(ts.Payload)
 				fakedPidStreamType[ts.PID] = streamType
@@ -59,7 +59,6 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 				for _, pmt_ts := range pmt_packages {
 					modifyPMTStreamType(pmt_ts, ts.PID, streamType)
 				}
-				pmt_packages = pmt_packages[:0]
 			}
 
 		} else if ts.PID == 0x11 {
@@ -152,6 +151,10 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 		totalSize += len(_ts.buffer)
 	}
 
+	sort.Slice(allTS, func(i, j int) bool {
+		return allTS[i].packageIndex < allTS[j].packageIndex
+	})
+
 	//复用原来的数据
 	pos := 0
 	for _, _ts := range allTS {
@@ -167,14 +170,14 @@ func hexToBytes(s string) []byte {
 }
 
 func Test() {
-	data, err := os.ReadFile("D://drm/raw.ts")
+	data, err := os.ReadFile("D://drm/master_20_26412672.ts")
 	//data, err := os.ReadFile("D://drm/012_mute_60s.ts")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	key := hexToBytes("8bcdab76c02b341fb3658d912b0def9c") // 示例 AES key
-	iv := hexToBytes("A2CC00BBA65B2DB60728B7168F5F4B9A")
+	key := hexToBytes("7a45dffa55203597821c0e28d758a5c6") // 示例 AES key
+	iv := hexToBytes("090E106DD1F6FEEBE161E3A027DE1F7F")
 	body := DecryptTS(data, key, iv)
 
 	os.WriteFile("D://drm/de.ts", body, 0644)
