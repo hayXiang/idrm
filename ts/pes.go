@@ -73,7 +73,6 @@ func (pes *PES) SplitToTS() {
 	const tsPacketSize = 188
 	const tsHeaderSize = 4
 
-	firstTsPackage := pes.tsPayload[0]
 	pid := pes.tsPayload[0].PID
 	var tsPackets []*TSPacket
 
@@ -81,13 +80,27 @@ func (pes *PES) SplitToTS() {
 	data := pes.buffer
 	//这里可以回填原始的tsPackage,因为解密后的数据只会减少
 	for len(data) > 0 {
-
+		current_ts := pes.tsPayload[tsPackageIndex]
 		offset := tsHeaderSize
 		var adaptField []byte
-		//只在PES开头copy adapField
 		if tsPackageIndex == 0 {
-			aFlen := len(firstTsPackage.AdaptationField) - firstTsPackage.suffingLength
-			adaptField = firstTsPackage.AdaptationField[:aFlen:aFlen]
+			aFlen := len(current_ts.AdaptationField) - current_ts.suffingLength
+			adaptField = current_ts.AdaptationField[:aFlen:aFlen]
+		} else if current_ts.PCR > 0 {
+			adaptField = make([]byte, 7)
+			adaptField[0] = 0x10
+			
+			pcrValue := current_ts.PCR
+			pcrBase  := uint64(pcrValue) / 300
+			pcrExt   := uint16((pcrValue % 300) << 1)
+
+			adaptField[1] = byte(pcrBase >> 25)
+			adaptField[2] = byte(pcrBase >> 17)
+			adaptField[3] = byte(pcrBase >> 9)
+			adaptField[4] = byte(pcrBase >> 1)
+			// 注意这里必须带上 0x7E 保留位
+			adaptField[5] = byte(pcrBase<<7) | 0x7E | byte(pcrExt>>8)
+			adaptField[6] = byte(pcrExt)
 		}
 
 		tsBuffer := pes.tsPayload[tsPackageIndex].buffer

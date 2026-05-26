@@ -51,15 +51,15 @@ type AudioFrame struct {
 	Payloads [][]byte // 跨 TS 包累积的 ES 数据片段
 }
 
-func findAudioNextHeaderAcrossTS(streamType byte, payloads [][]byte, startIdx, startPos int, twoFrameCheck bool) (firstPayloadIdx, firstPos int,
+func findAudioNextHeaderAcrossTS(streamType byte, payloads [][]byte, startIdx, startPos int) (firstPayloadIdx, firstPos int,
 	headerLen, frameLen int,
 	nextPayloadIdx, nextPos int,
 	ok bool,
 ) {
 	if streamType == STREAM_TYPE_AUDIO_AAC_ADTS {
-		return findNextADTSHeaderAcrossTS(payloads, startIdx, startPos, twoFrameCheck)
+		return findNextADTSHeaderAcrossTS(payloads, startIdx, startPos)
 	} else {
-		return findNextAC3HeaderAcrossTS(payloads, startIdx, startPos, twoFrameCheck)
+		return findNextAC3HeaderAcrossTS(payloads, startIdx, startPos)
 	}
 }
 
@@ -107,7 +107,7 @@ func isValidADTSHeaderStrict(header []byte) bool {
 
 // findNextADTSHeaderAcrossTS 查找 ADTS header
 // twoFrameCheck: 是否开启双帧检测
-func findNextADTSHeaderAcrossTS(payloads [][]byte, startIdx, startPos int, twoFrameCheck bool) (
+func findNextADTSHeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (
 	firstPayloadIdx, firstPos int,
 	headerLen, frameLen int,
 	nextPayloadIdx, nextPos int,
@@ -146,28 +146,9 @@ func findNextADTSHeaderAcrossTS(payloads [][]byte, startIdx, startPos int, twoFr
 				p++
 				continue
 			}
-
-			if !twoFrameCheck {
-				// 只返回第一帧，不做双帧验证
-				nextIdx, nextPos := advancePos(payloads, i, p, fLen1)
-				return i, p, hLen1, fLen1, nextIdx, nextPos, true
-			}
-
-			// ---- 两帧检测 ----
+			
 			nextIdx, nextPos := advancePos(payloads, i, p, fLen1)
-			if nextIdx == -1 {
-				p++
-				continue
-			}
-			header2 := getADTSHeader(payloads, nextIdx, nextPos, buf[:])
-			if header2 != nil && isValidADTSHeaderStrict(header2) {
-				hLen2, fLen2 := parseADTSLen(header2)
-				if fLen2 >= hLen2 && fLen2 <= 8191 {
-					return i, p, hLen1, fLen1, nextIdx, nextPos, true
-				}
-			}
-
-			p++
+			return i, p, hLen1, fLen1, nextIdx, nextPos, nextIdx != -1
 		}
 	}
 
@@ -239,14 +220,9 @@ func (audioFrame *AudioFrame) Process(block cipher.Block, ts *TSPacket, iv []byt
 	}
 
 	for {
-		startPayloadIdx, startPos, headerLen, _, nextPayloadIdx, nextPos, ok := findAudioNextHeaderAcrossTS(streamType, audioFrame.Payloads, 0, 0, true)
+		startPayloadIdx, startPos, headerLen, _, nextPayloadIdx, nextPos, ok := findAudioNextHeaderAcrossTS(streamType, audioFrame.Payloads, 0, 0)
 		if !ok {
-			if isEnd {
-				startPayloadIdx, startPos, headerLen, _, nextPayloadIdx, nextPos, ok = findAudioNextHeaderAcrossTS(streamType, audioFrame.Payloads, 0, 0, false)
-			}
-			if !ok {
-				break
-			}
+			break
 		}
 
 		// 拼接完整 AUDIO 数据
@@ -336,7 +312,7 @@ func parseAC3Header(header []byte) (headerLen, frameLen int) {
 }
 
 // 跨 payload 查找 AC3 帧头
-func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int, twoFrameCheck bool) (
+func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int) (
 	firstPayloadIdx, firstPos int,
 	headerLen, frameLen int,
 	nextPayloadIdx, nextPos int,
@@ -385,26 +361,8 @@ func findNextAC3HeaderAcrossTS(payloads [][]byte, startIdx, startPos int, twoFra
 				continue
 			}
 
-			if !twoFrameCheck {
-				nextIdx, nextPos := advancePos(payloads, i, p, fLen)
-				return i, p, hLen, fLen, nextIdx, nextPos, true
-			}
-
-			// 两帧检测
 			nextIdx, nextPos := advancePos(payloads, i, p, fLen)
-			if nextIdx == -1 {
-				p++
-				continue
-			}
-			// 第二帧头
-			header2 := getAC3Header(payloads, nextIdx, nextPos, buf[:])
-			if header2 != nil && isValidAC3Header(header2) {
-				h2, f2 := parseAC3Header(header2)
-				if f2 >= h2 && f2 <= 8191 {
-					return i, p, hLen, fLen, nextIdx, nextPos, true
-				}
-			}
-			p++
+			return i, p, hLen, fLen, nextIdx, nextPos, nextIdx != -1
 		}
 	}
 

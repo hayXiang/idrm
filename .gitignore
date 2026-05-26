@@ -10,3 +10,5 @@ idrm-darwin-arm64
 .gitignore
 idrm-darwin-amd64
 drm_decrypt_wasm_go/main.wasm
+/drm-cache/
+.DS_Store

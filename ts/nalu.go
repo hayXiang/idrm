@@ -49,7 +49,7 @@ func (nalu *NALU) Decrypt(block cipher.Block, iv []byte) {
 	unencryptedLeaderBytes := 31
 
 	// 只解密 I/P 帧
-	if (len(naluData) > naluPayloadOffset) && (naluType == 5 || naluType == 1) {
+	if (len(naluData) > naluPayloadOffset) && (naluType == 5 || naluType == 1) && (len(naluData)-nalu.startCodeLen) > 48{
 		naluEBSP := DeEmulationInPlace(naluData[naluPayloadOffset:], false)
 		if len(naluEBSP) > unencryptedLeaderBytes {
 			utils.DecryptCBCSInPlace(block, naluEBSP[unencryptedLeaderBytes:], iv, 1, 9, false)

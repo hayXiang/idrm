@@ -30,7 +30,6 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 
 	var allTS []*TSPacket
 	for offset := 0; offset+tsPacketSize <= len(data); offset += tsPacketSize {
-		isLastPacket := (offset+tsPacketSize >= len(data))
 		tsData := data[offset : offset+tsPacketSize]
 		packageIndex++
 		var ts TSPacket
@@ -98,53 +97,42 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 		}
 
 		// 视频流按 NALU 解密
-		if streamType == STREAM_TYPE_VIDEO_H265 || streamType == STREAM_TYPE_VIDEO_H264 || isLastPacket {
-			if streamType == STREAM_TYPE_VIDEO_H265 || streamType == STREAM_TYPE_VIDEO_H264 {
-				pes, exists := currentPESMap[ts.PID]
-				if !exists {
-					pes = &PES{continuity: 0}
-					currentPESMap[ts.PID] = pes
-				}
-				if newPES := pes.Process(block, &ts, iv); newPES != nil {
-					allTS = append(allTS, newPES.tsPayload...)
-				}
+		if streamType == STREAM_TYPE_VIDEO_H265 || streamType == STREAM_TYPE_VIDEO_H264  {
+			pes, exists := currentPESMap[ts.PID]
+			if !exists {
+				pes = &PES{continuity: 0}
+				currentPESMap[ts.PID] = pes
 			}
-
-			if isLastPacket {
-				for _, pes := range currentPESMap {
-					if newPES := pes.Process(block, nil, iv); newPES != nil {
-						allTS = append(allTS, newPES.tsPayload...)
-					}
-				}
+			if newPES := pes.Process(block, &ts, iv); newPES != nil {
+				allTS = append(allTS, newPES.tsPayload...)
 			}
-
 		} else if streamType == STREAM_TYPE_AUDIO_AAC_ADTS ||
 			streamType == STREAM_TYPE_AUDIO_AC3 ||
-			streamType == STREAM_TYPE_AUDIO_EAC3 ||
-			isLastPacket {
-			if streamType == STREAM_TYPE_AUDIO_AAC_ADTS ||
-				streamType == STREAM_TYPE_AUDIO_AC3 ||
-				streamType == STREAM_TYPE_AUDIO_EAC3 {
-				pid := ts.PID
-				audioFrame, exists := currentAudioMap[pid]
-				if !exists {
-					audioFrame = &AudioFrame{
-						PID:      pid,
-						Payloads: [][]byte{},
-					}
-					currentAudioMap[pid] = audioFrame
+			streamType == STREAM_TYPE_AUDIO_EAC3 {
+			pid := ts.PID
+			audioFrame, exists := currentAudioMap[pid]
+			if !exists {
+				audioFrame = &AudioFrame{
+					PID:      pid,
+					Payloads: [][]byte{},
 				}
-				audioFrame.Process(block, &ts, iv, streamType, packageIndex)
+				currentAudioMap[pid] = audioFrame
 			}
-			if isLastPacket {
-				for _, audioFrame := range currentAudioMap {
-					audioFrame.Process(block, nil, iv, streamType, packageIndex)
-				}
-			}
+			audioFrame.Process(block, &ts, iv, streamType, packageIndex)
 			allTS = append(allTS, &ts)
 		} else {
 			allTS = append(allTS, &ts)
 		}
+	}
+
+	for _, pes := range currentPESMap {
+		if newPES := pes.Process(block, nil, iv); newPES != nil {
+			allTS = append(allTS, newPES.tsPayload...)
+		}
+	}
+
+	for pid, audioFrame := range currentAudioMap {
+		audioFrame.Process(block, nil, iv, pidStreamType[pid], packageIndex)
 	}
 	totalSize := 0
 	for _, _ts := range allTS {
