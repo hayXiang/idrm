@@ -69,6 +69,62 @@ func (p *PES) Process(block cipher.Block, ts *TSPacket, iv []byte) *PES {
 	return newPES
 }
 
+func caluAdaptationFieldInfo(ts *TSPacket, data []byte) (int, int, bool) {
+	const tsPacketSize = 188
+	const tsHeaderSize = 4
+	// 1. 初始化自适应字段基础大小
+	adaptFieldSize := 0
+
+	// 检查是否存在自适应字段的标志位 (假设从头部解析到了 flags)
+	// 0x10 是 PCR 标志，0x08 是 OPCR 标志
+	hasPCR := len(ts.AdaptationField) > 0 && (ts.AdaptationField[0] & 0x10) != 0
+
+	if hasPCR {
+		adaptFieldSize = 1 // Length 字段 (1 字节)
+		adaptFieldSize += 1 // Flags 字段 (1 字节)
+		
+		if hasPCR {
+			adaptFieldSize += 6 // PCR 占用 6 字节
+		}
+	}
+
+	// 2. 计算剩余可用数据空间以及需要填充的大小
+	stuffingSize := 0
+	remainDataSize := tsPacketSize - tsHeaderSize - adaptFieldSize
+
+	if remainDataSize > len(data) {
+		// 实际数据不够填满，需要填充
+		stuffingSize = remainDataSize - len(data)
+		
+		if stuffingSize > 0 {
+			if adaptFieldSize > 0 {
+				// 情况 A: 原本就有自适应字段，直接把填充空间加进去
+				adaptFieldSize += stuffingSize
+			} else {
+				// 情况 B: 原本没有自适应字段，需要凭空创建
+				// 至少需要 1 字节的 Length 字段来声明自适应字段的长度
+				adaptFieldSize += 1 
+				stuffingSize -= 1
+				
+				// 如果减去 Length 后还有富余，说明需要开始填充内容
+				if stuffingSize > 0 {
+					// 如果你打算用标准的自适应字段填充，通常会再占用 1 字节的 Flags 字段（写 0x00）
+					// 这样后面剩下的全部写 0xFF 填充
+					adaptFieldSize += 1
+					stuffingSize -= 1
+				}
+				
+				// 加上最终剩余的纯填充字节数
+				if stuffingSize > 0 {
+					adaptFieldSize += stuffingSize
+				}
+			}
+		}
+	}
+	return adaptFieldSize, stuffingSize, hasPCR
+}
+
+
 func (pes *PES) SplitToTS() {
 	const tsPacketSize = 188
 	const tsHeaderSize = 4
@@ -82,26 +138,6 @@ func (pes *PES) SplitToTS() {
 	for len(data) > 0 {
 		current_ts := pes.tsPayload[tsPackageIndex]
 		offset := tsHeaderSize
-		var adaptField []byte
-		if tsPackageIndex == 0 {
-			aFlen := len(current_ts.AdaptationField) - current_ts.suffingLength
-			adaptField = current_ts.AdaptationField[:aFlen:aFlen]
-		} else if current_ts.PCR > 0 {
-			adaptField = make([]byte, 7)
-			adaptField[0] = 0x10
-			
-			pcrValue := current_ts.PCR
-			pcrBase  := uint64(pcrValue) / 300
-			pcrExt   := uint16((pcrValue % 300) << 1)
-
-			adaptField[1] = byte(pcrBase >> 25)
-			adaptField[2] = byte(pcrBase >> 17)
-			adaptField[3] = byte(pcrBase >> 9)
-			adaptField[4] = byte(pcrBase >> 1)
-			// 注意这里必须带上 0x7E 保留位
-			adaptField[5] = byte(pcrBase<<7) | 0x7E | byte(pcrExt>>8)
-			adaptField[6] = byte(pcrExt)
-		}
 
 		tsBuffer := pes.tsPayload[tsPackageIndex].buffer
 		tsBuffer[0] = 0x47 // sync byte
@@ -117,29 +153,37 @@ func (pes *PES) SplitToTS() {
 		// 第四字节: adaptation_field_control + continuity
 		// 先设为 payload only
 		tsBuffer[3] = 0x10
-		if len(adaptField) > 0 || tsPacketSize-tsHeaderSize > len(data) {
-			tsBuffer[3] = (tsBuffer[3] & 0xCF) | (0x30)
-			stuffingSize := max(0, tsPacketSize-tsHeaderSize-1-len(adaptField)-len(data))
-			tsBuffer[offset] = byte(len(adaptField) + stuffingSize)
-			offset++
-			// 写入 adaptation_field 内容
-			copy(tsBuffer[offset:], adaptField)
-			offset += len(adaptField)
-			for i := 0; i < stuffingSize; i++ {
-				if i == 0 {
-					tsBuffer[offset] = 0x00
-				} else {
-					tsBuffer[offset] = 0xFF
+		adaptFieldSize, stuffingSize, hasPCR := caluAdaptationFieldInfo(current_ts, data)
+		if adaptFieldSize > 0 {
+			adaptField := tsBuffer[offset : offset+adaptFieldSize]
+			tsBuffer[3] = (tsBuffer[3] & 0xCF) | (0x30)	// 设置 adaptation_field_control = 3 (adaptation + payload)
+			adaptField[0] = byte(adaptFieldSize - 1) //length 字段，后面跟着的 flags 和 PCR 数据
+			if adaptFieldSize > 1 {
+				adaptField[1] = 0x00 // 默认 flags 全 0
+				if hasPCR {
+					adaptField[1] = current_ts.AdaptationField[0] // flags 字段
+					adaptField[1] &= 0xF0 // 清除原有的 其他位置的标志位，只保留 PCR 和 OPCR 的标志
 				}
-				offset++
 			}
+			if hasPCR {
+				copy(adaptField[2:8], current_ts.AdaptationField[1:7]) // 假设 PCR 数据在原 AdaptationField 的 1-6 字节
+			}
+
+			if stuffingSize > 0 {
+				// 填充数据
+				stuffing := adaptField[adaptFieldSize-stuffingSize : adaptFieldSize]
+				for i := 0; i < stuffingSize; i++ {
+					stuffing[i] = 0xFF
+				}
+			}
+			offset += len(adaptField)
 		}
 
 		tsBuffer[3] = (tsBuffer[3] & 0xF0) | (pes.continuity & 0x0F)
 		pes.continuity = (pes.continuity + 1) & 0x0F
 
 		// 剩余可放的 payload 大小
-		payloadSize := tsPacketSize - offset
+		payloadSize := tsPacketSize - tsHeaderSize - adaptFieldSize
 		// 拷贝 payload
 		copy(tsBuffer[offset:], data[:payloadSize])
 		data = data[payloadSize:]
@@ -150,7 +194,6 @@ func (pes *PES) SplitToTS() {
 		tsPackets = append(tsPackets, &ts)
 		tsPackageIndex++
 	}
-
 	pes.tsPayload = tsPackets
 }
 
