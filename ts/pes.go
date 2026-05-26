@@ -159,10 +159,11 @@ func (pes *PES) SplitToTS() {
 			tsBuffer[3] = (tsBuffer[3] & 0xCF) | (0x30)	// 设置 adaptation_field_control = 3 (adaptation + payload)
 			adaptField[0] = byte(adaptFieldSize - 1) //length 字段，后面跟着的 flags 和 PCR 数据
 			if adaptFieldSize > 1 {
-				adaptField[1] = 0x00 // 默认 flags 全 0
 				if hasPCR {
 					adaptField[1] = current_ts.AdaptationField[0] // flags 字段
 					adaptField[1] &= 0xF0 // 清除原有的 其他位置的标志位，只保留 PCR 和 OPCR 的标志
+				}else{
+					adaptField[1] = 0x00 // 没有 PCR 的情况下 flags 全 0
 				}
 			}
 			if hasPCR {
@@ -328,46 +329,4 @@ func (p *PES) GetDTS() (dts uint64, ok bool) {
 
 	// DTS 不存在
 	return 0, false
-}
-
-func (p *PES) FillDTS(lastIPDTS uint64) {
-	hdr := p.header()
-	if len(hdr) < 9 {
-		return
-	}
-
-	flags := hdr[7]
-	headerLen := int(hdr[8])
-
-	if flags&0xC0 != 0xC0 { // 没有 DTS
-		// 设置 DTS 标志
-		hdr[7] = flags | 0x40
-		hdr[8] = byte(headerLen + 5)
-
-		// DTS 编码
-		dtsBytes := encodeDTSorPTS(lastIPDTS)
-
-		// 插入到 PTS 后
-		insertPos := 9 + 5 // PTS 5 bytes
-		if len(hdr) > insertPos {
-			hdr = append(hdr[:insertPos], append(dtsBytes, hdr[insertPos:]...)...)
-		} else {
-			hdr = append(hdr, dtsBytes...)
-		}
-
-		// 更新 buffer
-		newBuf := append(hdr, p.payload()...)
-		p.buffer = newBuf
-	}
-}
-
-// encodePTS 将 uint64 转成 5 字节 PES PTS/DTS 格式
-func encodeDTSorPTS(ts uint64) []byte {
-	b := make([]byte, 5)
-	b[0] = byte((ts>>29)&0x0E) | 0x10 // 4bits + '0010' marker
-	b[1] = byte((ts >> 22) & 0xFF)
-	b[2] = byte(((ts >> 14) & 0xFE) | 1) // 7bits + marker
-	b[3] = byte((ts >> 7) & 0xFF)
-	b[4] = byte(((ts << 1) & 0xFE) | 1) // 7bits + marker
-	return b
 }
