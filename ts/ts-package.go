@@ -29,6 +29,12 @@ type TSPacket struct {
 	buffer          []byte //原始数据
 }
 
+func (ts *TSPacket) upateCC(cc byte) {
+	ts.buffer[3] = (ts.buffer[3] & 0xF0) | (cc & 0x0F)
+	ts.CC = ts.buffer[3] & 0x0F
+}
+
+
 func (ts *TSPacket) Init(pkt []byte) error {
 	ts.buffer = pkt
 
