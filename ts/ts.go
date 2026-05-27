@@ -152,7 +152,6 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 			// 判断适配域中的特定标志位 (0xB7) 以决定是否强制修正 CC
 			if _ts.buffer[4] == 0xB7 {
 				_ts.upateCC(lastCCMap[_ts.PID])
-				continue
 			}
 		}
 
