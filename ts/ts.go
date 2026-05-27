@@ -144,20 +144,8 @@ func DecryptTS(data []byte, key []byte, iv []byte) []byte {
 	})
 	// 复用原来的数据，进行 CC 更新并重组 TS 流
 	pos := 0
-	lastCCMap := make(map[int]byte)
-
+	
 	for _, _ts := range allTS {
-		// 检查是否包含 PCR
-		if _ts.PCR != 0 {
-			// 判断适配域中的特定标志位 (0xB7) 以决定是否强制修正 CC
-			if _ts.buffer[4] == 0xB7 {
-				_ts.upateCC(lastCCMap[_ts.PID])
-			}
-		}
-
-		// 更新该 PID 的上一个 CC 值，用于后续校验或平滑处理
-		lastCCMap[_ts.PID] = _ts.CC
-
 		// 将处理后的 TS 包内容拷贝到目标 buffer 中
 		copy(data[pos:], _ts.buffer)
 		pos += len(_ts.buffer)

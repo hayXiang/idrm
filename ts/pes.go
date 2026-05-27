@@ -124,6 +124,23 @@ func caluAdaptationFieldInfo(ts *TSPacket, data []byte) (int, int, bool) {
 	return adaptFieldSize, stuffingSize, hasPCR
 }
 
+// convertToStuffingPacket 将传入的 TS 缓冲区原位(In-place)改造成一个合法的纯自适应填充包
+func convertToStuffingPacket(tsBuffer []byte, pid int, cc byte) {
+    // 全局初始化为 0xFF
+    for i := range tsBuffer {
+        tsBuffer[i] = 0xFF
+    }
+
+    // 构造 4 字节包头
+    tsBuffer[0] = 0x47                       // Sync Byte
+    tsBuffer[1] = byte(pid >> 8)             // PID 高位
+    tsBuffer[2] = byte(pid & 0xFF)           // PID 低位
+    tsBuffer[3] = 0x20 | (cc & 0x0F)         // 0x20 代表仅有自适应区(10) + 融入原有 CC
+
+    // 构造自适应区首部
+    tsBuffer[4] = 0xB7                       // 自适应区长度：183 字节
+    tsBuffer[5] = 0x00                       // Flags 标志位清零
+}
 
 func (pes *PES) SplitToTS() {
 	const tsPacketSize = 188
@@ -134,12 +151,15 @@ func (pes *PES) SplitToTS() {
 
 	tsPackageIndex := 0
 	data := pes.buffer
+	
 	//这里可以回填原始的tsPackage,因为解密后的数据只会减少
 	for len(data) > 0 {
 		current_ts := pes.tsPayload[tsPackageIndex]
 		offset := tsHeaderSize
 
 		tsBuffer := pes.tsPayload[tsPackageIndex].buffer
+		cc := tsBuffer[3] & 0x0F
+
 		tsBuffer[0] = 0x47 // sync byte
 
 		// 第二字节: payload_unit_start_indicator + PID 高5位
@@ -180,8 +200,8 @@ func (pes *PES) SplitToTS() {
 			offset += len(adaptField)
 		}
 
-		tsBuffer[3] = (tsBuffer[3] & 0xF0) | (pes.continuity & 0x0F)
-		pes.continuity = (pes.continuity + 1) & 0x0F
+		tsBuffer[3] = (tsBuffer[3] & 0xF0) | (cc & 0x0F)
+		///pes.continuity = (pes.continuity + 1) & 0x0F
 
 		// 剩余可放的 payload 大小
 		payloadSize := tsPacketSize - tsHeaderSize - adaptFieldSize
@@ -194,6 +214,21 @@ func (pes *PES) SplitToTS() {
 		ts.Init(tsBuffer)
 		tsPackets = append(tsPackets, &ts)
 		tsPackageIndex++
+		if len(data) == 0 {
+			for tsPackageIndex < len(pes.tsPayload) {
+				packet := pes.tsPayload[tsPackageIndex]
+				
+				// 1. 提取原包的连续性计数器 (CC)
+				cc := packet.buffer[3] & 0x0F
+				
+				// 2. 调用核心业务函数：将当前 buffer 改造为纯自适应区填充包
+				convertToStuffingPacket(packet.buffer, pid, cc)
+				
+				// 3. 收集并推进索引
+				tsPackets = append(tsPackets, packet)
+				tsPackageIndex++
+			}
+		}
 	}
 	pes.tsPayload = tsPackets
 }
