@@ -45,16 +45,13 @@ func DeEmulationInPlace(ebsp []byte, strict bool) []byte {
 func (nalu *NALU) Decrypt(block cipher.Block, iv []byte) {
 	naluType := nalu.buffer[nalu.startCodeLen] & 0x1F
 	naluData := nalu.buffer
-	naluPayloadOffset := nalu.startCodeLen + 1
-	unencryptedLeaderBytes := 31
+	unencryptedLeaderBytes := 32
 
 	// 只解密 I/P 帧
-	if (len(naluData) > naluPayloadOffset) && (naluType == 5 || naluType == 1) && (len(naluData)-nalu.startCodeLen) > 48{
-		naluEBSP := DeEmulationInPlace(naluData[naluPayloadOffset:], false)
-		if len(naluEBSP) > unencryptedLeaderBytes {
-			utils.DecryptCBCSInPlace(block, naluEBSP[unencryptedLeaderBytes:], iv, 1, 9, false)
-		}
-		nalu.buffer = naluData[:naluPayloadOffset+len(naluEBSP)]
+	if  (naluType == 5 || naluType == 1) && (len(naluData)-nalu.startCodeLen) > 48{
+		deEmulationData := DeEmulationInPlace(naluData[nalu.startCodeLen:], false)
+		utils.DecryptCBCSInPlace(block, deEmulationData[unencryptedLeaderBytes:], iv, 1, 9, false)
+		nalu.buffer = naluData[:nalu.startCodeLen+len(deEmulationData)]
 	}
 }
 
