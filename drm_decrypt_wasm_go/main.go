@@ -50,6 +50,7 @@ func decryptSegmentM4s(this js.Value, args []js.Value) interface{} {
 	js.CopyBytesToGo(data, args[0])
 	
 	kid := args[1].String()
+	uuid := args[2].String()
 	
 	key, exists := keys[kid]
 	if !exists {
@@ -64,7 +65,7 @@ func decryptSegmentM4s(this js.Value, args []js.Value) interface{} {
 
 	// 从map中获取对应的sinfBox
 	var sinfBox *mp4.SinfBox
-	sinfBox = sinfBoxMap[kid]
+	sinfBox = sinfBoxMap[uuid]
 
 	// 直接使用decrypt包中的DecryptFromBody函数
 	result, err := decrypt.DecryptFromBody("m4s", data, key, sinfBox)
@@ -99,6 +100,7 @@ func modifyInitM4s(this js.Value, args []js.Value) interface{} {
 	js.CopyBytesToGo(initData, args[0])
 	
 	kid := args[1].String()
+	uuid := args[2].String()
 
 	println("Processing init segment for KID:", kid)
 	println("Init segment size:", len(initData))
@@ -126,14 +128,14 @@ func modifyInitM4s(this js.Value, args []js.Value) interface{} {
 	}
 	
 	// 将sinfBox存储到全局map中
-	if kid != "" && sinfBox != nil {
-		sinfBoxMap[kid] = sinfBox
-		println("Stored sinfBox for KID:", kid)
-	} else if kid == "" {
-		println("Warning: KID is empty")
+	if uuid != "" && sinfBox != nil {
+		sinfBoxMap[uuid] = sinfBox
+		println("Stored sinfBox for uuid:", uuid)
+	} else if uuid == "" {
+		println("Warning: UUID is empty")
 		return js.ValueOf(map[string]interface{}{
 			"success": false,
-			"error":   "KID is empty",
+			"error":   "UUID is empty",
 		})
 	} else {
 		println("Info: sinfBox is nil (this may be normal if no sinf box was present)")
