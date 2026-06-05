@@ -386,7 +386,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 					}
 					lastT = t
 				}
-			} else if (segTemp.SelectAttrValue("presentationTimeOffset", "") != ""){
+			} else if (!is_static && segTemp.SelectAttrValue("presentationTimeOffset", "") != ""){
 				// presentationTimeOffset 存在但 SegmentTimeline 缺失 -> fallback
 				presentationTimeOffset, _ := strconv.Atoi(segTemp.SelectAttrValue("presentationTimeOffset", "0"))
 				duration, _ := strconv.Atoi(segTemp.SelectAttrValue("duration", "0"))
