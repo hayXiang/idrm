@@ -31,5 +31,4 @@ else
     echo "Error: Could not find wasm_exec.js at $WASM_EXEC_NEW_PATH or $WASM_EXEC_OLD_PATH"
     exit 1
 fi
-
-GOOS=js GOARCH=wasm go build -ldflags="-s -w" -o idrm.wasm main.go
+GOOS=js GOARCH=wasm GOEXPERIMENT=simd go build -ldflags="-s -w" -o idrm.wasm main.go

@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shaka Player + AI 离线字幕生成器</title>
+    <!-- 引入 Tailwind CSS 构建现代 UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 Shaka Player 样式和脚本 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/controls.css">
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.ui.js"></script>
+    <style>
+        /* 针对视频下方 AI 字幕容器的优雅样式 */
+        .ai-subtitle-container {
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+            font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+            background-color: rgba(0, 0, 0, 0.65);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- 顶部状态导航栏 -->
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+            <h1 class="text-lg font-bold tracking-wide">AI 离线自动字幕播放器</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span id="gpuStatus" class="text-xs bg-slate-800 px-3 py-1 rounded-full text-slate-400">正在检测 GPU/WebGPU 状态...</span>
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <!-- 左侧/上方：视频播放器与字幕实时展示 (占 3 格) -->
+        <div class="lg:col-span-3 flex flex-col space-y-4">
+            
+            <!-- Shaka Player 播放器容器 -->
+            <div class="relative rounded-2xl overflow-hidden shadow-2xl bg-black border border-slate-800 group">
+                <!-- Shaka Player 控制容器 -->
+                <div id="videoContainer" class="w-full aspect-video">
+                    <video id="video" class="w-full h-full" poster="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80"></video>
+                </div>
+
+                <!-- 自定义 AI 悬浮字幕层 -->
+                <div class="absolute bottom-16 left-0 right-0 pointer-events-none flex justify-center px-8 z-10">
+                    <div id="aiSubtitleText" class="ai-subtitle-container text-white text-lg md:text-2xl px-6 py-2 rounded-lg text-center font-semibold max-w-2xl opacity-0 transition-opacity duration-200">
+                        正在等待提取音频...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 音频截取及模型控制面板 -->
+            <div class="bg-slate-950/40 border border-slate-800/80 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-base font-semibold text-slate-200">AI 音频片段提取与识别</h3>
+                    <p class="text-xs text-slate-500 mt-1">播放器会自动切片当前播放音频段，并送入 Whisper-Tiny 推理。</p>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="extractBtn" disabled class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-5 py-2.5 rounded-xl disabled:bg-slate-800 disabled:text-slate-600 transition-colors">
+                        提取当前片段并转写
+                    </button>
+                    <button id="autoToggleBtn" disabled class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm px-5 py-2.5 rounded-xl disabled:opacity-50 transition-colors">
+                        开启自动实时字幕 (每5秒)
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 右侧：AI 状态监控与转写历史日志 (占 1 格) -->
+        <div class="lg:col-span-1 flex flex-col space-y-6">
+            
+            <!-- 模型加载进度面板 -->
+            <div class="bg-slate-950/60 border border-slate-800 p-5 rounded-2xl">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">AI 离线引擎状态</h2>
+                <div id="modelStatus" class="text-sm text-amber-500 font-medium">
+                    正在创建 Web Worker 线程...
+                </div>
+                <!-- 进度条 -->
+                <div class="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
+                    <div id="downloadProgress" class="bg-emerald-500 h-1.5 w-0 transition-all duration-300"></div>
+                </div>
+                <div id="downloadProgressText" class="text-xs text-slate-500 mt-1">等待初始化...</div>
+            </div>
+
+            <!-- 控制流媒体视频源 -->
+            <div class="bg-slate-950/60 border border-slate-800 p-5 rounded-2xl space-y-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">切换视频源</h2>
+                <div class="space-y-2">
+                    <label class="text-xs text-slate-500">示例 HLS/MP4 URL</label>
+                    <select id="videoSourceSelect" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                        <option value="https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd">Star Trek (DASH)</option>
+                        <option value="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4">Big Buck Bunny (MP4 - 中英文发音清晰)</option>
+                        <option value="https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4">Elephants Dream (MP4)</option>
+                    </select>
+                </div>
+                <button id="loadVideoBtn" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs py-2.5 rounded-xl transition-all">
+                    加载该视频
+                </button>
+            </div>
+
+            <!-- AI 识别历史日志 -->
+            <div class="bg-slate-950/60 border border-slate-800 p-5 rounded-2xl flex-1 flex flex-col min-h-[250px]">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">AI 转写记录</h2>
+                    <span id="inferenceTime" class="text-[10px] text-emerald-400"></span>
+                </div>
+                <div id="logsContainer" class="flex-1 overflow-y-auto text-xs space-y-2 max-h-[300px] text-slate-400 pr-1">
+                    <div class="text-slate-600 italic">暂无识别记录...</div>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- ==================== 主线程控制逻辑 ==================== -->
+    <script type="module">
+        let player = null;
+        let videoElement = null;
+        let speechRecognition = null;
+        let audioContext = null;
+        let sourceNode = null;
+
+        let autoSubInterval = null;
+        let isAutoSubOn = false;
+        let isListening = false;
+
+        // 检查浏览器是否支持 Web Speech API
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const supportsSpeechRecognition = !!SpeechRecognition;
+
+        const modelStatusDiv = document.getElementById('modelStatus');
+        const progressBar = document.getElementById('downloadProgress');
+        const progressText = document.getElementById('downloadProgressText');
+        const logContainer = document.getElementById('logsContainer');
+        const aiSubtitleText = document.getElementById('aiSubtitleText');
+        const gpuStatus = document.getElementById('gpuStatus');
+        
+        const extractBtn = document.getElementById('extractBtn');
+        const autoToggleBtn = document.getElementById('autoToggleBtn');
+        const loadVideoBtn = document.getElementById('loadVideoBtn');
+        const videoSourceSelect = document.getElementById('videoSourceSelect');
+        const inferenceTimeText = document.getElementById('inferenceTime');
+
+        // 更新状态显示
+        if (supportsSpeechRecognition) {
+            gpuStatus.innerText = '🎙️ 浏览器支持 Web Speech API';
+            gpuStatus.classList.remove('bg-slate-800', 'text-slate-400');
+            gpuStatus.classList.add('bg-emerald-950', 'text-emerald-400');
+        } else {
+            gpuStatus.innerText = '⚠️ 当前浏览器不支持语音识别';
+            gpuStatus.classList.remove('bg-slate-800', 'text-slate-400');
+            gpuStatus.classList.add('bg-red-950', 'text-red-400');
+        }
+
+        // 1. 初始化语音识别
+        function initSpeechRecognition() {
+            if (!supportsSpeechRecognition) {
+                modelStatusDiv.innerText = '❌ 浏览器不支持语音识别';
+                modelStatusDiv.classList.add('text-red-500');
+                progressText.innerText = '请使用 Chrome, Edge 或 Safari';
+                return;
+            }
+
+            speechRecognition = new SpeechRecognition();
+            speechRecognition.continuous = true;
+            speechRecognition.interimResults = true;
+            speechRecognition.lang = 'zh-CN'; // 设置中文识别
+
+            speechRecognition.onstart = () => {
+                isListening = true;
+                appendLog('[语音识别] 开始监听麦克风输入...');
+                modelStatusDiv.innerText = '👂 正在聆听...';
+                modelStatusDiv.classList.add('text-emerald-400');
+            };
+
+            speechRecognition.onend = () => {
+                isListening = false;
+                // 如果是自动模式且视频未暂停，尝试重启（防止意外停止）
+                if (isAutoSubOn && !videoElement.paused) {
+                    setTimeout(() => {
+                        if (isAutoSubOn) startRecognition();
+                    }, 500);
+                } else {
+                    modelStatusDiv.innerText = '✅ 语音识别就绪';
+                    modelStatusDiv.classList.remove('text-emerald-400');
+                }
+            };
+
+            speechRecognition.onresult = (event) => {
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+
+                if (finalTranscript) {
+                    showSubtitle(finalTranscript, 0);
+                } else if (interimTranscript) {
+                    // 可选：显示临时结果
+                    aiSubtitleText.innerText = interimTranscript;
+                    aiSubtitleText.style.opacity = 0.7;
+                }
+            };
+
+            speechRecognition.onerror = (event) => {
+                console.error('语音识别错误:', event.error);
+                appendLog(`[错误] 语音识别: ${event.error}`);
+                if (event.error === 'not-allowed') {
+                    modelStatusDiv.innerText = '❌ 麦克风权限被拒绝';
+                    stopRecognition();
+                }
+            };
+
+            modelStatusDiv.innerText = '✅ 内置语音识别已就绪';
+            modelStatusDiv.classList.remove('text-amber-500');
+            modelStatusDiv.classList.add('text-emerald-500');
+            progressBar.style.width = '100%';
+            progressText.innerText = '无需下载模型，使用浏览器原生能力';
+            
+            extractBtn.disabled = false;
+            autoToggleBtn.disabled = false;
+        }
+
+        function startRecognition() {
+            if (isListening) return;
+            try {
+                speechRecognition.start();
+            } catch (e) {
+                console.error("启动识别失败", e);
+            }
+        }
+
+        function stopRecognition() {
+            if (speechRecognition && isListening) {
+                speechRecognition.stop();
+            }
+        }
+
+        // 2. 初始化 Shaka Player
+        async function initPlayer() {
+            videoElement = document.getElementById('video');
+            const container = document.getElementById('videoContainer');
+
+            player = new shaka.Player(videoElement);
+
+            player.addEventListener('error', (event) => {
+                console.error('Shaka Player 错误:', event.detail);
+            });
+
+            const ui = new shaka.ui.Overlay(player, container, videoElement);
+            
+            await loadVideo(videoSourceSelect.value);
+        }
+
+        async function loadVideo(url) {
+            try {
+                if (audioContext) {
+                    await audioContext.close();
+                    audioContext = null;
+                }
+                
+                await player.load(url);
+                appendLog(`[系统] 成功载入视频：${url.substring(url.lastIndexOf('/') + 1)}`);
+                
+                setupAudioVisualizer();
+            } catch (err) {
+                console.error('加载视频失败:', err);
+                appendLog(`[错误] 载入视频失败: ${err.message}`);
+            }
+        }
+
+        // 简单的音频上下文设置（主要用于保持活跃，Web Speech API 实际上使用的是麦克风）
+        function setupAudioVisualizer() {
+             // 注意：Web Speech API 不直接接受 MediaStream 来自 createMediaElementSource
+             // 这里我们仅初始化 Context 以避免自动播放策略问题
+             const AudioContext = window.AudioContext || window.webkitAudioContext;
+             audioContext = new AudioContext();
+             
+             // 连接视频音频到输出，确保能听到声音
+             if (!sourceNode) {
+                 videoElement.crossOrigin = "anonymous";
+                 sourceNode = audioContext.createMediaElementSource(videoElement);
+                 sourceNode.connect(audioContext.destination);
+             }
+        }
+
+        // 3. 字幕渲染和日志展示
+        function showSubtitle(text, inferenceTime) {
+            const cleanText = text.trim();
+            if (inferenceTime > 0) {
+                inferenceTimeText.innerText = `延迟: ${inferenceTime}s`;
+            }
+            
+            if (cleanText) {
+                aiSubtitleText.innerText = cleanText;
+                aiSubtitleText.style.opacity = 1;
+
+                appendLog(`[识别] "${cleanText}"`);
+
+                setTimeout(() => {
+                    if (aiSubtitleText.innerText === cleanText) {
+                        aiSubtitleText.style.opacity = 0;
+                    }
+                }, 4000);
+            }
+        }
+
+        function appendLog(msg) {
+            const div = document.createElement('div');
+            div.className = 'py-1 border-b border-slate-900/40 font-mono leading-relaxed';
+            div.innerText = msg;
+            
+            if (logContainer.querySelector('.italic')) {
+                logContainer.innerHTML = '';
+            }
+
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // 4. UI 事件绑定
+        extractBtn.addEventListener('click', () => {
+            if (!supportsSpeechRecognition) {
+                appendLog('[错误] 浏览器不支持语音识别');
+                return;
+            }
+            appendLog('[手动] 触发一次语音识别...');
+            startRecognition();
+            // 手动模式下，识别到结果或几秒后自动停止，避免一直监听
+            setTimeout(stopRecognition, 5000);
+        });
+
+        autoToggleBtn.addEventListener('click', () => {
+            if (!supportsSpeechRecognition) {
+                appendLog('[错误] 浏览器不支持语音识别');
+                return;
+            }
+
+            if (isAutoSubOn) {
+                // 关闭
+                isAutoSubOn = false;
+                stopRecognition();
+                autoToggleBtn.innerText = '开启自动实时字幕';
+                autoToggleBtn.className = "bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm px-5 py-2.5 rounded-xl transition-colors";
+                appendLog(`[系统] 自动字幕已关闭。`);
+            } else {
+                // 开启
+                isAutoSubOn = true;
+                autoToggleBtn.innerText = '停止自动转写';
+                autoToggleBtn.className = "bg-red-600 hover:bg-red-500 text-white font-medium text-sm px-5 py-2.5 rounded-xl transition-colors";
+                appendLog(`[系统] 开启自动字幕 (请确保麦克风能收录声音)...`);
+                startRecognition();
+            }
+        });
+
+        loadVideoBtn.addEventListener('click', () => {
+            loadVideo(videoSourceSelect.value);
+        });
+
+        window.addEventListener('load', () => {
+            initSpeechRecognition();
+            initPlayer();
+        });
+    </script>
+</body>
+</html>

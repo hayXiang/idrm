@@ -6,7 +6,7 @@ package main
 import (
 	"encoding/hex"
 	"syscall/js"
-	
+	"strings"
 	// 引入项目原有的解密功能
 	"github.com/Eyevinn/mp4ff/mp4"
 	// 引入公共函数库
@@ -45,7 +45,7 @@ func addKey(this js.Value, args []js.Value) interface{} {
 }
 
 // 解密fMP4段
-func decryptSegmentM4s(this js.Value, args []js.Value) interface{} {
+func decryptSegment(this js.Value, args []js.Value) interface{} {
 	data := make([]byte, args[0].Get("length").Int())
 	js.CopyBytesToGo(data, args[0])
 	
@@ -64,11 +64,21 @@ func decryptSegmentM4s(this js.Value, args []js.Value) interface{} {
 	println("Found key for KID:", kid, ", key length:", len(key))
 
 	// 从map中获取对应的sinfBox
-	var sinfBox *mp4.SinfBox
-	sinfBox = sinfBoxMap[uuid]
-
-	// 直接使用decrypt包中的DecryptFromBody函数
-	result, err := decrypt.DecryptFromBody("m4s", data, key, sinfBox)
+	sinfBox, exists := sinfBoxMap[uuid]
+	if !exists {
+		println("SinfBox not found for UUID:", uuid)
+		return js.ValueOf(map[string]interface{}{
+			"success": false,
+			"error":   "SinfBox not found for UUID: " + uuid,
+		})
+	}
+	
+	drmType := "m4s"
+	// Fixed: Using SchemeVersion instead of SchemaVersion
+	if sinfBox != nil && sinfBox.Schm != nil && sinfBox.Schm.SchemeType == "cbcs" && sinfBox.Schm.SchemeVersion == 9527 {
+		drmType = "ts"
+	}
+	result, err := decrypt.DecryptFromBody(drmType, data, key, sinfBox)
 	if err != nil {
 		println("Failed to decrypt MP4 file:", err.Error())
 		return js.ValueOf(map[string]interface{}{
@@ -89,9 +99,39 @@ func decryptSegmentM4s(this js.Value, args []js.Value) interface{} {
 	})
 }
 
-// 适配旧的decryptFmp4接口
-func decryptFmp4(this js.Value, args []js.Value) interface{} {
-	return decryptSegmentM4s(this, args)
+
+// 修改初始化M4S片段 - 直接使用decrypt包中的函数，增加调试日志
+func initCbcsTsContext(this js.Value, args []js.Value) interface{}  {
+	kid := args[0].String()
+	iv := args[1].String()
+	uuid := args[2].String() // Fixed: was using args[2] twice
+
+	println("initCbcsTsContext for KID:", kid)
+	_, exists := sinfBoxMap[uuid] // Fixed: was using .Load() on regular map
+	if !exists {
+		sinBox := new(mp4.SinfBox)
+		sinBox.Schm = new(mp4.SchmBox)
+		sinBox.Schi = new(mp4.SchiBox)
+		sinBox.Schi.Tenc = new(mp4.TencBox)
+
+		sinBox.Schm.SchemeType = "cbcs"
+		sinBox.Schm.SchemeVersion = 9527
+		// Fixed: converting string to []byte
+		// 3. 转换为字节数组
+		ivBytes, err := hex.DecodeString(strings.TrimPrefix(iv, "0x"))
+		if err != nil {
+			return js.ValueOf(map[string]interface{}{
+				"success": false,
+				"error":   "Failed to decode IV: " + err.Error(),
+			})
+		}
+		sinBox.Schi.Tenc.DefaultConstantIV = ivBytes
+		sinfBoxMap[uuid] = sinBox
+		println("Stored sinfBox for uuid:", uuid)
+	}
+	return js.ValueOf(map[string]interface{}{
+			"success": true,
+	})
 }
 
 // 修改初始化M4S片段 - 直接使用decrypt包中的函数，增加调试日志
@@ -151,45 +191,12 @@ func modifyInitM4s(this js.Value, args []js.Value) interface{} {
 	})
 }
 
-// 保存初始化数据用于调试
-func saveInitDataForDebug(this js.Value, args []js.Value) interface{} {
-	initData := make([]byte, args[0].Get("length").Int())
-	js.CopyBytesToGo(initData, args[0])
-	
-	// 将数据转换为十六进制字符串
-	hexStr := hex.EncodeToString(initData)
-	
-	// 输出到控制台便于调试
-	println("Init data hex length:", len(hexStr))
-	
-	return js.ValueOf(map[string]interface{}{
-		"success": true,
-		"hexData": hexStr, // 返回十六进制编码的数据
-	})
-}
-
-// 记录初始化片段的URL用于调试
-func recordInitSegmentURL(this js.Value, args []js.Value) interface{} {
-	url := args[0].String()
-	size := args[1].Int()
-	
-	println("Init segment URL:", url)
-	println("Init segment size from JS:", size)
-	
-	return js.ValueOf(map[string]interface{}{
-		"success": true,
-		"message": "URL recorded for debugging",
-	})
-}
-
 func main() {
 	// 注册JavaScript回调函数
 	js.Global().Set("addKey", js.FuncOf(addKey))
 	js.Global().Set("modifyInitM4s", js.FuncOf(modifyInitM4s))
-	js.Global().Set("decryptSegmentM4s", js.FuncOf(decryptSegmentM4s))
-	js.Global().Set("decryptFmp4", js.FuncOf(decryptFmp4))
-	js.Global().Set("saveInitDataForDebug", js.FuncOf(saveInitDataForDebug))
-	js.Global().Set("recordInitSegmentURL", js.FuncOf(recordInitSegmentURL))  // 添加新的URL记录函数
+	js.Global().Set("initCbcsTsContext", js.FuncOf(initCbcsTsContext))
+	js.Global().Set("decryptSegment", js.FuncOf(decryptSegment))
 
 	// 创建一个永不关闭的channel，防止Go程序退出
 	done := make(chan bool, 0)
