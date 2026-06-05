@@ -279,6 +279,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 	if mpd == nil {
 		return "", nil, fmt.Errorf("not found MPD")
 	}
+	availabilityStartTime := mpd.SelectAttrValue("availabilityStartTime", "")
 	media_type := mpd.SelectAttrValue("type", "")
 	is_static := media_type == "static"
 
@@ -385,7 +386,36 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 					}
 					lastT = t
 				}
-			} else {
+			} else if (segTemp.SelectAttrValue("presentationTimeOffset", "") != ""){
+				// presentationTimeOffset 存在但 SegmentTimeline 缺失 -> fallback
+				presentationTimeOffset, _ := strconv.Atoi(segTemp.SelectAttrValue("presentationTimeOffset", "0"))
+				duration, _ := strconv.Atoi(segTemp.SelectAttrValue("duration", "0"))
+
+				// 转换单位：从 timescale 单位转成秒
+				offsetSec := float64(presentationTimeOffset) / float64(timescale)
+				durSec := float64(duration) / float64(timescale)
+
+				// 解析 availabilityStartTime
+				availabilityStartTimeUtc, _ := time.Parse(time.RFC3339, availabilityStartTime)
+
+				// 已过去的秒数（用 float64）
+				elapsedSec := float64(time.Now().UTC().Unix()) - float64(availabilityStartTimeUtc.Unix())
+
+				// 视频实际经历的时间 = 已过去时间 - 偏移量
+				mediaTime := elapsedSec - offsetSec
+
+				var seq int
+				if mediaTime < 0 {
+					seq = startNumber
+				} else {
+					seq = startNumber + int(math.Floor(mediaTime/durSec))
+				}
+				for i := 0; i < 3; i++ { // 生成前3个分片，后续分片通过 SegmentTimeline 推导
+					segURI := strings.ReplaceAll(mediaTemplate, "$Number$", strconv.Itoa(seq - 2 + i))
+					segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", durSec, segURI))					
+				}
+				startNumber = seq
+			}else{
 				periodDurationStr := mpd.SelectAttrValue("mediaPresentationDuration", "")
 				periodDuration := 0.0
 				if periodDurationStr != "" {
@@ -404,7 +434,7 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 					segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", segDur, segURI))
 					seq++
 					peridoDurationTotal -= float64(duration)
-				}
+				}				
 			}
 
 			// --------------------
