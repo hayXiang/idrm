@@ -1114,7 +1114,7 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 		}
 
 		//替换m3u8
-		if lastLineWasExtStremInf && !strings.HasPrefix(line, "http") && !strings.HasPrefix(line, "#") && strings.Contains(line, ".m3u8") {
+		if lastLineWasExtStremInf &&!strings.HasPrefix(line, "#") && strings.Contains(line, ".m3u8") {
 			if doConvert {
 				line = convert_to_proxy_url("m3u8", tvgID, line, url, "", userToken)
 			} else {

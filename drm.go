@@ -66,7 +66,22 @@ func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, bo
 		log.Printf("[解密进度] tvgID=%s: JWK 解析完成", tvgID)
 	}
 
-	kidKey := strings.Split(val.(string), ":")
+	kidKey := []string{}
+	if strings.Contains(val.(string), ",") && sinfBox != nil {
+		for _,eachKidKeyString := range strings.Split(val.(string), ",") {
+			eachKidKey := strings.Split(eachKidKeyString, ":")
+			defaultKid := (*(*(*(sinfBox)).Schi).Tenc).DefaultKID
+			if eachKidKey[0] ==  hex.EncodeToString(defaultKid){
+				log.Printf("[解密进度] tvgID=%s: 找到匹配的 kid=%s", tvgID, eachKidKey[0])
+				kidKey = eachKidKey
+				break
+			}
+		}
+	} 
+	if len(kidKey) != 2 {
+		kidKey = strings.Split(val.(string), ":") 
+	}
+	
 	if len(kidKey) != 2 {
 		log.Printf("[解密错误] tvgID=%s: 密钥格式错误, val=%s", tvgID, val.(string))
 		if ctx != nil {

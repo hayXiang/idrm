@@ -77,19 +77,52 @@
       <template v-if="form.drmEnabled">
         <el-form-item label="配置方式">
           <el-radio-group v-model="drmInputMode" :disabled="isViewMode">
-            <el-radio value="direct">直接配置 (kid:key)</el-radio>
+            <el-radio value="direct">直接配置 (多组 kid:key)</el-radio>
             <el-radio value="url">URL 获取</el-radio>
           </el-radio-group>
         </el-form-item>
         
         <!-- 直接配置模式 -->
         <template v-if="drmInputMode === 'direct'">
-          <el-form-item label="Key ID">
-            <el-input v-model="form.drmKeyId" placeholder="1acd2d7afd8cb34099cb832862e3c08d" :disabled="isViewMode" />
-          </el-form-item>
-          
-          <el-form-item label="Key">
-            <el-input v-model="form.drmKey" placeholder="b85491a27c2852323ac704a07cf7b779" :disabled="isViewMode" />
+          <el-form-item label="DRM Keys">
+            <div class="drm-keys-container">
+              <div 
+                v-for="(drmKey, index) in form.drmKeys" 
+                :key="index" 
+                class="drm-key-row"
+              >
+                <el-input
+                  v-model="drmKey.kid"
+                  placeholder="Key ID (e.g. 1acd2d7afd8cb34099cb832862e3c08d)"
+                  style="width: 45%; margin-right: 10px;"
+                  :disabled="isViewMode"
+                />
+                <el-input
+                  v-model="drmKey.key"
+                  placeholder="Key (e.g. b85491a27c2852323ac704a07cf7b779)"
+                  style="width: 45%; margin-right: 10px;"
+                  :disabled="isViewMode"
+                />
+                <el-button
+                  v-if="!isViewMode && form.drmKeys.length > 1"
+                  type="danger"
+                  size="small"
+                  @click="removeDrmKey(index)"
+                >
+                  删除
+                </el-button>
+              </div>
+              
+              <el-button
+                v-if="!isViewMode"
+                type="primary"
+                size="small"
+                @click="addDrmKey"
+                style="margin-top: 10px;"
+              >
+                <el-icon><Plus /></el-icon> 添加 DRM Key
+              </el-button>
+            </div>
           </el-form-item>
         </template>
         
@@ -127,6 +160,7 @@ import { ref, computed, watch } from 'vue'
 import { createChannel, updateChannel } from '@/api/provider'
 import { ElMessage } from 'element-plus'
 import { useProviderStore } from '@/stores/provider'
+import { Plus } from '@element-plus/icons-vue'
 
 const providerStore = useProviderStore()
 
@@ -166,8 +200,7 @@ const defaultForm = {
   url: '',
   enabled: true,
   drmEnabled: false,
-  drmKeyId: '',
-  drmKey: '',
+  drmKeys: [], // 改为数组，支持多组DRM
   drmUrl: ''
 }
 
@@ -178,8 +211,7 @@ watch(() => props.visible, (val) => {
   if (val) {
     if (props.data) {
       // 从后端的 value 字段解析配置
-      let keyId = ''
-      let key = ''
+      let keys = []
       let url = ''
       let mode = 'direct'
       
@@ -191,14 +223,28 @@ watch(() => props.visible, (val) => {
           url = value
           mode = 'url'
         } else {
-          // 直接配置模式
-          const parts = value.split(':')
-          if (parts.length === 2) {
-            keyId = parts[0]
-            key = parts[1]
-            mode = 'direct'
+          // 直接配置模式 - 支持多组
+          // 检查是否包含逗号分隔的多组kid:key
+          if (value.includes(',')) {
+            const pairs = value.split(',')
+            keys = pairs.map(pair => {
+              const [kid, key] = pair.trim().split(':')
+              return { kid: kid || '', key: key || '' }
+            }).filter(item => item.kid && item.key) // 过滤掉无效的条目
+          } else {
+            // 单组格式
+            const [kid, key] = value.split(':')
+            if (kid && key) {
+              keys = [{ kid: kid.trim(), key: key.trim() }]
+            }
           }
+          mode = 'direct'
         }
+      }
+      
+      // 如果没有DRM配置，初始化一个空的DRM Key
+      if (mode === 'direct' && keys.length === 0) {
+        keys = [{ kid: '', key: '' }]
       }
       
       drmInputMode.value = mode
@@ -208,14 +254,14 @@ watch(() => props.visible, (val) => {
         ...props.data,
         providerId: props.providerId || props.data.providerId,
         drmEnabled: !!props.data.drm,
-        drmKeyId: keyId,
-        drmKey: key,
+        drmKeys: keys,
         drmUrl: url
       }
     } else {
       form.value = { 
         ...defaultForm,
-        providerId: props.providerId || ''
+        providerId: props.providerId || '',
+        drmKeys: [{ kid: '', key: '' }] // 初始化一个空的DRM Key
       }
       drmInputMode.value = 'direct'
     }
@@ -244,6 +290,18 @@ const generateTvgId = () => {
   form.value.tvgId = result
 }
 
+// 添加新的DRM Key
+const addDrmKey = () => {
+  form.value.drmKeys.push({ kid: '', key: '' })
+}
+
+// 删除DRM Key
+const removeDrmKey = (index) => {
+  if (form.value.drmKeys.length > 1) {
+    form.value.drmKeys.splice(index, 1)
+  }
+}
+
 const handleSubmit = async () => {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -254,13 +312,22 @@ const handleSubmit = async () => {
     let drmValue = ''
     if (form.value.drmEnabled) {
       if (drmInputMode.value === 'direct') {
-        // 直接配置模式：合并为 "kid:key" 格式
-        if (!form.value.drmKeyId || !form.value.drmKey) {
-          ElMessage.error('请输入 Key ID 和 Key')
+        // 直接配置模式：将多组DRM Key合并为逗号分隔的字符串
+        if (!form.value.drmKeys || form.value.drmKeys.length === 0) {
+          ElMessage.error('请至少添加一组 Key ID 和 Key')
           submitting.value = false
           return
         }
-        drmValue = `${form.value.drmKeyId.trim()}:${form.value.drmKey.trim()}`
+        
+        // 过滤掉空的条目
+        const validKeys = form.value.drmKeys.filter(item => item.kid.trim() && item.key.trim())
+        if (validKeys.length === 0) {
+          ElMessage.error('请至少添加一组有效的 Key ID 和 Key')
+          submitting.value = false
+          return
+        }
+        
+        drmValue = validKeys.map(item => `${item.kid.trim()}:${item.key.trim()}`).join(',')
       } else {
         // URL 获取模式：直接使用 URL
         if (!form.value.drmUrl) {
@@ -299,3 +366,26 @@ const handleSubmit = async () => {
   }
 }
 </script>
+
+<style scoped>
+.drm-key-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.drm-keys-container {
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 10px;
+  background-color: #fafafa;
+  width: 100%;
+}
+
+/* 调整输入框宽度 */
+.drm-key-row .el-input {
+  width: calc(50%) !important; /* 调整宽度以适应空间 */
+}
+
+
+</style>
