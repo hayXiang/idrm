@@ -1102,11 +1102,11 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 					sinBox.Schi.Tenc = new(mp4.TencBox)
 
 					sinBox.Schm.SchemeType = "cbcs"
-					clearKey := clearKeysMap.Load(tvgID)
+					clearKey,_ := clearKeysMap.Load(tvgID)
 					if clearKey != nil {
 						parts := strings.Split(clearKey.(string), ":")
 						if len(parts) == 2 {
-							sinBox.Schi.Tenc.DefaultKeyID = []byte(parts[0])
+							sinBox.Schi.Tenc.DefaultKID = []byte(parts[0])
 						}
 					}
 					SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinBox)
