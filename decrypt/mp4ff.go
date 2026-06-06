@@ -24,6 +24,9 @@ func modifyInitM4s(mp4File *mp4.File) *mp4.SinfBox {
 			original_type := trak.Mdia.Minf.Stbl.Stsd.Encv.Sinf.Frma.DataFormat
 			var newBoxes []mp4.Box
 			for _, box := range trak.Mdia.Minf.Stbl.Stsd.Encv.Children {
+				if box.Type() == "dvvC" {
+					original_type = "dvh1"
+				}
 				if box.Type() != "sinf" {
 					newBoxes = append(newBoxes, box)
 				} else if trak.Mdia.Minf.Stbl.Stsd.Encv.Sinf != nil {

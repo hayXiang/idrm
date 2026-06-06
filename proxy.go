@@ -71,7 +71,7 @@ var (
 	VISIT_TRACKER              = NewVisitTracker()
 )
 
-var Version = "1.0.0.40"
+var Version = "1.0.0.41"
 
 // newHTTPClient 创建支持 SOCKS5 或 HTTP 代理的 net/http Client
 func newHTTPClient(proxyURL string, timeout int) *http.Client {
@@ -1088,6 +1088,13 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 			continue
 		}
 
+		// 处理EXT-X-STREAM-INF行，移除HDCP-LEVEL和ALLOWED-CPC属性
+		if strings.HasPrefix(line, "#EXT-X-STREAM-INF:") {
+			line = removeHDCPAndDRMAttributes(line)
+		}
+
+
+
 		if strings.HasPrefix(line, "#EXT-X-DATERANGE") {
 			continue
 		}
@@ -1179,6 +1186,23 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 	}
 
 	return []byte(strings.Join(newLines, "\n"))
+}
+
+// removeHDCPAndDRMAttributes 从EXT-X-STREAM-INF行中移除HDCP-LEVEL和ALLOWED-CPC属性
+func removeHDCPAndDRMAttributes(line string) string {
+	// 移除 HDCP-LEVEL 属性
+	reHDCP := regexp.MustCompile(`HDCP-LEVEL=[^,\s]*[,\s]*`)
+	line = reHDCP.ReplaceAllString(line, "")
+
+	// 移除 ALLOWED-CPC 属性
+	reCPC := regexp.MustCompile(`ALLOWED-CPC="[^"]*"[,\s]*`)
+	line = reCPC.ReplaceAllString(line, "")
+
+	// 清理多余的逗号和空格
+	line = strings.ReplaceAll(line, ",,", ",")
+	line = strings.TrimRight(line, ", ")
+	
+	return line
 }
 
 // parseISO8601ToSeconds 将 PT1H2M3S 格式转换为秒数
