@@ -1083,6 +1083,9 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 
 	hash := md5.Sum([]byte(url))
 	stream_uuid := hex.EncodeToString(hash[:])
+	if _, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); !ok && !strings.Contains(strBody, "#EXT-X-STREAM-INF") {
+		log.Printf("[hls] stream_uuid: %s, url: %s", stream_uuid, url)
+	}
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
