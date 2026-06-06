@@ -86,42 +86,30 @@
         <template v-if="drmInputMode === 'direct'">
           <el-form-item label="DRM Keys">
             <div class="drm-keys-container">
-              <div 
-                v-for="(drmKey, index) in form.drmKeys" 
-                :key="index" 
-                class="drm-key-row"
-              >
+              <div class="drm-key-input-area">
                 <el-input
-                  v-model="drmKey.kid"
-                  placeholder="Key ID (e.g. 1acd2d7afd8cb34099cb832862e3c08d)"
-                  style="width: 45%; margin-right: 10px;"
+                  v-model="drmKeyInput"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="请输入DRM 配置，格式为 kid:key，多个使用逗号分隔"
                   :disabled="isViewMode"
                 />
-                <el-input
-                  v-model="drmKey.key"
-                  placeholder="Key (e.g. b85491a27c2852323ac704a07cf7b779)"
-                  style="width: 45%; margin-right: 10px;"
-                  :disabled="isViewMode"
-                />
-                <el-button
-                  v-if="!isViewMode && form.drmKeys.length > 1"
-                  type="danger"
-                  size="small"
-                  @click="removeDrmKey(index)"
-                >
-                  删除
-                </el-button>
               </div>
               
-              <el-button
-                v-if="!isViewMode"
-                type="primary"
-                size="small"
-                @click="addDrmKey"
-                style="margin-top: 10px;"
-              >
-                <el-icon><Plus /></el-icon> 添加 DRM Key
-              </el-button>
+              <!-- 显示解析后的DRM配置列表 -->
+              <div v-if="parsedDrmKeys.length > 0" class="parsed-drm-keys">
+                <div class="parsed-key-item" v-for="(key, index) in parsedDrmKeys" :key="index">
+                  <span class="key-display">{{ key.kid }}:<strong>{{ key.key }}</strong></span>
+                  <el-button
+                    v-if="!isViewMode"
+                    type="danger"
+                    size="small"
+                    @click="removeParsedDrmKey(index)"
+                  >
+                    删除
+                  </el-button>
+                </div>
+              </div>
             </div>
           </el-form-item>
         </template>
@@ -206,6 +194,31 @@ const defaultForm = {
 
 const form = ref({ ...defaultForm })
 const drmInputMode = ref('direct') // 'direct' 或 'url'
+const drmKeyInput = ref('') // 存储用户输入的DRM配置文本
+
+// 计算解析后的DRM键值对
+const parsedDrmKeys = computed(() => {
+  if (!drmKeyInput.value.trim()) return []
+  
+  // 支持逗号分隔或换行分隔
+  const lines = drmKeyInput.value.split(/[\n,]+/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+  
+  const keys = []
+  lines.forEach(line => {
+    const parts = line.split(':')
+    if (parts.length === 2) {
+      const kid = parts[0].trim()
+      const key = parts[1].trim()
+      if (kid && key) {
+        keys.push({ kid, key })
+      }
+    }
+  })
+  
+  return keys
+})
 
 watch(() => props.visible, (val) => {
   if (val) {
@@ -242,11 +255,6 @@ watch(() => props.visible, (val) => {
         }
       }
       
-      // 如果没有DRM配置，初始化一个空的DRM Key
-      if (mode === 'direct' && keys.length === 0) {
-        keys = [{ kid: '', key: '' }]
-      }
-      
       drmInputMode.value = mode
       
       form.value = {
@@ -257,16 +265,28 @@ watch(() => props.visible, (val) => {
         drmKeys: keys,
         drmUrl: url
       }
+      
+      // 设置输入框的值
+      if (mode === 'direct' && keys.length > 0) {
+        drmKeyInput.value = keys.map(key => `${key.kid}:${key.key}`).join(',\n')
+      } else {
+        drmKeyInput.value = ''
+      }
     } else {
       form.value = { 
         ...defaultForm,
-        providerId: props.providerId || '',
-        drmKeys: [{ kid: '', key: '' }] // 初始化一个空的DRM Key
+        providerId: props.providerId || ''
       }
       drmInputMode.value = 'direct'
+      drmKeyInput.value = '' // 新增时清空输入框
     }
   }
 })
+
+// 监听输入变化，更新form中的drmKeys
+watch(parsedDrmKeys, (newKeys) => {
+  form.value.drmKeys = newKeys
+}, { deep: true })
 
 const rules = {
   providerId: [{ required: true, message: '请选择 Provider', trigger: 'change' }],
@@ -290,16 +310,16 @@ const generateTvgId = () => {
   form.value.tvgId = result
 }
 
-// 添加新的DRM Key
-const addDrmKey = () => {
-  form.value.drmKeys.push({ kid: '', key: '' })
-}
-
-// 删除DRM Key
-const removeDrmKey = (index) => {
-  if (form.value.drmKeys.length > 1) {
-    form.value.drmKeys.splice(index, 1)
-  }
+// 删除解析后的DRM Key
+const removeParsedDrmKey = (index) => {
+  if (isViewMode.value) return
+  
+  const keys = drmKeyInput.value.split(/[\n,]+/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+  
+  keys.splice(index, 1)
+  drmKeyInput.value = keys.join(',\n')
 }
 
 const handleSubmit = async () => {
@@ -368,12 +388,6 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-.drm-key-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
 .drm-keys-container {
   border: 1px solid #dcdfe6;
   border-radius: 4px;
@@ -382,10 +396,42 @@ const handleSubmit = async () => {
   width: 100%;
 }
 
-/* 调整输入框宽度 */
-.drm-key-row .el-input {
-  width: calc(50%) !important; /* 调整宽度以适应空间 */
+.drm-key-input-area {
+  margin-bottom: 15px;
 }
 
+.drm-input-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
 
+.drm-input-hint ul {
+  margin: 5px 0;
+  padding-left: 15px;
+}
+
+.drm-input-hint li {
+  margin: 3px 0;
+}
+
+.parsed-drm-keys {
+  border-top: 1px dashed #dcdfe6;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.parsed-key-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.key-display {
+  word-break: break-all;
+  font-family: monospace;
+  font-size: 13px;
+}
 </style>

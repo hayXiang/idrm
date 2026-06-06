@@ -14,6 +14,12 @@ import (
 
 
 func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, sinfBox *mp4.SinfBox, proxy_type string) ([]byte, error) {
+
+	if (sinfBox == nil || sinfBox.Schi == nil || sinfBox.Schi.Tenc == nil) {
+		log.Printf("[无需解密] tvgID=%s: sinfBox 中缺少 Schi/Tenc 信息", tvgID)
+		return body, nil
+	}
+
 	clientIP := ""
 	if ctx != nil {
 		clientIP = getClientIP(ctx)
@@ -66,20 +72,27 @@ func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, bo
 		log.Printf("[解密进度] tvgID=%s: JWK 解析完成", tvgID)
 	}
 
+	defaultKid := (*(*(*(sinfBox)).Schi).Tenc).DefaultKID
 	kidKey := []string{}
 	if strings.Contains(val.(string), ",") && sinfBox != nil {
 		for _,eachKidKeyString := range strings.Split(val.(string), ",") {
 			eachKidKey := strings.Split(eachKidKeyString, ":")
-			defaultKid := (*(*(*(sinfBox)).Schi).Tenc).DefaultKID
+			
 			if eachKidKey[0] ==  hex.EncodeToString(defaultKid){
 				log.Printf("[解密进度] tvgID=%s: 找到匹配的 kid=%s", tvgID, eachKidKey[0])
 				kidKey = eachKidKey
 				break
 			}
 		}
-	} 
-	if len(kidKey) != 2 {
-		kidKey = strings.Split(val.(string), ":") 
+	}
+
+	if len(kidKey) == 0 {
+		log.Printf("[解密错误] tvgID=%s: 未找到匹配的 kid=%s", tvgID, hex.EncodeToString(defaultKid))
+		if ctx != nil {
+			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+			ctx.SetBodyString("未找到匹配的，kid=" + hex.EncodeToString(defaultKid))
+		}
+		return nil, fmt.Errorf("invalid key format: %s", val)
 	}
 	
 	if len(kidKey) != 2 {

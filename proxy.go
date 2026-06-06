@@ -28,7 +28,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/beevik/etree"
 	"github.com/patrickmn/go-cache"
@@ -831,7 +830,8 @@ func filterHighestAV(body string) string {
 	lines := strings.Split(body, "\n")
 
 	var maxVideoBW int64 = -1
-	var bestVideoINF, bestVideoURI, bestAudioGroup, bestCCGroup string
+	var bestVideoINF, bestVideoURI, bestAudioGroup, bestCCGroup, bestSubtitleGroup string
+	var hasDolbyVision bool = false
 
 	// 存全局标签 / 图片轨道
 	var globalTags, imageTracks []string
@@ -861,7 +861,7 @@ func filterHighestAV(body string) string {
 		if strings.HasPrefix(line, "#EXT-X-STREAM-INF:") {
 			attrs := strings.Split(line[len("#EXT-X-STREAM-INF:"):], ",")
 			var bw int64
-			var audioGroup, ccGroup string
+			var audioGroup, ccGroup, subtitleGroup, codec string
 			for _, a := range attrs {
 				kv := strings.SplitN(strings.TrimSpace(a), "=", 2)
 				if len(kv) == 2 {
@@ -873,31 +873,60 @@ func filterHighestAV(body string) string {
 					case "AUDIO":
 						audioGroup = val
 					case "CLOSED-CAPTIONS":
-					case "SUBTITLES":
 						ccGroup = val
+					case "SUBTITLES":
+						subtitleGroup = val
+					case "CODECS":
+						codec = val
 					}
 				}
 			}
+			
+			// 检查是否包含杜比视界 (Dolby Vision) 编码
+			isDolbyVision := strings.Contains(strings.ToLower(codec), "dvhe") || strings.Contains(strings.ToLower(codec), "dvh1") || strings.Contains(strings.ToLower(codec), "dva1") || strings.Contains(strings.ToLower(codec), "dvav")
+			
 			uri := strings.TrimSpace(lines[i+1])
-			if bw > maxVideoBW {
+			
+			// 杜比视界优先逻辑：如果有杜比视界流，优先选择；否则按最高码率选择
+			if isDolbyVision && !hasDolbyVision {
+				// 如果当前流是杜比视界且还没有找到杜比视界流，则优先选择
+				hasDolbyVision = true
 				maxVideoBW = bw
 				bestVideoINF = line
 				bestVideoURI = uri
 				bestAudioGroup = audioGroup
 				bestCCGroup = ccGroup
+				bestSubtitleGroup = subtitleGroup
+			} else if !hasDolbyVision && bw > maxVideoBW {
+				// 如果还没有找到杜比视界流，则按最高码率选择
+				maxVideoBW = bw
+				bestVideoINF = line
+				bestVideoURI = uri
+				bestAudioGroup = audioGroup
+				bestCCGroup = ccGroup
+				bestSubtitleGroup = subtitleGroup
+			} else if hasDolbyVision && isDolbyVision && bw > maxVideoBW {
+				// 如果已经有杜比视界流，继续寻找最高码率的杜比视界流
+				maxVideoBW = bw
+				bestVideoINF = line
+				bestVideoURI = uri
+				bestAudioGroup = audioGroup
+				bestCCGroup = ccGroup
+				bestSubtitleGroup = subtitleGroup
 			}
 		}
 	}
 
 	// 找对应的音频
 	var bestAudioLine string
+	var lastAudioLang string
 	if bestAudioGroup != "" {
 		var maxABW int64 = -1
 		for _, line := range lines {
 			if strings.HasPrefix(line, "#EXT-X-MEDIA:") &&
 				strings.Contains(line, "TYPE=AUDIO") &&
 				strings.Contains(line, fmt.Sprintf("GROUP-ID=\"%s\"", bestAudioGroup)) {
-
+				
 				// 带宽
 				var bw int64
 				if m := reBW.FindStringSubmatch(line); len(m) == 2 {
@@ -916,10 +945,12 @@ func filterHighestAV(body string) string {
 				if bw > maxABW {
 					maxABW = bw
 					bestAudioLine = line
+					lastAudioLang = lang
 				} else if bw == maxABW {
 					// 相同码率 → 英文优先
-					if strings.HasPrefix(lang, "en") {
+					if strings.HasPrefix(lang, "en") && !strings.HasPrefix(lastAudioLang, "en") {
 						bestAudioLine = line
+						lastAudioLang = lang
 					}
 				}
 			}
@@ -931,9 +962,21 @@ func filterHighestAV(body string) string {
 	if bestCCGroup != "" && bestCCGroup != "NONE" {
 		for _, line := range lines {
 			if strings.HasPrefix(line, "#EXT-X-MEDIA:") &&
-				(strings.Contains(line, "TYPE=CLOSED-CAPTIONS") || strings.Contains(line, "TYPE=SUBTITLES")) &&
+				strings.Contains(line, "TYPE=CLOSED-CAPTIONS") &&
 				strings.Contains(line, fmt.Sprintf("GROUP-ID=\"%s\"", bestCCGroup)) {
 				ccLines = append(ccLines, line)
+			}
+		}
+	}
+
+	var subtitleLines []string
+	// 找对应的字幕
+	if bestSubtitleGroup != "" && bestSubtitleGroup != "NONE" {
+		for _, line := range lines {
+			if strings.HasPrefix(line, "#EXT-X-MEDIA:") &&
+				strings.Contains(line, "TYPE=SUBTITLES") &&
+				strings.Contains(line, fmt.Sprintf("GROUP-ID=\"%s\"", bestSubtitleGroup)) {
+				subtitleLines = append(subtitleLines, line)
 			}
 		}
 	}
@@ -948,6 +991,9 @@ func filterHighestAV(body string) string {
 		sb.WriteString(bestAudioLine + "\n")
 	}
 	for _, l := range ccLines {
+		sb.WriteString(l + "\n")
+	}
+	for _, l := range subtitleLines {
 		sb.WriteString(l + "\n")
 	}
 	if bestVideoINF != "" {
@@ -1056,6 +1102,13 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 					sinBox.Schi.Tenc = new(mp4.TencBox)
 
 					sinBox.Schm.SchemeType = "cbcs"
+					clearKey := clearKeysMap.Load(tvgID)
+					if clearKey != nil {
+						parts := strings.Split(clearKey.(string), ":")
+						if len(parts) == 2 {
+							sinBox.Schi.Tenc.DefaultKeyID = []byte(parts[0])
+						}
+					}
 					SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinBox)
 					sinBox.Schi.Tenc.DefaultConstantIV = iv
 				}
@@ -1537,18 +1590,21 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
 		}
 	} else if proxy_type == "init-m4s" {
-		modifiedBody, sinfBox, err := decrypt.ModifyInitM4sFromBody(body)
-		if err != nil {
-			ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
-			ctx.SetBodyString("移除 DRM 信息失败")
-			log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
-			return
+		_, ok := clearKeysMap.Load(tvgID)
+		if ok {
+			modifiedBody, sinfBox, err := decrypt.ModifyInitM4sFromBody(body)
+			if err != nil {
+				ctx.SetStatusCode(fasthttp.StatusServiceUnavailable)
+				ctx.SetBodyString("移除 DRM 信息失败")
+				log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
+				return
+			}
+			SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinfBox)
+			if cache != nil {
+				cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
+			}
+			body = modifiedBody
 		}
-		SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinfBox)
-		if cache != nil {
-			cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})
-		}
-		body = modifiedBody
 	} else if proxy_type == "m4s" {
 		var sinfBox *mp4.SinfBox = nil
 		if t, ok := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); ok {
