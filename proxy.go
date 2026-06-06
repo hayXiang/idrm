@@ -1079,6 +1079,7 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 	var newLines []string
 	var lastLineWasExtInf bool
 	var lastLineWasExtStremInf bool
+	var isFmp4 = strings.Contains(strBody, "#EXT-X-MAP:URI=")
 
 	hash := md5.Sum([]byte(url))
 	stream_uuid := hex.EncodeToString(hash[:])
@@ -1100,7 +1101,7 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 		}
 
 		// 跳过 KEY（你这里是直接忽略的）
-		if strings.HasPrefix(line, "#EXT-X-KEY:METHOD=") {
+		if !isFmp4 && strings.HasPrefix(line, "#EXT-X-KEY:METHOD=") {
 			if _, exists := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); !exists {
 				if iv, err := parseIV(line); err == nil && len(iv) > 0 {
 					sinBox := new(mp4.SinfBox)
@@ -1116,6 +1117,7 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 							sinBox.Schi.Tenc.DefaultKID = []byte(parts[0])
 						}
 					}
+					log.Printf("Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", url, stream_uuid, tvgID, sinBox.Schi.Tenc.DefaultKID)
 					SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinBox)
 					sinBox.Schi.Tenc.DefaultConstantIV = iv
 				}
@@ -1623,6 +1625,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 				log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
 				return
 			}
+			log.Printf("init-m4s,Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", proxy_url, stream_uuid, tvgID, sinfBox.Schi.Tenc.DefaultKID)
 			SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinfBox)
 			if cache != nil {
 				cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})

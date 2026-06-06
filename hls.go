@@ -513,6 +513,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				if err != nil {
 					return
 				}
+				log.Printf("preloadSegments,Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", initURL, initStreamUUID, tvgID, sinfBox.Schi.Tenc.DefaultKID)
 				SINF_BOX_BY_STREAM_ID.Store(initStreamUUID, sinfBox)
 				if cache != nil {
 					cache.Set(initURL, body, MyMetadata{contentType, tvgID, 0})
