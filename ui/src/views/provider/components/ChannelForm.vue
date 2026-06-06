@@ -78,6 +78,7 @@
         <el-form-item label="配置方式">
           <el-radio-group v-model="drmInputMode" :disabled="isViewMode">
             <el-radio value="direct">直接配置 (多组 kid:key)</el-radio>
+            <el-radio value="json">JSON 配置</el-radio>
             <el-radio value="url">URL 获取</el-radio>
           </el-radio-group>
         </el-form-item>
@@ -109,6 +110,23 @@
                     删除
                   </el-button>
                 </div>
+              </div>
+            </div>
+          </el-form-item>
+        </template>
+        
+        <!-- JSON 配置模式 -->
+        <template v-else-if="drmInputMode === 'json'">
+          <el-form-item label="JSON 配置">
+            <div class="drm-keys-container">
+              <div class="drm-key-input-area">
+                <el-input
+                  v-model="drmJsonInput"
+                  type="textarea"
+                  :rows="6"
+                  placeholder='请输入JSON格式的DRM配置，例如：&#10;{"keys":[{"kty":"oct","k":"0SzOuvu6KlNdiKMIf4hCUg","kid":"jiaciqMq1364MGgxI0PWEA"}],"type":"temporary"}'
+                  :disabled="isViewMode"
+                />
               </div>
             </div>
           </el-form-item>
@@ -193,8 +211,9 @@ const defaultForm = {
 }
 
 const form = ref({ ...defaultForm })
-const drmInputMode = ref('direct') // 'direct' 或 'url'
+const drmInputMode = ref('direct') // 'direct', 'json' 或 'url'
 const drmKeyInput = ref('') // 存储用户输入的DRM配置文本
+const drmJsonInput = ref('') // 存储用户输入的JSON格式DRM配置
 
 // 计算解析后的DRM键值对
 const parsedDrmKeys = computed(() => {
@@ -225,33 +244,47 @@ watch(() => props.visible, (val) => {
     if (props.data) {
       // 从后端的 value 字段解析配置
       let keys = []
+      let jsonValue = ''
       let url = ''
       let mode = 'direct'
       
       if (props.data.drm?.value) {
         const value = props.data.drm.value
-        // 判断是 URL 还是 kid:key 格式
-        if (value.startsWith('http://') || value.startsWith('https://')) {
-          // URL 模式
-          url = value
-          mode = 'url'
-        } else {
-          // 直接配置模式 - 支持多组
-          // 检查是否包含逗号分隔的多组kid:key
-          if (value.includes(',')) {
-            const pairs = value.split(',')
-            keys = pairs.map(pair => {
-              const [kid, key] = pair.trim().split(':')
-              return { kid: kid || '', key: key || '' }
-            }).filter(item => item.kid && item.key) // 过滤掉无效的条目
+        
+        // 尝试解析是否为JSON格式
+        try {
+          const parsedJson = JSON.parse(value)
+          if (parsedJson.keys && Array.isArray(parsedJson.keys)) {
+            // 这是一个JSON格式的DRM配置
+            jsonValue = value
+            mode = 'json'
           } else {
-            // 单组格式
-            const [kid, key] = value.split(':')
-            if (kid && key) {
-              keys = [{ kid: kid.trim(), key: key.trim() }]
-            }
+            throw new Error('Not a JSON DRM config')
           }
-          mode = 'direct'
+        } catch (e) {
+          // 不是JSON格式，继续判断其他格式
+          if (value.startsWith('http://') || value.startsWith('https://')) {
+            // URL 模式
+            url = value
+            mode = 'url'
+          } else {
+            // 直接配置模式 - 支持多组
+            // 检查是否包含逗号分隔的多组kid:key
+            if (value.includes(',')) {
+              const pairs = value.split(',')
+              keys = pairs.map(pair => {
+                const [kid, key] = pair.trim().split(':')
+                return { kid: kid || '', key: key || '' }
+              }).filter(item => item.kid && item.key) // 过滤掉无效的条目
+            } else {
+              // 单组格式
+              const [kid, key] = value.split(':')
+              if (kid && key) {
+                keys = [{ kid: kid.trim(), key: key.trim() }]
+              }
+            }
+            mode = 'direct'
+          }
         }
       }
       
@@ -263,14 +296,20 @@ watch(() => props.visible, (val) => {
         providerId: props.providerId || props.data.providerId,
         drmEnabled: !!props.data.drm,
         drmKeys: keys,
+        drmJsonValue: jsonValue,
         drmUrl: url
       }
       
       // 设置输入框的值
       if (mode === 'direct' && keys.length > 0) {
         drmKeyInput.value = keys.map(key => `${key.kid}:${key.key}`).join(',\n')
+        drmJsonInput.value = ''
+      } else if (mode === 'json') {
+        drmJsonInput.value = jsonValue
+        drmKeyInput.value = ''
       } else {
         drmKeyInput.value = ''
+        drmJsonInput.value = ''
       }
     } else {
       form.value = { 
@@ -279,6 +318,7 @@ watch(() => props.visible, (val) => {
       }
       drmInputMode.value = 'direct'
       drmKeyInput.value = '' // 新增时清空输入框
+      drmJsonInput.value = ''
     }
   }
 })
@@ -348,6 +388,23 @@ const handleSubmit = async () => {
         }
         
         drmValue = validKeys.map(item => `${item.kid.trim()}:${item.key.trim()}`).join(',')
+      } else if (drmInputMode.value === 'json') {
+        // JSON 配置模式：直接使用JSON字符串
+        if (!drmJsonInput.value.trim()) {
+          ElMessage.error('请输入JSON格式的DRM配置')
+          submitting.value = false
+          return
+        }
+        
+        // 验证JSON格式
+        try {
+          JSON.parse(drmJsonInput.value.trim())
+          drmValue = drmJsonInput.value.trim()
+        } catch (e) {
+          ElMessage.error('JSON格式错误，请检查输入的JSON是否正确')
+          submitting.value = false
+          return
+        }
       } else {
         // URL 获取模式：直接使用 URL
         if (!form.value.drmUrl) {
