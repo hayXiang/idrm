@@ -171,6 +171,7 @@ func main() {
 	flag.StringVar(&cacheDir, "cache-dir", "./", "cache 文件的保存路径，默认当前路径")
 	flag.BoolVar(&enablePprof, "pprof-enable", false, "Enable pprof HTTP server")
 	flag.StringVar(&pprofAddr, "pprof-addr", "localhost:7070", "pprof listen address")
+	flag.StringVar(&PUBLISH_ADDRESS, "publish", "", "发布地址，例如 https://my-proxy.com，设置后生成的 M3U 中将使用该地址作为前缀")
 
 	flag.Parse()
 
@@ -587,29 +588,6 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string, userToken string) {
 		serverName = strings.Split(GetForwardHeader(ctx, "X-Forwarded-Host", ""), ":")[0]
 		if serverName == "" {
 			serverName = GetForwardHeader(ctx, "X-Forwarded-Server-Name", _host)
-		}
-	} else {
-		// 后台加载时使用 PUBLISH_ADDRESS 或 BIND_ADDRESS
-		if PUBLISH_ADDRESS != "" {
-			// 解析 PUBLISH_ADDRESS
-			if u, err := url.Parse(PUBLISH_ADDRESS); err == nil {
-				schema = u.Scheme
-				serverName = u.Hostname()
-				port = u.Port()
-				if port == "" {
-					if schema == "https" {
-						port = "443"
-					} else {
-						port = "80"
-					}
-				}
-			}
-		} else if BIND_ADDRESS != "" {
-			// 解析 BIND_ADDRESS
-			if h, p, err := net.SplitHostPort(BIND_ADDRESS); err == nil {
-				serverName = h
-				port = p
-			}
 		}
 	}
 

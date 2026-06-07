@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 	"time"
-
+	"bytes"
 	"github.com/valyala/fasthttp"
 )
 
@@ -123,14 +123,20 @@ func httpGetOnce(client *http.Client, startURL string, headers []string) (status
 	return resp.StatusCode, _body, resp.ContentLength, nil, contentType, currentURL
 }
 
-func GetForwardHeader(ctx *fasthttp.RequestCtx, header, fallback string) string {
+func GetForwardHeader(ctx *fasthttp.RequestCtx, header, defautValue string) string {
 	if ctx == nil {
 		return ""
 	}
-	if val := ctx.Request.Header.Peek(header); val != nil {
+	
+	val := ctx.Request.Header.Peek(header)
+	// 使用 bytes.TrimSpace 去除可能存在的首尾空格
+	val = bytes.TrimSpace(val)
+	
+	if len(val) > 0 {
 		return string(val)
 	}
-	return fallback
+	
+	return defautValue
 }
 
 func getAliasFromPath(path string) string {
