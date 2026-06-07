@@ -569,7 +569,7 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				if ok {
 					sinfBox = v.(*mp4.SinfBox)
 				}
-				body, err = fetchAndDecrypt(client, config, tvgID, body, nil, sinfBox, proxy_type)
+				body, err = fetchAndDecrypt(client, config, tvgID, body, nil, sinfBox, proxy_type, url)
 				if err != nil {
 					log.Printf("解密错误：%s, %s，%s, 耗时：%s", "preloader", tvgID, url, utils.FormatDuration(time.Since(start)))
 					return

@@ -13,10 +13,10 @@ import (
 )
 
 
-func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, sinfBox *mp4.SinfBox, proxy_type string) ([]byte, error) {
+func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, body []byte, ctx *fasthttp.RequestCtx, sinfBox *mp4.SinfBox, proxy_type string, url string) ([]byte, error) {
 
 	if (sinfBox == nil || sinfBox.Schi == nil || sinfBox.Schi.Tenc == nil) {
-		log.Printf("[无需解密] tvgID=%s: sinfBox 中缺少 Schi/Tenc 信息", tvgID)
+		log.Printf("[无需解密] tvgID=%s, url=%s, sinfBox 中缺少 Schi/Tenc 信息", tvgID, url)
 		return body, nil
 	}
 

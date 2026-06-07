@@ -1302,8 +1302,9 @@ func modifyMpd(provider string, tvgId string, url string, body []byte, userToken
 	segTemplates := doc.FindElements("//SegmentTemplate")
 	stream_index := 0
 	hash := md5.Sum([]byte(url))
-	stream_uuid := hex.EncodeToString(hash[:]) + "_" + strconv.Itoa(stream_index)
+	stream_uuid_base := hex.EncodeToString(hash[:]) 
 	for _, st := range segTemplates {
+		stream_uuid := stream_uuid_base + "_" + strconv.Itoa(stream_index)
 		media := st.SelectAttrValue("media", "")
 		if media != "" {
 			media = joinBaseAndMedia(collectBaseURLs(st), media)
@@ -1652,7 +1653,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		configsMu.RLock()
 		config := CONFIGS_BY_PROVIDER[provider.(string)]
 		configsMu.RUnlock()
-		body, err = fetchAndDecrypt(client, config, tvgID, body, ctx, sinfBox, proxy_type)
+		body, err = fetchAndDecrypt(client, config, tvgID, body, ctx, sinfBox, proxy_type, proxy_url)
 		if err != nil {
 			log.Printf("解密m4s错误: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, utils.FormatDuration(time.Since(start)), utils.FormatSize(int64(len(body))))
 			return
@@ -1668,7 +1669,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 		configsMu.RLock()
 		config := CONFIGS_BY_PROVIDER[provider.(string)]
 		configsMu.RUnlock()
-		body, err = fetchAndDecrypt(client, config, tvgID, body, ctx, sinfBox, proxy_type)
+		body, err = fetchAndDecrypt(client, config, tvgID, body, ctx, sinfBox, proxy_type, proxy_url)
 		if err != nil {
 			log.Printf("解密ts错误: %s, %s, %s, 耗时：%s, 大小=%s,", getClientIP(ctx), tvgID, proxy_url, utils.FormatDuration(time.Since(start)), utils.FormatSize(int64(len(body))))
 			return
