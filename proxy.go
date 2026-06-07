@@ -1301,6 +1301,8 @@ func modifyMpd(provider string, tvgId string, url string, body []byte, userToken
 	// 查找所有 SegmentTemplate 节点
 	segTemplates := doc.FindElements("//SegmentTemplate")
 	stream_index := 0
+	hash := md5.Sum([]byte(url))
+	stream_uuid := hex.EncodeToString(hash[:]) + "_" + strconv.Itoa(stream_index)
 	for _, st := range segTemplates {
 		media := st.SelectAttrValue("media", "")
 		if media != "" {
@@ -1310,14 +1312,14 @@ func modifyMpd(provider string, tvgId string, url string, body []byte, userToken
 				media_type = "jpg"
 			}
 			st.RemoveAttr("media")
-			st.CreateAttr("media", convert_to_proxy_url(media_type, tvgId, media, url, strconv.Itoa(stream_index), userToken))
+			st.CreateAttr("media", convert_to_proxy_url(media_type, tvgId, media, url, stream_uuid, userToken))
 		}
 
 		init := st.SelectAttrValue("initialization", "")
 		if init != "" {
 			init = joinBaseAndMedia(collectBaseURLs(st), init)
 			st.RemoveAttr("initialization")
-			st.CreateAttr("initialization", convert_to_proxy_url("init-m4s", tvgId, init, url, strconv.Itoa(stream_index), userToken))
+			st.CreateAttr("initialization", convert_to_proxy_url("init-m4s", tvgId, init, url, stream_uuid, userToken))
 		}
 		stream_index++
 	}
@@ -1632,7 +1634,7 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 				return
 			}
 			var kid []byte
-			if sinfBox != nil && sinfBox.Schi != nil && sinfBox.Schi.Tenc != nil {
+			if sinfBox != nil{
 				kid = sinfBox.Schi.Tenc.DefaultKID
 			}
 			log.Printf("init-m4s,Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", proxy_url, stream_uuid, tvgID, hex.EncodeToString(kid))
