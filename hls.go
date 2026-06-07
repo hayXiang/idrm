@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-
+	"encoding/hex"
 	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/beevik/etree"
 	"github.com/patrickmn/go-cache"
@@ -513,7 +513,11 @@ func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4
 				if err != nil {
 					return
 				}
-				log.Printf("preloadSegments,Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", initURL, initStreamUUID, tvgID, sinfBox.Schi.Tenc.DefaultKID)
+				var kid []byte = nil
+				if sinfBox != nil && sinfBox.Schi != nil && sinfBox.Schi.Tenc != nil {
+					kid = sinfBox.Schi.Tenc.DefaultKID
+				}
+				log.Printf("preloadSegments,Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", initURL, initStreamUUID, tvgID, hex.EncodeToString(kid))
 				SINF_BOX_BY_STREAM_ID.Store(initStreamUUID, sinfBox)
 				if cache != nil {
 					cache.Set(initURL, body, MyMetadata{contentType, tvgID, 0})

@@ -1103,9 +1103,9 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 			continue
 		}
 
-		// 跳过 KEY（你这里是直接忽略的）
-		if !isFmp4 && strings.HasPrefix(line, "#EXT-X-KEY:METHOD=") {
-			if _, exists := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); !exists {
+		if strings.HasPrefix(line, "#EXT-X-KEY:METHOD=") {
+			//只有TS over HLS的cbc，才需要
+			if _, exists := SINF_BOX_BY_STREAM_ID.Load(stream_uuid); !isFmp4 && !exists {
 				if iv, err := parseIV(line); err == nil && len(iv) > 0 {
 					sinBox := new(mp4.SinfBox)
 					sinBox.Schm = new(mp4.SchmBox)
@@ -1120,13 +1120,16 @@ func modifyHLS(body []byte, tvgID, url string, bestQuality bool, userToken strin
 							sinBox.Schi.Tenc.DefaultKID = []byte(parts[0])
 						}
 					}
-					log.Printf("Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", url, stream_uuid, tvgID, sinBox.Schi.Tenc.DefaultKID)
+					log.Printf("Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", url, stream_uuid, tvgID, hex.EncodeToString(sinBox.Schi.Tenc.DefaultKID))
 					SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinBox)
 					sinBox.Schi.Tenc.DefaultConstantIV = iv
 				}
 			}
+			//过滤掉EXT-X-KEY行，交给播放器处理
 			continue
 		}
+
+		
 
 		// 替换 init-m4s (EXT-X-MAP)
 		if strings.HasPrefix(line, "#EXT-X-MAP:") {
@@ -1628,7 +1631,11 @@ func proxyStreamURL(ctx *fasthttp.RequestCtx, path string) {
 				log.Printf("[ERROR] 移除 DRM 信息失败， %s，%s, %s", tvgID, proxy_url, err)
 				return
 			}
-			log.Printf("init-m4s,Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", proxy_url, stream_uuid, tvgID, sinfBox.Schi.Tenc.DefaultKID)
+			var kid []byte
+			if sinfBox != nil && sinfBox.Schi != nil && sinfBox.Schi.Tenc != nil {
+				kid = sinfBox.Schi.Tenc.DefaultKID
+			}
+			log.Printf("init-m4s,Store sinbox for url=%s, stream_uuid=%s, tvgID=%s, DefaultKID=%s", proxy_url, stream_uuid, tvgID, hex.EncodeToString(kid))
 			SINF_BOX_BY_STREAM_ID.Store(stream_uuid, sinfBox)
 			if cache != nil {
 				cache.Set(proxy_url, body, MyMetadata{contentType, tvgID, 0})

@@ -74,7 +74,7 @@ func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, bo
 
 	defaultKid := (*(*(*(sinfBox)).Schi).Tenc).DefaultKID
 	kidKey := []string{}
-	if strings.Contains(val.(string), ",") && sinfBox != nil {
+	if sinfBox != nil {
 		for _,eachKidKeyString := range strings.Split(val.(string), ",") {
 			eachKidKey := strings.Split(eachKidKeyString, ":")
 			
