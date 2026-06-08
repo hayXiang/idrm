@@ -175,7 +175,35 @@ const form = ref({ ...defaultForm })
 watch(() => props.visible, (val) => {
   if (val) {
     if (props.data) {
-      form.value = { ...defaultForm, ...props.data }
+      // 处理从后端接收到的字符串数组格式的请求头，转换为前端使用的对象数组格式
+      const processedData = { ...props.data }
+      if (Array.isArray(processedData.headers)) {
+        processedData.headers = processedData.headers.map(headerStr => {
+          const separatorIndex = headerStr.indexOf(':')
+          if (separatorIndex > 0) {
+            return {
+              key: headerStr.substring(0, separatorIndex).trim(),
+              value: headerStr.substring(separatorIndex + 1).trim()
+            }
+          } else {
+            return { key: headerStr.trim(), value: '' }
+          }
+        })
+      }
+      if (Array.isArray(processedData.streamHeaders)) {
+        processedData.streamHeaders = processedData.streamHeaders.map(headerStr => {
+          const separatorIndex = headerStr.indexOf(':')
+          if (separatorIndex > 0) {
+            return {
+              key: headerStr.substring(0, separatorIndex).trim(),
+              value: headerStr.substring(separatorIndex + 1).trim()
+            }
+          } else {
+            return { key: headerStr.trim(), value: '' }
+          }
+        })
+      }
+      form.value = { ...defaultForm, ...processedData }
     } else {
       form.value = { ...defaultForm }
     }
@@ -209,6 +237,13 @@ const visible = computed({
   set: (val) => emit('update:visible', val)
 })
 
+// 转换请求头格式：将对象数组转换为字符串数组
+const convertHeadersToStringArray = (headers) => {
+  return headers
+    .filter(header => header.key && header.key.trim() !== '')
+    .map(header => `${header.key.trim()}: ${header.value ? header.value.trim() : ''}`)
+}
+
 const handleSubmit = async () => {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
@@ -220,6 +255,10 @@ const handleSubmit = async () => {
     if (submitData.type === 'custom') {
       delete submitData.url
     }
+    
+    // 转换请求头格式：将对象数组转换为字符串数组
+    submitData.headers = convertHeadersToStringArray(form.value.headers)
+    submitData.streamHeaders = convertHeadersToStringArray(form.value.streamHeaders)
     
     if (isEdit.value) {
       await providerStore.editProvider(props.data.id, submitData)

@@ -534,8 +534,25 @@ func registerProviderRuntime(provider *Provider) {
 			}
 		}
 	}
-	config.UserAgent = &ua
+
+	// 处理 User-Agent
+	stream_ua := "okhttp/4.12.0"
+	for _, h := range provider.StreamHeaders {
+		parts := strings.SplitN(h, ":", 2)
+		if len(parts) == 2 {
+			key := strings.TrimSpace(strings.ToLower(parts[0]))
+			value := strings.TrimSpace(parts[1])
+			if key == "user-agent" {
+				stream_ua = value
+				break
+			}
+		}
+	}
+
+	
+	config.UserAgent = &stream_ua
 	config.M3uUserAgent = &ua
+	config.Headers = provider.StreamHeaders
 
 	// 注册到全局变量
 	configsMu.Lock()
