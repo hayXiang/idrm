@@ -288,6 +288,36 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 		subtitleExists := periodHasSubtitle(period)
 		adaps := period.FindElements("AdaptationSet")
 
+		// 1. 创建一个 map 用来记录已经存在、防止重复的 codec
+		existingCodecs := make(map[string]bool)
+		var audioCodecs string
+
+		for _, adap := range adaps {
+			mimeType := adap.SelectAttrValue("mimeType", "")
+			if strings.HasPrefix(mimeType, "audio") {
+				codecs := adap.SelectAttrValue("codecs", "")
+				if codecs == "" {
+					reps := adap.FindElements("Representation")
+					for _, rep := range reps {
+						codecs = rep.SelectAttrValue("codecs", "")
+						break
+					}
+				}
+				if codecs != "" {
+				// 2. 检查 map 中是否已经包含当前 codecs
+					if !existingCodecs[codecs] {
+						existingCodecs[codecs] = true // 标记为已存在
+						
+						if audioCodecs != "" {
+							audioCodecs += ","
+						}
+						audioCodecs += codecs
+					}
+				}
+			}
+						
+		}
+
 		for _, adap := range adaps {
 			maxDuration := GetMaxSegmentDurationInt(adap)
 			contentType := adap.SelectAttrValue("contentType", "")
@@ -307,162 +337,165 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 			}
 			groupID := contentType
 
-			rep := adap.FindElement("Representation")
-			if rep == nil {
+			reps := adap.FindElements("Representation")
+			if len(reps) == 0 {
 				continue
 			}
-			repID := rep.SelectAttrValue("id", "")
-			bandwidth := rep.SelectAttrValue("bandwidth", "")
-			codecs := rep.SelectAttrValue("codecs", "")
-			resolution := ""
-			if contentType == "video" {
-				width := rep.SelectAttrValue("width", "")
-				height := rep.SelectAttrValue("height", "")
-				resolution = fmt.Sprintf("%sx%s", width, height)
-			}
 
-			playlistName := fmt.Sprintf("%s_%s.m3u8", contentType, repID)
-
-			switch contentType {
-			case "text", "subtitle":
-				lang := adap.SelectAttrValue("lang", "und")
-				masterBuilder.WriteString(fmt.Sprintf(
-					`#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=NO,FORCED=NO,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
-					lang, lang, tvgId, userToken, playlistName))
-			case "audio":
-				lang := adap.SelectAttrValue("lang", "und")
-				masterBuilder.WriteString(fmt.Sprintf(
-					`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
-					groupID, lang, lang, tvgId, userToken, playlistName))
-			default:
-				line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio"`,
-					bandwidth, resolution, codecs)
-				if subtitleExists {
-					line += `,SUBTITLES="subs"`
+			for _, rep := range reps {
+				repID := rep.SelectAttrValue("id", "")
+				bandwidth := rep.SelectAttrValue("bandwidth", "")
+				codecs := rep.SelectAttrValue("codecs", "")
+				resolution := ""
+				if contentType == "video" {
+					width := rep.SelectAttrValue("width", "")
+					height := rep.SelectAttrValue("height", "")
+					resolution = fmt.Sprintf("%sx%s", width, height)
 				}
-				masterBuilder.WriteString(line + "\n")
-				masterBuilder.WriteString(fmt.Sprintf("/drm/proxy/hls/%s/%s/%s\n", tvgId, userToken, playlistName))
-			}
 
-			// 生成 media playlist
-			var mediaBuilder strings.Builder
-			mediaBuilder.WriteString(fmt.Sprintf("#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:%d\n", maxDuration))
+				playlistName := strings.ReplaceAll(fmt.Sprintf("%s_%s.m3u8", contentType, repID), "=", "_")
 
-			segTemp := adap.FindElement("SegmentTemplate")
-			if segTemp == nil {
-				continue
-			}
-			startNumber, _ := strconv.Atoi(segTemp.SelectAttrValue("startNumber", "-1"))
-			timescale, _ := strconv.Atoi(segTemp.SelectAttrValue("timescale", "1"))
-			mediaTemplate := strings.ReplaceAll(segTemp.SelectAttrValue("media", ""), "$RepresentationID$", repID)
-
-			var segmentBuilder strings.Builder
-			timeline := segTemp.FindElement("SegmentTimeline")
-			seq := startNumber
-			if timeline != nil {
-				if seq == -1 {
-					newSegTimes := parseTimeline(timeline)
-					seq = hlsManager.UpdateTimelineSegments(tvgId+"_"+playlistName, newSegTimes)
-					startNumber = seq
+				switch contentType {
+				case "text", "subtitle":
+					lang := adap.SelectAttrValue("lang", "und")
+					masterBuilder.WriteString(fmt.Sprintf(
+						`#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=NO,FORCED=NO,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
+						lang, lang, tvgId, userToken, playlistName))
+				case "audio":
+					lang := adap.SelectAttrValue("lang", "und")
+					masterBuilder.WriteString(fmt.Sprintf(
+						`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
+						groupID, lang, lang, tvgId, userToken, playlistName))
+				default:
+					line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s,%s",AUDIO="audio"`,
+						bandwidth, resolution, codecs, audioCodecs)
+					if subtitleExists {
+						line += `,SUBTITLES="subs"`
+					}
+					masterBuilder.WriteString(line + "\n")
+					masterBuilder.WriteString(fmt.Sprintf("/drm/proxy/hls/%s/%s/%s\n", tvgId, userToken, playlistName))
 				}
-				lastT := 0
-				for _, s := range timeline.FindElements("S") {
-					d, _ := strconv.Atoi(s.SelectAttrValue("d", "0"))
-					r, _ := strconv.Atoi(s.SelectAttrValue("r", "0"))
-					tStr := s.SelectAttrValue("t", "")
-					t := 0
-					if tStr != "" {
-						t, _ = strconv.Atoi(tStr)
+
+				// 生成 media playlist
+				var mediaBuilder strings.Builder
+				mediaBuilder.WriteString(fmt.Sprintf("#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:%d\n", maxDuration))
+
+				segTemp := adap.FindElement("SegmentTemplate")
+				if segTemp == nil {
+					continue
+				}
+				startNumber, _ := strconv.Atoi(segTemp.SelectAttrValue("startNumber", "-1"))
+				timescale, _ := strconv.Atoi(segTemp.SelectAttrValue("timescale", "1"))
+				mediaTemplate := strings.ReplaceAll(segTemp.SelectAttrValue("media", ""), "$RepresentationID$", repID)
+
+				var segmentBuilder strings.Builder
+				timeline := segTemp.FindElement("SegmentTimeline")
+				seq := startNumber
+				if timeline != nil {
+					if seq == -1 {
+						newSegTimes := parseTimeline(timeline)
+						seq = hlsManager.UpdateTimelineSegments(tvgId+"_"+playlistName, newSegTimes)
+						startNumber = seq
+					}
+					lastT := 0
+					for _, s := range timeline.FindElements("S") {
+						d, _ := strconv.Atoi(s.SelectAttrValue("d", "0"))
+						r, _ := strconv.Atoi(s.SelectAttrValue("r", "0"))
+						tStr := s.SelectAttrValue("t", "")
+						t := 0
+						if tStr != "" {
+							t, _ = strconv.Atoi(tStr)
+						} else {
+							t = lastT
+						}
+						duration := float64(d) / float64(timescale)
+						for i := 0; i <= r; i++ {
+							segURI := strings.ReplaceAll(mediaTemplate, "$Time$", strconv.Itoa(t))
+							segURI = strings.ReplaceAll(segURI, "$Number$", strconv.Itoa(seq))
+							segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", duration, segURI))
+							t += d
+							seq++
+						}
+						lastT = t
+					}
+				} else if (!is_static && segTemp.SelectAttrValue("presentationTimeOffset", "") != ""){
+					// presentationTimeOffset 存在但 SegmentTimeline 缺失 -> fallback
+					presentationTimeOffset, _ := strconv.Atoi(segTemp.SelectAttrValue("presentationTimeOffset", "0"))
+					duration, _ := strconv.Atoi(segTemp.SelectAttrValue("duration", "0"))
+
+					// 转换单位：从 timescale 单位转成秒
+					offsetSec := float64(presentationTimeOffset) / float64(timescale)
+					durSec := float64(duration) / float64(timescale)
+
+					// 解析 availabilityStartTime
+					availabilityStartTimeUtc, _ := time.Parse(time.RFC3339, availabilityStartTime)
+
+					// 已过去的秒数（用 float64）
+					elapsedSec := float64(time.Now().UTC().Unix()) - float64(availabilityStartTimeUtc.Unix())
+
+					// 视频实际经历的时间 = 已过去时间 - 偏移量
+					mediaTime := elapsedSec - offsetSec
+
+					var seq int
+					if mediaTime < 0 {
+						seq = startNumber
 					} else {
-						t = lastT
+						seq = startNumber + int(math.Floor(mediaTime/durSec))
 					}
-					duration := float64(d) / float64(timescale)
-					for i := 0; i <= r; i++ {
-						segURI := strings.ReplaceAll(mediaTemplate, "$Time$", strconv.Itoa(t))
-						segURI = strings.ReplaceAll(segURI, "$Number$", strconv.Itoa(seq))
-						segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", duration, segURI))
-						t += d
+					for i := 0; i < 3; i++ { // 生成前3个分片，后续分片通过 SegmentTimeline 推导
+						segURI := strings.ReplaceAll(mediaTemplate, "$Number$", strconv.Itoa(seq - 2 + i))
+						segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", durSec, segURI))					
+					}
+					startNumber = seq
+				}else{
+					periodDurationStr := mpd.SelectAttrValue("mediaPresentationDuration", "")
+					periodDuration := 0.0
+					if periodDurationStr != "" {
+						periodDuration, _ = parseDuration(periodDurationStr) // ISO 8601 转秒
+					}
+					peridoDurationTotal := periodDuration * float64(timescale)
+					// SegmentTimeline 缺失 -> fallback
+					duration, _ := strconv.Atoi(segTemp.SelectAttrValue("duration", "0"))
+					durSec := float64(duration) / float64(timescale)
+					for peridoDurationTotal > 0 {
+						segURI := strings.ReplaceAll(mediaTemplate, "$Number$", strconv.Itoa(seq))
+						segDur := durSec
+						if peridoDurationTotal < float64(duration) {
+							segDur = peridoDurationTotal / float64(timescale)
+						}
+						segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", segDur, segURI))
 						seq++
+						peridoDurationTotal -= float64(duration)
+					}				
+				}
+
+				// --------------------
+				// 直播，保留最多 10 个分片
+				// --------------------
+				firstSeq := startNumber
+				if !is_static {
+					segments := strings.Split(strings.TrimSpace(segmentBuilder.String()), "\n")
+					segCount := len(segments) / 2 // 总分片数
+					keep := segCount
+					if keep > 10 {
+						keep = 10
+						segments = segments[len(segments)-(keep*2):]
 					}
-					lastT = t
+					firstSeq = startNumber + (segCount - keep)
+					segmentBuilder.Reset()
+					segmentBuilder.WriteString(strings.Join(segments, "\n"))
 				}
-			} else if (!is_static && segTemp.SelectAttrValue("presentationTimeOffset", "") != ""){
-				// presentationTimeOffset 存在但 SegmentTimeline 缺失 -> fallback
-				presentationTimeOffset, _ := strconv.Atoi(segTemp.SelectAttrValue("presentationTimeOffset", "0"))
-				duration, _ := strconv.Atoi(segTemp.SelectAttrValue("duration", "0"))
 
-				// 转换单位：从 timescale 单位转成秒
-				offsetSec := float64(presentationTimeOffset) / float64(timescale)
-				durSec := float64(duration) / float64(timescale)
-
-				// 解析 availabilityStartTime
-				availabilityStartTimeUtc, _ := time.Parse(time.RFC3339, availabilityStartTime)
-
-				// 已过去的秒数（用 float64）
-				elapsedSec := float64(time.Now().UTC().Unix()) - float64(availabilityStartTimeUtc.Unix())
-
-				// 视频实际经历的时间 = 已过去时间 - 偏移量
-				mediaTime := elapsedSec - offsetSec
-
-				var seq int
-				if mediaTime < 0 {
-					seq = startNumber
-				} else {
-					seq = startNumber + int(math.Floor(mediaTime/durSec))
+				if is_static {
+					segmentBuilder.WriteString("#EXT-X-ENDLIST")
 				}
-				for i := 0; i < 3; i++ { // 生成前3个分片，后续分片通过 SegmentTimeline 推导
-					segURI := strings.ReplaceAll(mediaTemplate, "$Number$", strconv.Itoa(seq - 2 + i))
-					segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", durSec, segURI))					
-				}
-				startNumber = seq
-			}else{
-				periodDurationStr := mpd.SelectAttrValue("mediaPresentationDuration", "")
-				periodDuration := 0.0
-				if periodDurationStr != "" {
-					periodDuration, _ = parseDuration(periodDurationStr) // ISO 8601 转秒
-				}
-				peridoDurationTotal := periodDuration * float64(timescale)
-				// SegmentTimeline 缺失 -> fallback
-				duration, _ := strconv.Atoi(segTemp.SelectAttrValue("duration", "0"))
-				durSec := float64(duration) / float64(timescale)
-				for peridoDurationTotal > 0 {
-					segURI := strings.ReplaceAll(mediaTemplate, "$Number$", strconv.Itoa(seq))
-					segDur := durSec
-					if peridoDurationTotal < float64(duration) {
-						segDur = peridoDurationTotal / float64(timescale)
-					}
-					segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", segDur, segURI))
-					seq++
-					peridoDurationTotal -= float64(duration)
-				}				
+
+				initURI := strings.ReplaceAll(segTemp.SelectAttrValue("initialization", ""), "$RepresentationID$", repID)
+				mediaBuilder.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", firstSeq))
+				mediaBuilder.WriteString(fmt.Sprintf(`#EXT-X-MAP:URI="%s"`+"\n", initURI))
+				mediaBuilder.WriteString(segmentBuilder.String())
+				hlsMap[playlistName] = mediaBuilder.String()
 			}
-
-			// --------------------
-			// 直播，保留最多 10 个分片
-			// --------------------
-			firstSeq := startNumber
-			if !is_static {
-				segments := strings.Split(strings.TrimSpace(segmentBuilder.String()), "\n")
-				segCount := len(segments) / 2 // 总分片数
-				keep := segCount
-				if keep > 10 {
-					keep = 10
-					segments = segments[len(segments)-(keep*2):]
-				}
-				firstSeq = startNumber + (segCount - keep)
-				segmentBuilder.Reset()
-				segmentBuilder.WriteString(strings.Join(segments, "\n"))
-			}
-
-			if is_static {
-				segmentBuilder.WriteString("#EXT-X-ENDLIST")
-			}
-
-			initURI := strings.ReplaceAll(segTemp.SelectAttrValue("initialization", ""), "$RepresentationID$", repID)
-			mediaBuilder.WriteString(fmt.Sprintf("#EXT-X-MEDIA-SEQUENCE:%d\n", firstSeq))
-			mediaBuilder.WriteString(fmt.Sprintf(`#EXT-X-MAP:URI="%s"`+"\n", initURI))
-			mediaBuilder.WriteString(segmentBuilder.String())
-			hlsMap[playlistName] = mediaBuilder.String()
 		}
 	}
 

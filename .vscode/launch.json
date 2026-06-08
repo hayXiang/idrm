@@ -11,7 +11,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            "args": ["-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev"]
+            "args": ["-l","8080"]
             //"args": ["v8_222-0-T-164918980225.m4s.1", "11.m4s", "b85491a27c2852323ac704a07cf7b779"]
             //"args": ["-i", "https://live.9528.eu.org/stan/mini/index.m3u?token=c36f10fd0ff59c3bcce088d7a7a6c410", "-to-hls=true"]
             //"args": ["-i", "https://live.9528.eu.org/subscribe/npl/mpd?token=rashhman","-name", "tvb","-publish", "https://glorious-space-memory-gwx5j95v66rfpvxv-1234.app.github.dev", "-A", "Mozilla/5.0 (SMART-TV; LINUX; Tizen 8.0) AppleWebKit/537.36 (KHTML, like Gecko) 108.0.5359.1/8.0 TV Safari/537.36"]
