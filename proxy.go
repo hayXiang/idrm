@@ -649,6 +649,10 @@ func loadM3u(ctx *fasthttp.RequestCtx, name string, userToken string) {
 			continue
 		}
 
+		if strings.HasPrefix(line, "#EXTVLC") {
+			continue
+		}
+
 		// 普通流 URL
 		u, err := base.Parse(line)
 		content_type := "m3u8"
