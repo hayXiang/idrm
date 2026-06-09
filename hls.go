@@ -440,13 +440,14 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 					if mediaTime < 0 {
 						seq = startNumber
 					} else {
-						seq = startNumber + int(math.Floor(mediaTime/durSec))
+						seq = startNumber + int(math.Floor(mediaTime/durSec))	
 					}
-					for i := 0; i < 3; i++ { // 生成前3个分片，后续分片通过 SegmentTimeline 推导
-						segURI := strings.ReplaceAll(mediaTemplate, "$Number$", strconv.Itoa(seq - 2 + i))
+					maxSegmentCount := min(10, seq) // 最多生成10个分片	
+					for i := 0; i < maxSegmentCount; i++ { // 生成前3个分片，后续分片通过 SegmentTimeline 推导
+						segURI := strings.ReplaceAll(mediaTemplate, "$Number$", strconv.Itoa(seq - (maxSegmentCount - 1) + i))
 						segmentBuilder.WriteString(fmt.Sprintf("#EXTINF:%.3f,\n%s\n", durSec, segURI))					
 					}
-					startNumber = seq
+					startNumber = seq - (maxSegmentCount - 1) // 更新 startNumber 为当前 seq 的起始位置
 				}else{
 					periodDurationStr := mpd.SelectAttrValue("mediaPresentationDuration", "")
 					periodDuration := 0.0
