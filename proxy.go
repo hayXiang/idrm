@@ -71,7 +71,7 @@ var (
 	VISIT_TRACKER              = NewVisitTracker()
 )
 
-var Version = "1.0.0.44"
+var Version = "1.0.0.45"
 
 // newHTTPClient 创建支持 SOCKS5 或 HTTP 代理的 net/http Client
 func newHTTPClient(proxyURL string, timeout int) *http.Client {
@@ -135,9 +135,18 @@ type JWKSet struct {
 }
 
 func base64DecodeWithPad(s string) ([]byte, error) {
-	padding := (4 - len(s)%4) % 4
-	s += strings.Repeat("=", padding)
-	return base64.StdEncoding.DecodeString(s)
+	// 检查是否包含Base64URL特有的字符(-或_)，如果是则使用URL安全的编码
+	if strings.ContainsAny(s, "-_") {
+		// 对于Base64URL编码，先添加必要的填充
+		padding := (4 - len(s)%4) % 4
+		paddedS := s + strings.Repeat("=", padding)
+		return base64.URLEncoding.DecodeString(paddedS)
+	} else {
+		// 对于标准Base64编码，添加必要的填充
+		padding := (4 - len(s)%4) % 4
+		paddedS := s + strings.Repeat("=", padding)
+		return base64.StdEncoding.DecodeString(paddedS)
+	}
 }
 
 func validateHeaderLine(line string) error {

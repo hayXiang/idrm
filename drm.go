@@ -64,12 +64,16 @@ func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, bo
 			log.Printf("[解密错误] tvgID=%s: 解析 JWK 失败: %v", tvgID, err)
 			return nil, err
 		}
+		
+		var keyList []string
 		for _, key := range jwk.Keys {
 			kid, _ := base64DecodeWithPad(key.Kid)
 			k, _ := base64DecodeWithPad(key.K)
-			val = hex.EncodeToString(kid) + ":" + hex.EncodeToString(k)
+			keyStr := hex.EncodeToString(kid) + ":" + hex.EncodeToString(k)
+			keyList = append(keyList, keyStr)
 		}
-		log.Printf("[解密进度] tvgID=%s: JWK 解析完成", tvgID)
+		val = strings.Join(keyList, ",")
+		log.Printf("[解密进度] tvgID=%s: JWK 解析完成，共 %d 个密钥", tvgID, len(keyList))
 	}
 
 	defaultKid := (*(*(*(sinfBox)).Schi).Tenc).DefaultKID
@@ -78,7 +82,7 @@ func fetchAndDecrypt(client *http.Client, config *StreamConfig, tvgID string, bo
 		for _,eachKidKeyString := range strings.Split(val.(string), ",") {
 			eachKidKey := strings.Split(eachKidKeyString, ":")
 			
-			if eachKidKey[0] ==  hex.EncodeToString(defaultKid){
+			if strings.EqualFold(eachKidKey[0], hex.EncodeToString(defaultKid)){
 				log.Printf("[解密进度] tvgID=%s: 找到匹配的 kid=%s", tvgID, eachKidKey[0])
 				kidKey = eachKidKey
 				break

@@ -341,11 +341,11 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 			if len(reps) == 0 {
 				continue
 			}
-
+			adapCodecs := adap.SelectAttrValue("codecs", "")
 			for _, rep := range reps {
 				repID := rep.SelectAttrValue("id", "")
 				bandwidth := rep.SelectAttrValue("bandwidth", "")
-				codecs := rep.SelectAttrValue("codecs", "")
+				codecs := rep.SelectAttrValue("codecs", adapCodecs)
 				resolution := ""
 				if contentType == "video" {
 					width := rep.SelectAttrValue("width", "")
@@ -364,8 +364,8 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 				case "audio":
 					lang := adap.SelectAttrValue("lang", "und")
 					masterBuilder.WriteString(fmt.Sprintf(
-						`#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
-						groupID, lang, lang, tvgId, userToken, playlistName))
+						`#EXT-X-MEDIA:TYPE=AUDIO,CODECS="%s",GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
+						codecs, groupID, lang, lang, tvgId, userToken, playlistName))
 				default:
 					line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s,%s",AUDIO="audio"`,
 						bandwidth, resolution, codecs, audioCodecs)
