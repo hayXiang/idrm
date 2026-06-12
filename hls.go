@@ -288,36 +288,6 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 		subtitleExists := periodHasSubtitle(period)
 		adaps := period.FindElements("AdaptationSet")
 
-		// 1. 创建一个 map 用来记录已经存在、防止重复的 codec
-		existingCodecs := make(map[string]bool)
-		var audioCodecs string
-
-		for _, adap := range adaps {
-			mimeType := adap.SelectAttrValue("mimeType", "")
-			if strings.HasPrefix(mimeType, "audio") {
-				codecs := adap.SelectAttrValue("codecs", "")
-				if codecs == "" {
-					reps := adap.FindElements("Representation")
-					for _, rep := range reps {
-						codecs = rep.SelectAttrValue("codecs", "")
-						break
-					}
-				}
-				if codecs != "" {
-				// 2. 检查 map 中是否已经包含当前 codecs
-					if !existingCodecs[codecs] {
-						existingCodecs[codecs] = true // 标记为已存在
-						
-						if audioCodecs != "" {
-							audioCodecs += ","
-						}
-						audioCodecs += codecs
-					}
-				}
-			}
-						
-		}
-
 		for _, adap := range adaps {
 			maxDuration := GetMaxSegmentDurationInt(adap)
 			contentType := adap.SelectAttrValue("contentType", "")
@@ -342,14 +312,16 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 				continue
 			}
 			adapCodecs := adap.SelectAttrValue("codecs", "")
+			adapWidth := adap.SelectAttrValue("width", "")
+			adapHeight := adap.SelectAttrValue("height", "")
 			for _, rep := range reps {
 				repID := rep.SelectAttrValue("id", "")
 				bandwidth := rep.SelectAttrValue("bandwidth", "")
 				codecs := rep.SelectAttrValue("codecs", adapCodecs)
 				resolution := ""
 				if contentType == "video" {
-					width := rep.SelectAttrValue("width", "")
-					height := rep.SelectAttrValue("height", "")
+					width := rep.SelectAttrValue("width", adapWidth)
+					height := rep.SelectAttrValue("height", adapHeight)
 					resolution = fmt.Sprintf("%sx%s", width, height)
 				}
 
@@ -367,8 +339,8 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 						`#EXT-X-MEDIA:TYPE=AUDIO,CODECS="%s",GROUP-ID="%s",LANGUAGE="%s",NAME="%s",AUTOSELECT=YES,DEFAULT=YES,URI="/drm/proxy/hls/%s/%s/%s"`+"\n",
 						codecs, groupID, lang, lang, tvgId, userToken, playlistName))
 				default:
-					line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s,%s",AUDIO="audio"`,
-						bandwidth, resolution, codecs, audioCodecs)
+					line := fmt.Sprintf(`#EXT-X-STREAM-INF:BANDWIDTH=%s,RESOLUTION=%s,CODECS="%s",AUDIO="audio"`,
+						bandwidth, resolution, codecs)
 					if subtitleExists {
 						line += `,SUBTITLES="subs"`
 					}
@@ -500,12 +472,81 @@ func DashToHLS(mpdUrl string, body []byte, tvgId string, bestQuality bool, userT
 		}
 	}
 
+	master_m3u8 := ""
 	if bestQuality {
-		hlsMap["master.m3u8"] = filterHighestAV(masterBuilder.String())
+		master_m3u8 = filterHighestAV(masterBuilder.String())		
 	} else {
-		hlsMap["master.m3u8"] = masterBuilder.String()
+		master_m3u8 = masterBuilder.String()
 	}
+	hlsMap["master.m3u8"] = appendVideoCodecs(master_m3u8, extractAudioCodecs(master_m3u8))
 	return media_type, hlsMap, nil
+}
+
+func extractAudioCodecs(masterM3u8 string) []string {
+	var audioCodecs []string
+	lines := strings.Split(masterM3u8, "\n")
+	
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// 查找包含音频信息的标签
+		if strings.HasPrefix(line, "#EXT-X-MEDIA:TYPE=AUDIO") {
+			if strings.Contains(line, "CODECS=") {
+				// 简单的字符串提取逻辑（实际开发建议用正则表达式或 m3u8 解析库）
+				parts := strings.Split(line, "CODECS=\"")
+				if len(parts) > 1 {
+					codecStr := strings.Split(parts[1], "\"")[0]
+					audioCodecs = append(audioCodecs, strings.TrimSpace(codecStr))
+				}
+			}
+		}
+	}
+	return audioCodecs
+}
+
+// appendVideoCodecs 在 M3U8 文本中保留原有编码，并批量追加新的 Video Codecs
+func appendVideoCodecs(m3u8Content string, newCodecs []string) string {
+	lines := strings.Split(m3u8Content, "\n")
+	m3u8Builder := strings.Builder{}
+
+	for _, line := range lines {
+		trimmedLine := strings.TrimSpace(line)
+		
+		// 仅处理包含视频流信息的标签
+		if strings.HasPrefix(trimmedLine, "#EXT-X-STREAM-INF") && strings.Contains(trimmedLine, "CODECS=") {
+			// 1. 提取当前的 CODECS 字符串 (格式通常为 CODECS="avc1.42e00a,mp4a.40.2")
+			parts := strings.Split(trimmedLine, "CODECS=\"")
+			if len(parts) > 1 {
+				codecStr := strings.Split(parts[1], "\"")[0]
+				
+				// 2. 将原有编码按逗号拆分，并放入 map 中进行去重
+				existingCodecMap := make(map[string]bool)
+				var finalCodecs []string
+				
+				for _, codec := range strings.Split(codecStr, ",") {
+					c := strings.TrimSpace(codec)
+					if c != "" && !existingCodecMap[c] {
+						existingCodecMap[c] = true
+						finalCodecs = append(finalCodecs, c)
+					}
+				}
+				
+				// 3. 遍历传入的新 codec 数组，追加未存在的编码
+				for _, newCodec := range newCodecs {
+					nc := strings.TrimSpace(newCodec)
+					if nc != "" && !existingCodecMap[nc] {
+						existingCodecMap[nc] = true
+						finalCodecs = append(finalCodecs, nc)
+					}
+				}
+				
+				// 4. 重新拼接该行
+				newCodecStr := strings.Join(finalCodecs, ",")
+				line = strings.Replace(trimmedLine, codecStr, newCodecStr, 1)
+			}
+		}
+		m3u8Builder.WriteString(line + "\n")
+	}
+	return m3u8Builder.String()
 }
 
 func preloadSegments(provider string, tvgID string, segmentURLs []string, initM4sUrl string) {
